@@ -1,6 +1,10 @@
 -- Businesses: slug rules, time zone validation and the public profile RPC.
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
+-- bare search_path, so both are set explicitly (locally this is a no-op).
+set local role postgres;
+set local search_path = public, extensions;
 select plan(12);
 
 insert into public.businesses (id, slug, name, vertical, timezone, theme, booking_enabled) values
@@ -66,7 +70,7 @@ select is_empty(
   'a business with online booking disabled is not public'
 );
 
-reset role;
+set local role postgres;
 
 select is(
   pg_get_function_result('public.public_business_profile(text)'::regprocedure),

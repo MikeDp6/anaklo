@@ -2,6 +2,10 @@
 -- rejects cross-tenant references even for roles that bypass RLS.
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
+-- bare search_path, so both are set explicitly (locally this is a no-op).
+set local role postgres;
+set local search_path = public, extensions;
 select plan(18);
 
 -- ---------------------------------------------------------------------------------------------
@@ -104,7 +108,7 @@ select throws_ok(
   'events cannot be deleted through the API'
 );
 
-reset role;
+set local role postgres;
 
 -- ---------------------------------------------------------------------------------------------
 -- Staff member of A (not owner)
@@ -135,7 +139,7 @@ select is(
   'staff can find the clients of their own business (quick-add)'
 );
 
-reset role;
+set local role postgres;
 
 select is(
   (select full_name from public.clients where id = 'b3000000-0000-4000-8000-000000000001'),
@@ -161,7 +165,7 @@ select throws_ok(
   'anon cannot read clients'
 );
 
-reset role;
+set local role postgres;
 
 -- ---------------------------------------------------------------------------------------------
 -- Cross-tenant references are impossible even when RLS is bypassed
@@ -195,7 +199,7 @@ select throws_ok(
   'service_role: staff of A cannot be linked to a service of B'
 );
 
-reset role;
+set local role postgres;
 
 select * from finish();
 rollback;

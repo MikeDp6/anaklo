@@ -1,6 +1,10 @@
 -- Appointments: double-booking constraint, status transitions and corrections, event history.
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
+-- bare search_path, so both are set explicitly (locally this is a no-op).
+set local role postgres;
+set local search_path = public, extensions;
 select plan(27);
 
 -- ---------------------------------------------------------------------------------------------

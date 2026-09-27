@@ -25,6 +25,7 @@
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
+    "db:test:dev": "supabase test db --linked",
     "db:push": "supabase db push",
     "db:reset:dev": "node scripts/db-reset-dev.mjs",
     "gen:types": "node scripts/gen-types.mjs",

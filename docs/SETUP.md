@@ -64,6 +64,7 @@ npx supabase link --project-ref <DEV_REF>
 |---|---|
 | Νέο migration | `npm run db:push` |
 | Άλλαξε migration που έχει ήδη σταλεί (επιτρέπεται μόνο πριν μπουν πραγματικά δεδομένα) | `npm run db:reset:dev` |
+| Έλεγχος ότι το dev στήθηκε σωστά (pgTAP στο remote, όλα γίνονται rollback) | `npm run db:test:dev` |
 
 Το `db:reset:dev` ξαναχτίζει τη remote dev βάση από το μηδέν. Αρνείται να τρέξει αν το συνδεδεμένο project δεν είναι το dev.
 

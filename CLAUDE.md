@@ -38,6 +38,7 @@ npm run db:reset     # migrations + seed στην τοπική βάση
 npm run db:test      # pgTAP
 npm run db:push      # ΝΕΑ migrations στο συνδεδεμένο (remote) project
 npm run db:reset:dev # ξαναχτίζει τη remote DEV βάση (μόνο πριν τα πραγματικά δεδομένα)
+npm run db:test:dev  # pgTAP πάνω στη remote DEV βάση (rollback, δεν αφήνει δεδομένα)
 npm run gen:types    # τύποι βάσης → src/shared/lib/database.types.ts (μετά από κάθε αλλαγή σχήματος)
 npm run check:types  # αποτυγχάνει αν οι τύποι δεν ταιριάζουν με την τοπική βάση (τρέχει στο CI)
 ```

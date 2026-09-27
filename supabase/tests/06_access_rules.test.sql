@@ -2,6 +2,10 @@
 -- records as evidence, and what staff may see of their own time off.
 begin;
 create extension if not exists pgtap with schema extensions;
+-- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
+-- bare search_path, so both are set explicitly (locally this is a no-op).
+set local role postgres;
+set local search_path = public, extensions;
 select plan(20);
 
 -- ---------------------------------------------------------------------------------------------
@@ -84,7 +88,7 @@ select results_eq(
   'staff sees the reason of their own time off only'
 );
 
-reset role;
+set local role postgres;
 
 -- The owner of A removes U from A (as postgres, standing in for an MFA-verified owner).
 delete from public.business_members
@@ -98,7 +102,7 @@ select lives_ok(
   'a removed member may issue a delete (RLS makes it a no-op; checked below)'
 );
 
-reset role;
+set local role postgres;
 
 select is(
   (select count(*) from public.client_notes where id = 'f4000000-0000-4000-8000-0000000000a1'),
@@ -133,7 +137,7 @@ select lives_ok(
   'an owner with MFA (aal2) can add a member'
 );
 
-reset role;
+set local role postgres;
 
 set constraints all immediate;
 
@@ -218,7 +222,7 @@ select lives_ok(
   'a member can create a client with the allowed fields'
 );
 
-reset role;
+set local role postgres;
 
 select * from finish();
 rollback;
