@@ -19,7 +19,12 @@ Booking → Memory → Retention. Πρώτος κλάδος: **κουρεία**.
 - Styling: **CSS variables (design tokens) + CSS modules**. ΟΧΙ Tailwind.
 - Supabase (Postgres + RLS, Auth μόνο για προσωπικό, Storage, Realtime, Edge Functions, pg_cron), **EU** (dev: `anaklo-dev`, eu-west-1 Ιρλανδία), ξεχωριστό project. Ποτέ άλλο project του λογαριασμού.
 - Διαθεσιμότητα και κράτηση: **SQL functions** (ADR-0003). Edge Functions μόνο για παρενέργειες (OTP, SMS, push, email).
-- OneSignal (push **μόνο προσωπικού**), πάροχος SMS (TBD), Resend (email), Sentry (EU).
+- Push **μόνο προσωπικού** (ADR-0010, proposed): OneSignal αν περάσει η δοκιμή του 1.1 σε PWA εγκατεστημένη στην αρχική οθόνη iPhone, αλλιώς Web Push (VAPID). Πάροχος SMS (επιλογή στη Φάση 1, κριτήρια SPEC §18), Resend (email, EU), Sentry (EU).
+- Hosting: **Cloudflare Workers**: static assets + **ένας** Worker (`edge/`, από το 1.1) για σελίδα κράτησης, `/app`, `/<slug>` (Open Graph) και σκληρυμένο `/api` proxy που κατέχει το cookie της έμπιστης συσκευής (ADR-0008). Domains `anaklo.gr` / `dev.anaklo.gr`.
+- Σύνδεση προσωπικού (ADR-0009): κωδικός email 6 ψηφίων, signup κλειστό. Owner/manager: κωδικός email + εφαρμογή κωδικών (TOTP, από το 1.7) σε κάθε νέα σύνδεση, υποχρεωτική πρόταση 2ης συσκευής, επαναφορά μόνο από τη Nous (runbook `mfa-reset.md`), συνεδρία λήγει μετά από 30 ημέρες αδράνειας («Inactivity timeout» 720h στο prod και φύλακας στην εφαρμογή, γιατί το Free δεν το έχει)· staff μόνο κωδικός email, ποτέ TOTP· στο UI ποτέ «TOTP/MFA/2FA» (Vitest στις τιμές i18n).
+- Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.logout()` (κοινά κινητά)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
+- **Χωρίς Realtime στη Φάση 1:** refetch on focus και κάθε 60″, μαζί με push.
+- Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.9).
 - PWA πρώτα. Native (Capacitor) μόνο αν αποφασιστεί ρητά.
 
 ## Εντολές
@@ -61,7 +66,7 @@ supabase/tests/       pgTAP (*.test.sql)
 supabase/functions/_shared/  κώδικας κοινός web + Edge Functions (Deno): money, dates, phone, sms,
                       sms-templates, domain (+ Vitest tests). Alias `@fn-shared`, imports με `.ts`.
 e2e/                  Playwright
-docs/                 SPEC.md, adr/, SETUP.md, runbooks/
+docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
 ```
 
 ## Κανόνες κώδικα (υποχρεωτικοί)
@@ -72,7 +77,7 @@ docs/                 SPEC.md, adr/, SETUP.md, runbooks/
 5. **Χρήματα:** πάντα integer cents, μόνο μέσω `money.ts`. Ποτέ float.
 6. **Ημερομηνίες:** `timestamptz` (UTC) στη βάση· εμφάνιση στη ζώνη `businesses.timezone` μέσω `dates.ts`. **Ποτέ καρφωτό `Europe/Athens`.** Ωράρια = τοπικές ώρες.
 7. **Τηλέφωνα:** E.164 (`+3069…`) μόνο μέσω `phone.ts`. Το τηλέφωνο **δεν** είναι μοναδικό κλειδί πελάτη.
-8. **Καμία καρφωτή φράση UI**, ούτε σε SMS/email/push/validation — όλα i18n. Εξαίρεση θέσης: τα κείμενα SMS ζουν στο `supabase/functions/_shared/sms-templates.ts` (el/en), γιατί τα στέλνουν οι Edge Functions.
+8. **Καμία καρφωτή φράση UI**, ούτε σε SMS/email/push/validation — όλα i18n. Εξαιρέσεις θέσης: τα κείμενα SMS στο `supabase/functions/_shared/sms-templates.ts` (ADR-0007), τα κείμενα push στο `supabase/functions/_shared/push-templates.ts` (ADR-0010, από το 1.5a) και τα κείμενα των email ασφαλείας στο `supabase/functions/_shared/security-email-templates.ts` (ADR-0009, από το 1.9), el/en με test el = en, γιατί τα στέλνουν οι Edge Functions· το στατικό δίγλωσσο πρότυπο του email σύνδεσης στο `supabase/templates/` (ADR-0009 §6), γιατί το στέλνει το Auth, μέχρι το Send Email Hook.
 9. **SMS μόνο μέσω `renderSms`/`prepareSms`:** μετατροπή σε GSM-7 (ελληνικά σε κεφαλαία χωρίς τόνους, look-alike → λατινικά· τα λατινικά/links μένουν ίδια), χωρίς €. Κάθε πρότυπο έχει τεστ ότι με τις μεγαλύτερες τιμές βγαίνει **1 SMS** και το link φτάνει byte-byte.
 10. Components < ~200 γραμμές. Αν μεγαλώνουν, σπάσ' τα.
 11. **Configuration, όχι forks:** καμία λογική τύπου `if (business.slug === '…')`. Οι διαφορές πάνε σε `settings`/`theme`/πρότυπα κλάδου.
@@ -87,12 +92,13 @@ docs/                 SPEC.md, adr/, SETUP.md, runbooks/
 - Κάθε πίνακας επιχείρησης έχει `business_id not null`. Κάθε γονικός έχει `unique (business_id, id)` και κάθε αναφορά είναι **σύνθετο FK** `(business_id, x_id)`.
 - Πολιτικές RLS στη μορφή `business_id in (select private.my_business_ids())` / `private.my_business_ids_with_role(array[...])` / `staff_id in (select private.my_staff_ids())` (υπολογίζονται μία φορά ανά ερώτημα).
 - **Μοτίβο RPC:** η λογική σε `private.<name>_impl` (SECURITY DEFINER, `set search_path = ''`, κάνει η ίδια ελέγχους μέλους/ρόλου)· το API βλέπει λεπτό wrapper στο `public` (SECURITY INVOKER) με ρητό `GRANT EXECUTE` ανά ρόλο. Καμία SECURITY DEFINER function στο `public`. `EXECUTE` κλειστό για PUBLIC (και global).
-- RPCs/jobs/seed/tests δηλώνουν ποιος ενεργεί: `set_config('anaklo.actor_type', 'client'|'system'|'import', true)`. Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη, η εγγραφή ραντεβού **αποτυγχάνει** (ποτέ σιωπηρό `system`).
+- Ποιος ενεργεί (`anaklo.actor_type`, με `set_config(…, true)` μέσα στο `_impl`): οι RPCs κράτησης/διαχείρισης για πελάτες `client`· τα cron jobs `system`· ο importer `import`· seed και fixtures των tests `system`. Οι RPCs του `authenticated` **δεν** δηλώνουν τίποτα (→ `staff`) και ποτέ `system`. Edge Functions και scripts γράφουν ραντεβού μόνο μέσω RPC που δηλώνει actor. Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη → `42501`· άγνωστη τιμή → `22023` (ποτέ σιωπηρό `system`).
 - Ο έλεγχος ρόλου/ποσών ζει στη definer `_impl`, ποτέ μόνο στο wrapper.
-- Στήλες που δεν αλλάζουν από την εφαρμογή → UPDATE **ανά στήλη** (π.χ. `businesses`: όχι slug/timezone/currency/vertical, μόνο με RPC του owner).
+- Κρίσιμες ενέργειες (ανωνυμοποίηση, μέλη/ρόλοι/owner, slug/ζώνη/νόμισμα, εξαγωγή, συσκευές κωδικών, απενεργοποίηση επιχείρησης) → `private.require_fresh_totp()` μέσα στο `_impl` (aal2 + `totp` στο `amr` ≤ 5′, hints `aal2_required`/`fresh_totp_required`)· ποτέ μόνο στο UI· όχι σε καθημερινές ενέργειες. `business_members` αλλάζει μόνο μέσω RPC.
+- Στήλες που δεν αλλάζουν από την εφαρμογή → UPDATE **ανά στήλη** (π.χ. `businesses`: όχι slug/timezone/currency/vertical· τα τρία πρώτα μόνο με RPC του owner με φρέσκο κωδικό, `change_business_identity` στο 1.7· το vertical μόνο στη δημιουργία).
 - Ωράρια/εξαιρέσεις: exclusion constraints κατά επικάλυψης. `time_off.reason` ουδέτερο (ποτέ δεδομένα υγείας).
 - Online κράτηση ⇔ `verified_via` (otp|trusted_device). `clients.phone_verified_at` το γράφει μόνο η ροή OTP.
-- Signup κλειστό: λογαριασμοί μόνο με πρόσκληση/onboarding.
+- Signup κλειστό: λογαριασμοί μόνο με provisioning της Nous, πρόσκληση από owner με φρέσκο κωδικό (1.7) ή onboarding (Φάση 5).
 - Καταστάσεις/τύποι ως `text` + `CHECK`, όχι Postgres enums. Οι λίστες τιμών ζουν και στο `_shared/domain.ts` (test ελέγχει ότι ταιριάζουν).
 - `appointments`: exclusion constraint (btree_gist) κατά διπλοκράτησης για status `booked|confirmed`.
 - **`appointment_events` από την πρώτη μέρα:** trigger σε INSERT και σε αλλαγή status/ώρας/επαγγελματία. Μόνο INSERT, χωρίς προσωπικά στοιχεία.
@@ -100,7 +106,7 @@ docs/                 SPEC.md, adr/, SETUP.md, runbooks/
 - Συναινέσεις στο `client_consents` με `legal_basis` (όχι boolean). Μάρκετινγκ **μόνο** με νόμιμη βάση. Η εισαγωγή πελατών δεν δημιουργεί ποτέ συναίνεση **μάρκετινγκ** (CHECK στη βάση). Μια συναίνεση δεν αλλάζει ποτέ, μόνο ανακαλείται μία φορά (trigger σε κάθε UPDATE, και για `service_role`· μόνη εξαίρεση το `created_by → null` όταν σβήνεται ο λογαριασμός).
 - Λογική «μνήμης» σε **μία** SQL function (`private.client_memory_impl(business_id, as_of)` + public wrapper), με pgTAP. Όχι materialized view. Κανόνες: SPEC §4.
 - Expand/contract: πρώτα προσθέτεις, αφαιρείς σε επόμενη έκδοση. Σειρά deploy: migration → Edge Functions → frontend.
-- Ο χρήστης εφαρμόζει τα migrations στο remote. Όταν φτιάχνεις migration, **πες του ρητά**: νέο migration → `npm run db:push`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev`· και αν χρειάζεται redeploy Edge Function.
+- Ο χρήστης εφαρμόζει τα migrations στο remote. Όταν φτιάχνεις migration, **πες του ρητά**: νέο migration → `npm run db:push` και, από το 1.1, `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev` → `npm run secrets:dev` → `npm run provision:dev` → `npm run db:test:dev` → `npm run deploy:dev` (τα secrets/provision/deploy υπάρχουν από το 1.1· το reset σβήνει τα δεδομένα του provisioning και ίσως το Vault). Το `deploy:dev` ανεβάζει και τις Edge Functions και τον Worker.
 
 ## Δοκιμές
 - Vitest (UTC μέσω `vitest.config.ts`, όχι `TZ=` στο script): money/dates/phone/sms (1 SMS/πρότυπο), λίστες τιμών = CHECK, i18n el = en, schemas, λογική UI.

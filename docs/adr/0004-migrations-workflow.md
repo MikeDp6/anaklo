@@ -23,7 +23,7 @@
 2. **Ονόματα αρχείων:** αριθμημένα `0001_<name>.sql`. Δεν τα ανακατεύουμε με timestamps.
 3. **Μέχρι να μπουν τα πρώτα πραγματικά δεδομένα** τα migrations αλλάζουν ελεύθερα:
    - Τοπικά ξαναχτίζεις με `db:reset`.
-   - Στο remote dev, ένα migration που έχει ήδη σταλεί **δεν** ξαναστέλνεται με `db:push`, γιατί το push κρίνει μόνο από τον αριθμό έκδοσης και το προσπερνά αθόρυβα. Εκεί χρειάζεται `npm run db:reset:dev` (`supabase db reset --linked`). Το script αρνείται να τρέξει αν το συνδεδεμένο project δεν είναι το `SUPABASE_DEV_PROJECT_REF`.
+   - Στο remote dev, ένα migration που έχει ήδη σταλεί **δεν** ξαναστέλνεται με `db:push`, γιατί το push κρίνει μόνο από τον αριθμό έκδοσης και το προσπερνά αθόρυβα. Εκεί χρειάζεται `npm run db:reset:dev` (`supabase db reset --linked`). Το script αρνείται να τρέξει αν το συνδεδεμένο project δεν είναι το `SUPABASE_DEV_PROJECT_REF`. Από τη Φάση 1 ακολουθούν `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev` (πλάνο Φάσης 1, «Migrations»).
    - Πριν μπουν πραγματικά δεδομένα: squash σε ένα baseline (`0001_baseline.sql`), ξαναχτίζεται το dev (ή `supabase migration repair` για το ιστορικό) και γίνεται το πρώτο push στο prod.
    - Από εκεί και πέρα τα migrations είναι **αμετάβλητα**.
 4. Κάθε νέος πίνακας έρχεται στο ίδιο αρχείο με το RLS, τις πολιτικές και τα ρητά GRANT του.
@@ -44,5 +44,5 @@
 9. Το `seed.sql` περιέχει μόνο συνθετικά δεδομένα (επιχείρηση «demo-barber») και δεν στέλνεται ποτέ στο prod.
 
 ## Συνέπειες
-- Όταν γράφεται ένα migration, ο χρήστης ενημερώνεται: «τρέξε `npm run db:push`».
+- Όταν γράφεται ένα migration, ο χρήστης ενημερώνεται: νέο migration → «τρέξε `npm run db:push`» και, από το 1.1, `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev` με τη σειρά του σημείου 3.
 - Backups: 7 ημέρες στο Pro, προαιρετικά και εβδομαδιαίο κρυπτογραφημένο dump. Όχι «30 ημέρες» στο πλάνο του Supabase.

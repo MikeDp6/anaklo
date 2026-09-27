@@ -12,13 +12,14 @@
   - ότι η επιχείρηση έχει `booking_enabled`
   - ότι αγνοούνται οι ανενεργοί επαγγελματίες και οι ανενεργές υπηρεσίες
 - `book_appointment(...)`: η λογική σε SECURITY DEFINER impl. Το wrapper εκτελείται μόνο από `service_role` (Edge Function OTP) και, σε λειτουργία προσωπικού, από `authenticated` με έλεγχο ρόλου.
-  - Κλείνει advisory lock ανά επιχείρηση + τοπική ημέρα.
+  - Παίρνει advisory lock ανά επιχείρηση + τοπική ημέρα.
   - Καλεί την ίδια λογική για να ξαναελέγξει ότι η ώρα είναι διαθέσιμη.
   - Υπολογίζει διάρκεια και τιμή στον server.
   - Σέβεται το idempotency key.
   - Κάνει το insert.
   - Αν χτυπήσει το exclusion constraint (`23P01`), το μετατρέπει σε «η ώρα μόλις κλείστηκε».
 - Η δημόσια κράτηση περνά πρώτα από την Edge Function OTP/έμπιστης συσκευής (ADR-0006), που μετά καλεί το `book_appointment`. Το `anon` **δεν** έχει `EXECUTE` στο `book_appointment`.
+- **Τροποποίηση (πλάνο Φάσης 1, D10):** το wrapper του `book_appointment` χωρίζεται σε δύο. Το `public.book_appointment` το εκτελεί **μόνο** το `service_role` (online κράτηση μέσω της Edge Function). Η κράτηση προσωπικού γίνεται με το `public.staff_book_appointment` του `authenticated`, με έλεγχο ρόλου στο `_impl`. Και τα δύο περνούν από την ίδια λογική κράτησης, με τα παραπάνω βήματα.
 - Όλη η λογική ώρας γίνεται με `AT TIME ZONE businesses.timezone`:
   - κάθε τοπικό διάστημα μετατρέπεται μία φορά ανά ημερομηνία
   - τα slots μπαίνουν σε τοπικό πλέγμα
