@@ -1,0 +1,40 @@
+# dependencies & build
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# tests
+playwright-report/
+test-results/
+blob-report/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# NEVER commit real client data (exports, dumps, imports)
+*.csv
+*.xls
+*.xlsx
+*.vcf
+*.dump
+*.sql.gz
+dumps/
+imports/
+exports/
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

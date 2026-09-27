@@ -1,0 +1,28 @@
+{
+  "app": {
+    "name": "Anaklo",
+    "tagline": "Not just an appointment book. It remembers every client."
+  },
+  "common": {
+    "retry": "Try again",
+    "loading": "Loading…"
+  },
+  "landing": {
+    "body": "Appointments and a smart client book for barbershops, hair salons and beauty centres."
+  },
+  "booking": {
+    "comingSoon": "Online booking opens soon.",
+    "notFoundTitle": "Booking page not found",
+    "notFoundBody": "Check the link or ask the business for it.",
+    "errorTitle": "The page did not load",
+    "errorBody": "Check your connection and try again."
+  },
+  "pro": {
+    "todayTitle": "Today",
+    "todayPlaceholder": "Here you will see today's appointments, the gaps and which clients are overdue."
+  },
+  "errors": {
+    "pageNotFoundTitle": "This page does not exist",
+    "pageNotFoundBody": "The link you followed leads nowhere."
+  }
+}

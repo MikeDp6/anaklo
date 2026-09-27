@@ -1,0 +1,12 @@
+{
+  "name": "Anaklo",
+  "short_name": "Anaklo",
+  "id": "/app/",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#1f3a5f",
+  "lang": "el",
+  "icons": [{ "src": "/app/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

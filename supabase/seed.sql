@@ -1,0 +1,104 @@
+-- seed.sql — LOCAL/DEV ONLY. 100% synthetic data for the fictional business "demo-barber".
+-- Never put real client data here (CLAUDE.md > Git). Phone numbers use the reserved-looking
+-- +30 6900 000 xxx range and are not meant to receive SMS.
+
+do $$
+declare
+  v_business uuid := '00000000-0000-4000-8000-000000000001';
+  v_tz text := 'Europe/Athens';
+  v_nikos uuid := '00000000-0000-4000-8000-000000000101';
+  v_alex uuid := '00000000-0000-4000-8000-000000000102';
+  v_cat_hair uuid := '00000000-0000-4000-8000-000000000201';
+  v_cat_beard uuid := '00000000-0000-4000-8000-000000000202';
+  v_cut uuid := '00000000-0000-4000-8000-000000000301';
+  v_cut_beard uuid := '00000000-0000-4000-8000-000000000302';
+  v_beard uuid := '00000000-0000-4000-8000-000000000303';
+  v_kids uuid := '00000000-0000-4000-8000-000000000304';
+  v_day date;
+  v_client uuid;
+  v_i int;
+begin
+  insert into public.businesses (id, slug, name, vertical, timezone, phone_e164, booking_enabled, theme)
+  values (
+    v_business, 'demo-barber', 'Demo Barber', 'barber', v_tz, '+302610000000', true,
+    '{"primary": "#C8A15A", "accent": "#1F1F1F", "surface": "dark", "radius": 16, "font": "manrope"}'
+  );
+
+  insert into public.staff (id, business_id, display_name, color, sort) values
+    (v_nikos, v_business, 'Νίκος', '#C8A15A', 0),
+    (v_alex, v_business, 'Άλεξ', '#4F7CAC', 1);
+
+  insert into public.service_categories (id, business_id, name, sort) values
+    (v_cat_hair, v_business, 'Μαλλιά', 0),
+    (v_cat_beard, v_business, 'Γένια', 1);
+
+  insert into public.services (id, business_id, category_id, name, duration_min, buffer_after_min, price_cents, sort) values
+    (v_cut, v_business, v_cat_hair, 'Κούρεμα', 30, 5, 1300, 0),
+    (v_cut_beard, v_business, v_cat_hair, 'Κούρεμα + γένια', 45, 5, 1800, 1),
+    (v_beard, v_business, v_cat_beard, 'Γένια', 15, 0, 700, 2),
+    (v_kids, v_business, v_cat_hair, 'Παιδικό κούρεμα', 20, 5, 1000, 3);
+
+  insert into public.staff_services (business_id, staff_id, service_id, custom_duration_min)
+  select v_business, s.id, sv.id, case when s.id = v_alex and sv.id = v_cut then 35 end
+  from public.staff s cross join public.services sv
+  where s.business_id = v_business and sv.business_id = v_business;
+
+  -- Tuesday–Friday split shift, Saturday continuous (weekday: 0 = Sunday).
+  insert into public.working_hours (business_id, staff_id, weekday, start_time, end_time)
+  select v_business, s.id, d.weekday, d.start_time, d.end_time
+  from public.staff s
+  cross join (values
+    (2, time '09:00', time '14:00'), (2, time '17:00', time '21:00'),
+    (3, time '09:00', time '14:00'), (3, time '17:00', time '21:00'),
+    (4, time '09:00', time '14:00'), (4, time '17:00', time '21:00'),
+    (5, time '09:00', time '14:00'), (5, time '17:00', time '21:00'),
+    (6, time '09:00', time '16:00')
+  ) as d (weekday, start_time, end_time)
+  where s.business_id = v_business;
+
+  insert into public.schedule_exceptions (business_id, staff_id, local_date, kind, note) values
+    (v_business, null, date '2026-10-28', 'closed', 'Αργία');
+
+  -- Synthetic clients with visit histories of different rhythms, for the memory rules later.
+  for v_i in 1..12 loop
+    insert into public.clients (business_id, full_name, phone_e164, source)
+    values (
+      v_business,
+      (array['Γιώργος Π.', 'Κώστας Μ.', 'Δημήτρης Α.', 'Νίκος Σ.', 'Γιάννης Κ.', 'Παναγιώτης Λ.',
+             'Χρήστος Β.', 'Βασίλης Τ.', 'Θανάσης Ρ.', 'Μιχάλης Ζ.', 'Σπύρος Ε.', 'Άγγελος Φ.'])[v_i],
+      '+306900000' || lpad(v_i::text, 3, '0'),
+      'staff'
+    )
+    returning id into v_client;
+
+    -- visits every (21 + 3*i) days going back, completed
+    for v_day in
+      select (current_date - (n * (21 + 3 * v_i)))::date
+      from generate_series(1, 1 + (v_i % 6)) as n
+    loop
+      insert into public.appointments
+        (business_id, client_id, staff_id, starts_at, ends_at, status, source, total_cents, charged_cents)
+      values (
+        v_business, v_client, case when v_i % 2 = 0 then v_nikos else v_alex end,
+        -- each client has its own time of day, so same-day visits never overlap
+        (v_day + time '09:00' + v_i * interval '25 minutes') at time zone v_tz,
+        (v_day + time '09:30' + v_i * interval '25 minutes') at time zone v_tz,
+        'booked', 'phone', 1300, null
+      );
+    end loop;
+  end loop;
+
+  -- Past appointments become completed through a valid transition (booked -> completed).
+  update public.appointments
+  set status = 'completed', charged_cents = total_cents
+  where business_id = v_business and starts_at < now();
+
+  -- A few upcoming bookings.
+  insert into public.appointments (business_id, client_id, staff_id, starts_at, ends_at, status, source, total_cents)
+  select v_business, c.id, v_nikos,
+         ((current_date + 2) + make_time(10 + row_number() over () :: int, 0, 0)) at time zone v_tz,
+         ((current_date + 2) + make_time(10 + row_number() over () :: int, 30, 0)) at time zone v_tz,
+         'booked', 'online', 1300
+  from (select id from public.clients where business_id = v_business order by created_at limit 3) c;
+end;
+$$;

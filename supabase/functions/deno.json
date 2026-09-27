@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "zod/mini": "npm:zod@4.6.5/mini",
+    "date-fns": "npm:date-fns@4.4.0",
+    "date-fns/locale": "npm:date-fns@4.4.0/locale",
+    "@date-fns/tz": "npm:@date-fns/tz@1.5.0"
+  }
+}

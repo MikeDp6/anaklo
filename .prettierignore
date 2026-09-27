@@ -1,0 +1,8 @@
+dist
+coverage
+playwright-report
+test-results
+supabase/.temp
+src/shared/lib/database.types.ts
+package-lock.json
+*.md

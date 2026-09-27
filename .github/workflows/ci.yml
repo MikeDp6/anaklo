@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Lint, types, unit tests, build, size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci-build-placeholder
+      # postbuild scans the output for server keys (scripts/check-secrets.mjs)
+      - run: npm run size
+
+  database-e2e:
+    name: pgTAP + Playwright (local Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase (migrations + seed)
+        run: npx supabase start -x studio,imgproxy,logflare,vector,edge-runtime,mailpit,supavisor
+      - name: pgTAP
+        run: npx supabase test db
+      - name: Generated DB types are up to date
+        run: npm run check:types
+      - name: Expose local keys to Vite
+        run: |
+          npx supabase status -o json > supabase-status.json
+          node -e "const s=require('./supabase-status.json');console.log('VITE_SUPABASE_URL='+s.API_URL);console.log('VITE_SUPABASE_PUBLISHABLE_KEY='+s.PUBLISHABLE_KEY)" >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
