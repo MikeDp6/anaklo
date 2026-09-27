@@ -10,7 +10,8 @@ export const VERTICALS = ['barber', 'hair_salon', 'beauty'] as const
 export const LOCALES = ['el', 'en'] as const
 export const MEMBER_ROLES = ['owner', 'manager', 'staff'] as const
 export const EXCEPTION_KINDS = ['closed', 'open'] as const
-export const TIME_OFF_REASONS = ['vacation', 'sick', 'personal', 'other'] as const
+/** Neutral on purpose: no value may reveal health data (GDPR art. 9). */
+export const TIME_OFF_REASONS = ['vacation', 'leave', 'personal', 'other'] as const
 export const CLIENT_SOURCES = ['online', 'staff', 'import'] as const
 export const CONSENT_PURPOSES = [
   'marketing_sms',
@@ -29,6 +30,8 @@ export const APPOINTMENT_STATUSES = [
   'cancelled',
 ] as const
 export const APPOINTMENT_SOURCES = ['online', 'phone', 'walkin', 'staff', 'import'] as const
+/** How the client of an online booking proved the phone (ADR-0006). */
+export const VERIFIED_VIA = ['otp', 'trusted_device'] as const
 export const CANCELLED_BY = ['client', 'business', 'system'] as const
 export const CANCEL_REASONS = [
   'client_request',
@@ -77,6 +80,7 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   client_consents_given_by: CONSENT_GIVEN_BY,
   appointments_status: APPOINTMENT_STATUSES,
   appointments_source: APPOINTMENT_SOURCES,
+  appointments_verified_via: VERIFIED_VIA,
   appointments_cancelled_by: CANCELLED_BY,
   appointments_cancel_reason: CANCEL_REASONS,
   appointment_events_event: APPOINTMENT_EVENTS,

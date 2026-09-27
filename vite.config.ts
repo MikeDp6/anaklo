@@ -75,7 +75,9 @@ export default defineConfig(({ command, mode }) => {
     build: {
       target: 'es2022',
       manifest: true,
-      sourcemap: true,
+      // Maps are generated for Sentry but never referenced from the bundles. With Sentry
+      // (Phase 1) they are uploaded at build time and deleted from dist before deploy.
+      sourcemap: 'hidden',
       rolldownOptions: {
         input: {
           booking: fileURLToPath(new URL('./index.html', import.meta.url)),

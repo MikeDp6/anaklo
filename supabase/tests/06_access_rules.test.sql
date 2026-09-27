@@ -6,7 +6,7 @@ create extension if not exists pgtap with schema extensions;
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(20);
+select plan(26);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres). U is staff in A and owner in B. O is the owner of A. X is an outsider.
@@ -44,7 +44,7 @@ values ('f5000000-0000-4000-8000-0000000000a1', 'f1000000-0000-4000-8000-0000000
         'f3000000-0000-4000-8000-0000000000a1', 'marketing_sms', 'consent', true, 'booking_form', 'v1', now(), now() - interval '1 day');
 
 insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason) values
-  ('f1000000-0000-4000-8000-00000000000a', 'f2000000-0000-4000-8000-0000000000a1', '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'sick'),
+  ('f1000000-0000-4000-8000-00000000000a', 'f2000000-0000-4000-8000-0000000000a1', '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'leave'),
   ('f1000000-0000-4000-8000-00000000000a', 'f2000000-0000-4000-8000-0000000000a2', '2026-11-12 00:00Z', '2026-11-13 00:00Z', 'vacation');
 
 -- ---------------------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ select lives_ok(
 -- Staff sees their own time off (with reason), never a colleague's.
 select results_eq(
   $$select reason from public.time_off$$,
-  $$values ('sick'::text)$$,
+  $$values ('leave'::text)$$,
   'staff sees the reason of their own time off only'
 );
 
@@ -188,6 +188,68 @@ select ok(
   (select withdrawn_at > now() - interval '1 minute' from public.client_consents
    where id = 'f5000000-0000-4000-8000-0000000000a2'),
   'a withdrawal is always stamped with the current time'
+);
+
+-- The guard binds every role and every column, not only the API's withdrawn_at.
+insert into public.client_consents (id, business_id, client_id, purpose, legal_basis, granted, source, policy_version)
+values ('f5000000-0000-4000-8000-0000000000a3', 'f1000000-0000-4000-8000-00000000000a',
+        'f3000000-0000-4000-8000-0000000000a1', 'photos_publish', 'consent', true, 'staff_ui', 'v1');
+
+set local role service_role;
+
+select throws_ok(
+  $$update public.client_consents set purpose = 'photos_record', granted = false
+    where id = 'f5000000-0000-4000-8000-0000000000a3'$$,
+  '23514', null,
+  'a consent record cannot be rewritten, not even by the service role'
+);
+
+select throws_ok(
+  $$update public.client_consents set withdrawn_at = now(), created_at = now() - interval '1 year'
+    where id = 'f5000000-0000-4000-8000-0000000000a3'$$,
+  '23514', null,
+  'a withdrawal cannot carry other changes along (e.g. backdating the grant)'
+);
+
+set local role postgres;
+
+select is(
+  (select purpose || ' / ' || granted || ' / ' || (withdrawn_at is null) from public.client_consents
+   where id = 'f5000000-0000-4000-8000-0000000000a3'),
+  'photos_publish / true / true',
+  'the consent record is unchanged'
+);
+
+-- Deleting the account that recorded a consent: the FK clears created_by, the record stays.
+insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('f0000000-0000-4000-8000-0000000000d1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'leaver-f@test.local', '{}', '{}', now(), now());
+
+insert into public.client_consents (id, business_id, client_id, purpose, legal_basis, granted, source, policy_version, created_by)
+values ('f5000000-0000-4000-8000-0000000000a4', 'f1000000-0000-4000-8000-00000000000a',
+        'f3000000-0000-4000-8000-0000000000a1', 'photos_record', 'consent', true, 'staff_ui', 'v1',
+        'f0000000-0000-4000-8000-0000000000d1');
+
+set local role service_role;
+
+select throws_ok(
+  $$update public.client_consents set created_by = 'f0000000-0000-4000-8000-00000000000a'
+    where id = 'f5000000-0000-4000-8000-0000000000a4'$$,
+  '23514', null,
+  'who recorded a consent cannot be reassigned'
+);
+
+set local role postgres;
+
+select lives_ok(
+  $$delete from auth.users where id = 'f0000000-0000-4000-8000-0000000000d1'$$,
+  'the account that recorded a consent can still be deleted'
+);
+
+select is(
+  (select coalesce(created_by::text, 'null') || ' / ' || purpose || ' / ' || (withdrawn_at is null)
+   from public.client_consents where id = 'f5000000-0000-4000-8000-0000000000a4'),
+  'null / photos_record / true',
+  'the consent survives the deletion; only the link to its author is cleared'
 );
 
 select throws_ok(

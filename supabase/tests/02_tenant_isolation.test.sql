@@ -6,6 +6,8 @@ create extension if not exists pgtap with schema extensions;
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
+-- Fixture appointments are written by the system (appointment writes must declare an actor).
+select set_config('anaklo.actor_type', 'system', true);
 select plan(18);
 
 -- ---------------------------------------------------------------------------------------------
@@ -45,7 +47,7 @@ insert into public.services (id, business_id, name, duration_min, price_cents) v
   ('b4000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 'B Cut', 30, 1500);
 
 insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason) values
-  ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'sick');
+  ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'leave');
 
 -- ---------------------------------------------------------------------------------------------
 -- Owner of A

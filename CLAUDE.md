@@ -87,19 +87,24 @@ docs/                 SPEC.md, adr/, SETUP.md, runbooks/
 - Κάθε πίνακας επιχείρησης έχει `business_id not null`. Κάθε γονικός έχει `unique (business_id, id)` και κάθε αναφορά είναι **σύνθετο FK** `(business_id, x_id)`.
 - Πολιτικές RLS στη μορφή `business_id in (select private.my_business_ids())` / `private.my_business_ids_with_role(array[...])` / `staff_id in (select private.my_staff_ids())` (υπολογίζονται μία φορά ανά ερώτημα).
 - **Μοτίβο RPC:** η λογική σε `private.<name>_impl` (SECURITY DEFINER, `set search_path = ''`, κάνει η ίδια ελέγχους μέλους/ρόλου)· το API βλέπει λεπτό wrapper στο `public` (SECURITY INVOKER) με ρητό `GRANT EXECUTE` ανά ρόλο. Καμία SECURITY DEFINER function στο `public`. `EXECUTE` κλειστό για PUBLIC (και global).
-- RPCs/jobs δηλώνουν ποιος ενεργεί: `set_config('anaklo.actor_type', 'client'|'system'|'import', true)`.
+- RPCs/jobs/seed/tests δηλώνουν ποιος ενεργεί: `set_config('anaklo.actor_type', 'client'|'system'|'import', true)`. Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη, η εγγραφή ραντεβού **αποτυγχάνει** (ποτέ σιωπηρό `system`).
+- Ο έλεγχος ρόλου/ποσών ζει στη definer `_impl`, ποτέ μόνο στο wrapper.
+- Στήλες που δεν αλλάζουν από την εφαρμογή → UPDATE **ανά στήλη** (π.χ. `businesses`: όχι slug/timezone/currency/vertical, μόνο με RPC του owner).
+- Ωράρια/εξαιρέσεις: exclusion constraints κατά επικάλυψης. `time_off.reason` ουδέτερο (ποτέ δεδομένα υγείας).
+- Online κράτηση ⇔ `verified_via` (otp|trusted_device). `clients.phone_verified_at` το γράφει μόνο η ροή OTP.
+- Signup κλειστό: λογαριασμοί μόνο με πρόσκληση/onboarding.
 - Καταστάσεις/τύποι ως `text` + `CHECK`, όχι Postgres enums. Οι λίστες τιμών ζουν και στο `_shared/domain.ts` (test ελέγχει ότι ταιριάζουν).
 - `appointments`: exclusion constraint (btree_gist) κατά διπλοκράτησης για status `booked|confirmed`.
 - **`appointment_events` από την πρώτη μέρα:** trigger σε INSERT και σε αλλαγή status/ώρας/επαγγελματία. Μόνο INSERT, χωρίς προσωπικά στοιχεία.
 - **Διαγραφή GDPR = ανωνυμοποίηση** (`erase_client`), όχι cascade delete. FK προς `clients` με `RESTRICT`.
-- Συναινέσεις στο `client_consents` με `legal_basis` (όχι boolean). Μάρκετινγκ **μόνο** με νόμιμη βάση. Η εισαγωγή πελατών δεν δημιουργεί ποτέ συναίνεση **μάρκετινγκ** (CHECK στη βάση).
+- Συναινέσεις στο `client_consents` με `legal_basis` (όχι boolean). Μάρκετινγκ **μόνο** με νόμιμη βάση. Η εισαγωγή πελατών δεν δημιουργεί ποτέ συναίνεση **μάρκετινγκ** (CHECK στη βάση). Μια συναίνεση δεν αλλάζει ποτέ, μόνο ανακαλείται μία φορά (trigger σε κάθε UPDATE, και για `service_role`· μόνη εξαίρεση το `created_by → null` όταν σβήνεται ο λογαριασμός).
 - Λογική «μνήμης» σε **μία** SQL function (`private.client_memory_impl(business_id, as_of)` + public wrapper), με pgTAP. Όχι materialized view. Κανόνες: SPEC §4.
 - Expand/contract: πρώτα προσθέτεις, αφαιρείς σε επόμενη έκδοση. Σειρά deploy: migration → Edge Functions → frontend.
 - Ο χρήστης εφαρμόζει τα migrations στο remote. Όταν φτιάχνεις migration, **πες του ρητά**: νέο migration → `npm run db:push`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev`· και αν χρειάζεται redeploy Edge Function.
 
 ## Δοκιμές
 - Vitest (UTC μέσω `vitest.config.ts`, όχι `TZ=` στο script): money/dates/phone/sms (1 SMS/πρότυπο), λίστες τιμών = CHECK, i18n el = en, schemas, λογική UI.
-- pgTAP: RLS και απομόνωση επιχειρήσεων (Α δεν διαβάζει/γράφει Β), allow-lists δικαιωμάτων (πίνακες & functions), σύνθετα FK, constraint διπλοκράτησης, μεταβάσεις/διορθώσεις κατάστασης, events, αναζήτηση, διαθεσιμότητα (DST, μεσάνυχτα, ρεπό, μισή μέρα, δεύτερη ζώνη), κράτηση, «μνήμη», ανωνυμοποίηση.
+- pgTAP: RLS και απομόνωση επιχειρήσεων (Α δεν διαβάζει/γράφει Β), allow-lists δικαιωμάτων (πίνακες, στήλες & functions), default privileges, σύνθετα FK, constraint διπλοκράτησης, επικαλύψεις ωραρίων, δηλωμένος actor, μεταβάσεις/διορθώσεις κατάστασης, events, αναζήτηση, διαθεσιμότητα (DST, μεσάνυχτα, ρεπό, μισή μέρα, δεύτερη ζώνη), κράτηση, «μνήμη», ανωνυμοποίηση.
 - Playwright (mobile viewport): Instagram → κράτηση → επιβεβαίωση · ακύρωση · γρήγορο ραντεβού/walk-in · άδεια με ραντεβού · (v1) at-risk → win-back · (Φάση 5) onboarding.
 - Νέα λειτουργία = νέα tests. Μην σβήνεις/χαλαρώνεις tests για να περάσουν.
 

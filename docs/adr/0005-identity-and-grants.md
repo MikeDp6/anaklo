@@ -12,6 +12,10 @@
 1. **`auth.users` = μόνο προσωπικό και ιδιοκτήτες.**
    - Οι πελάτες **δεν** είναι χρήστες Auth. Είναι γραμμές στο `clients` της κάθε επιχείρησης.
    - Επαληθεύονται με OTP ή έμπιστη συσκευή, ανά επιχείρηση (ADR-0006).
+   - **Signup κλειστό** (`[auth] enable_signup = false` στο `config.toml` και ίδια ρύθμιση στο dashboard κάθε project). Το `[auth.email] enable_signup` μένει `true`: παρά το όνομά του ανοίγει/κλείνει όλο τον πάροχο email, μαζί με τη σύνδεση.
+     - Κανείς δεν φτιάχνει λογαριασμό μόνος του.
+     - Οι owners μπαίνουν από το onboarding (Φάση 5), το προσωπικό με πρόσκληση από Edge Function με `service_role`.
+     - Ένας ξένος λογαριασμός δεν βλέπει τίποτα λόγω RLS, αλλά γεμίζει το `auth.users` και ανοίγει δρόμο για spam email.
 2. **Συμμετοχή:**
    - Ποιος ανήκει σε ποια επιχείρηση ορίζεται στο `business_members(business_id, user_id, role, staff_id?)`.
    - Βοηθητικές functions στο schema `private`, που δεν εκτίθεται. Είναι `stable security definer set search_path = ''`.
@@ -30,19 +34,31 @@
 4. **Ρητά GRANT ανά πίνακα**, στο ίδιο migration:
    - `anon`: τίποτα σε πίνακες.
    - `authenticated`: μόνο όσα χρειάζεται η εφαρμογή επαγγελματία, πάντα μαζί με RLS.
+   - Όπου μια στήλη δεν πρέπει να αλλάζει από την εφαρμογή, το UPDATE δίνεται **ανά στήλη**. Το RLS λέει ποιες γραμμές, το GRANT ποιες στήλες. Παραδείγματα:
+     - `clients`: όχι provenance, συγχώνευση, ανωνυμοποίηση, `phone_verified_at`
+     - `client_notes`: μόνο `body`
+     - `client_consents`: μόνο `withdrawn_at`
+     - `businesses`: όχι `slug`, `timezone`, `currency`, `vertical`, ούτε για τον owner. Αλλάζουν μόνο με RPC του owner που χειρίζεται τις συνέπειες (παλιά links, τοπική ώρα των μελλοντικών ραντεβού, νόημα των ποσών).
    - `service_role`: μόνο όσα χρειάζονται οι Edge Functions.
    - Πίνακες μόνο για προσθήκη (`appointment_events`, `audit_log`): μόνο `SELECT` για τους ρόλους του API. Γράφουν μόνο οι triggers ή οι functions του owner.
 5. **Functions (μοτίβο wrapper):**
    - Η Postgres δίνει `EXECUTE` στο PUBLIC **global**, και οι προεπιλογές ανά schema δεν μπορούν να το αναιρέσουν. Γι' αυτό το 0001 κάνει και τα δύο:
-     - `alter default privileges revoke execute on functions from public`
+     - `alter default privileges for role postgres revoke execute on functions from public`
      - revoke ανά schema από `anon`, `authenticated` και `service_role`
+   - Οι προεπιλογές ανήκουν στον ρόλο που **δημιουργεί** τα αντικείμενα. Γι' αυτό δηλώνονται ρητά `for role postgres` (migrations, CLI, dashboard) και δεν εξαρτώνται από το ποιο login έτρεξε το migration. Το `01_security` φτιάχνει δοκιμαστικό πίνακα και functions και ελέγχει ότι κανένας ρόλος του API δεν τα βλέπει.
    - Η λογική που παρακάμπτει το RLS ζει στο `private.<name>_impl` (SECURITY DEFINER, `search_path = ''`) και κάνει η ίδια τους ελέγχους μέλους και ρόλου. Το API βλέπει μόνο λεπτά wrappers στο `public` (SECURITY **INVOKER**).
    - **Στο `public` δεν υπάρχει καμία SECURITY DEFINER function** (το ελέγχει test).
    - Οι ρόλοι του API έχουν `USAGE` στο `private` (που δεν εκτίθεται), ώστε τα wrappers και οι πολιτικές να καλούν συγκεκριμένες functions. Το `EXECUTE` δίνεται ρητά ανά function.
    - Το `anon` εκτελεί μόνο τις read-only RPCs της δημόσιας σελίδας και τα impl τους. Στη Φάση 0 αυτό σημαίνει μόνο το `public_business_profile`, που απαντά μόνο για επιχειρήσεις με `booking_enabled`.
    - Οι trigger functions (events, audit, κατάσταση) είναι SECURITY DEFINER και δεν χρειάζονται GRANT: το `EXECUTE` δεν ελέγχεται όταν τρέχει ο trigger.
    - Allow-lists στο `01_security.test.sql`: ποιες functions εκτελούν ο `anon` και ο `authenticated`, και ποια δικαιώματα πινάκων έχει ο `authenticated`.
-   - Η «μνήμη»: `private.client_memory_impl` με δικό της έλεγχο μέλους, υπολογισμός πάνω σε όλη την επιχείρηση. Το wrapper κρύβει τα ποσά από το staff, ώστε owner και staff να βλέπουν την ίδια φάση.
+   - Η «μνήμη»: `private.client_memory_impl`, με υπολογισμό πάνω σε όλη την επιχείρηση, ώστε owner και staff να βλέπουν την ίδια φάση.
+     - Η **ίδια** η `_impl` ελέγχει μέλος και ρόλο, και για το staff επιστρέφει τα ποσά ως `null`.
+     - Το wrapper μένει λεπτό, χωρίς έλεγχο. Γενικός κανόνας: κάθε έλεγχος ασφαλείας ζει εκεί όπου παρακάμπτεται το RLS (στη definer function), ποτέ μόνο στο wrapper.
+   - **Ποιος ενεργεί:**
+     - Οι triggers των ραντεβού διαβάζουν το `anaklo.actor_type` μέσω `private.current_actor_type()`.
+     - Χωρίς δήλωση: συνδεδεμένος χρήστης → `staff`, αλλιώς **σφάλμα** (`42501`). Ποτέ σιωπηρό `system`, γιατί το `system` διορθώνει τα πάντα.
+     - Seed, jobs, Edge Functions και tests δηλώνουν ρητά `system`/`client`/`import`.
 6. **Χρήματα και ρόλοι:**
    - Το staff διαβάζει απευθείας μόνο τα δικά του ραντεβού.
    - Τα ραντεβού των άλλων τα βλέπει μέσω RPC χωρίς τιμές και ονόματα πελατών, ως «κατειλημμένο».

@@ -1,11 +1,15 @@
--- Appointments: double-booking constraint, status transitions and corrections, event history.
+-- Appointments: double-booking constraint, status transitions and corrections, event history,
+-- declared actors and phone verification of online bookings.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(27);
+-- Appointment writes must declare who acts. Fixtures and set-up steps are the system; the
+-- sections below switch the actor (or clear it) on purpose.
+select set_config('anaklo.actor_type', 'system', true);
+select plan(31);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres): one business, an owner, two staff members with logins, one client.
@@ -60,19 +64,40 @@ select lives_ok(
 );
 
 select lives_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, status, cancelled_by)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, status, cancelled_by)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001',
-            '2026-11-03 08:10Z', '2026-11-03 08:40Z', 'online', 'cancelled', 'client')$$,
+            '2026-11-03 08:10Z', '2026-11-03 08:40Z', 'online', 'otp', 'cancelled', 'client')$$,
   'cancelled appointments do not block the slot'
 );
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001',
-            '2026-11-08 09:00Z', '2026-11-08 09:00Z', 'online')$$,
+            '2026-11-08 09:00Z', '2026-11-08 09:00Z', 'online', 'otp')$$,
   '23514',
   null,
   'a zero-length appointment is rejected (it would slip past the overlap check)'
+);
+
+-- ---------------------------------------------------------------------------------------------
+-- Phone verification of online bookings (ADR-0006)
+-- ---------------------------------------------------------------------------------------------
+select throws_ok(
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source)
+    values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
+            '2026-11-10 08:00Z', '2026-11-10 08:30Z', 'online')$$,
+  '23514',
+  null,
+  'an online booking must record how the phone was verified (OTP or trusted device)'
+);
+
+select throws_ok(
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via)
+    values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
+            '2026-11-10 09:00Z', '2026-11-10 09:30Z', 'phone', 'otp')$$,
+  '23514',
+  null,
+  'a booking entered by the business cannot claim a client verification'
 );
 
 -- ---------------------------------------------------------------------------------------------
@@ -104,18 +129,18 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, status)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, status)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
-            '2026-11-05 08:00Z', '2026-11-05 08:30Z', 'online', 'cancelled')$$,
+            '2026-11-05 08:00Z', '2026-11-05 08:30Z', 'online', 'otp', 'cancelled')$$,
   '23514',
   null,
   'a cancelled appointment must say who cancelled it'
 );
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, charged_cents)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, charged_cents)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
-            '2026-11-05 09:00Z', '2026-11-05 09:30Z', 'online', 1300)$$,
+            '2026-11-05 09:00Z', '2026-11-05 09:30Z', 'online', 'otp', 1300)$$,
   '23514',
   null,
   'a charged amount exists only on completed appointments'
@@ -139,6 +164,8 @@ select lives_ok(
   'the system may correct completed -> no_show at any time'
 );
 
+-- Signed-in users declare nothing: they act as 'staff'.
+select set_config('anaklo.actor_type', '', true);
 select set_config('request.jwt.claims', '{"sub": "c0000000-0000-4000-8000-0000000000c1"}', true);
 
 select lives_ok(
@@ -202,7 +229,32 @@ select throws_ok(
   'a client cannot turn a past no-show into a cancellation'
 );
 
+-- ---------------------------------------------------------------------------------------------
+-- Undeclared actors: without a signed-in user nothing may pass for the system
+-- ---------------------------------------------------------------------------------------------
 select set_config('anaklo.actor_type', '', true);
+
+select throws_ok(
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source)
+    values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
+            '2026-11-11 08:00Z', '2026-11-11 08:30Z', 'phone')$$,
+  '42501',
+  null,
+  'a write with no signed-in user and no declared actor is rejected (never assumed to be the system)'
+);
+
+select set_config('anaklo.actor_type', 'admin', true);
+
+select throws_ok(
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source)
+    values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
+            '2026-11-11 09:00Z', '2026-11-11 09:30Z', 'phone')$$,
+  '22023',
+  null,
+  'an unknown declared actor is rejected'
+);
+
+select set_config('anaklo.actor_type', 'system', true);
 
 select results_eq(
   $$select from_status, to_status, actor_type from public.appointment_events
@@ -217,14 +269,14 @@ select results_eq(
 -- ---------------------------------------------------------------------------------------------
 -- Reschedule, reassign, actor type
 -- ---------------------------------------------------------------------------------------------
-insert into public.appointments (id, business_id, staff_id, starts_at, ends_at, source)
+insert into public.appointments (id, business_id, staff_id, starts_at, ends_at, source, verified_via)
 values ('c4000000-0000-4000-8000-000000000002', 'c1000000-0000-4000-8000-000000000001',
-        'c2000000-0000-4000-8000-000000000002', '2026-11-06 08:00Z', '2026-11-06 08:30Z', 'online');
+        'c2000000-0000-4000-8000-000000000002', '2026-11-06 08:00Z', '2026-11-06 08:30Z', 'online', 'trusted_device');
 
 select set_config('anaklo.actor_type', 'client', true);
 update public.appointments set starts_at = '2026-11-06 10:00Z', ends_at = '2026-11-06 10:30Z'
 where id = 'c4000000-0000-4000-8000-000000000002';
-select set_config('anaklo.actor_type', '', true);
+select set_config('anaklo.actor_type', 'system', true);
 
 select results_eq(
   $$select old_starts_at, new_starts_at, actor_type from public.appointment_events
@@ -274,32 +326,32 @@ select throws_ok(
   're-importing the same external reference is rejected (idempotent imports)'
 );
 
-insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, idempotency_key)
+insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, idempotency_key)
 values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000002',
-        '2026-11-07 08:00Z', '2026-11-07 08:30Z', 'online', 'c5000000-0000-4000-8000-000000000001');
+        '2026-11-07 08:00Z', '2026-11-07 08:30Z', 'online', 'otp', 'c5000000-0000-4000-8000-000000000001');
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, idempotency_key)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, idempotency_key)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001',
-            '2026-11-07 09:00Z', '2026-11-07 09:30Z', 'online', 'c5000000-0000-4000-8000-000000000001')$$,
+            '2026-11-07 09:00Z', '2026-11-07 09:30Z', 'online', 'otp', 'c5000000-0000-4000-8000-000000000001')$$,
   '23505',
   null,
   'the same idempotency key cannot create a second booking'
 );
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001',
-            '2026-11-08 09:00Z', '2026-11-08 08:30Z', 'online')$$,
+            '2026-11-08 09:00Z', '2026-11-08 08:30Z', 'online', 'otp')$$,
   '23514',
   null,
   'an appointment must end after it starts'
 );
 
 select throws_ok(
-  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, status, cancelled_by, cancel_reason)
+  $$insert into public.appointments (business_id, staff_id, starts_at, ends_at, source, verified_via, status, cancelled_by, cancel_reason)
     values ('c1000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001',
-            '2026-11-09 09:00Z', '2026-11-09 09:30Z', 'online', 'cancelled', 'client', 'Γιώργος was sick')$$,
+            '2026-11-09 09:00Z', '2026-11-09 09:30Z', 'online', 'otp', 'cancelled', 'client', 'Γιώργος was sick')$$,
   '23514',
   null,
   'the cancellation reason is a code, never free text'

@@ -68,6 +68,8 @@ npx supabase link --project-ref <DEV_REF>
 
 Το `db:reset:dev` ξαναχτίζει τη remote dev βάση από το μηδέν. Αρνείται να τρέξει αν το συνδεδεμένο project δεν είναι το dev.
 
+**Auth στο dashboard (μία φορά ανά project):** το `config.toml` ισχύει μόνο τοπικά. Στο dashboard κάθε project: Authentication → Sign In / Providers → **«Allow new users to sign up» = off**. Μην χρησιμοποιήσεις `supabase config push`: θα έστελνε και τις τοπικές διευθύνσεις (`site_url` κ.λπ.) στο remote.
+
 ## 5. Συχνά προβλήματα
 
 | Πρόβλημα | Λύση |

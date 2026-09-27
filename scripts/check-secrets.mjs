@@ -1,11 +1,13 @@
 // Fails if a server-side key ever reaches the frontend build (ADR-0005).
 // Looks for secret API keys and JWTs whose payload claims the service_role.
+// Also fails if a bundle points browsers at its source map (maps are 'hidden', for Sentry only).
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DIST = 'dist'
 const SECRET_KEY = /sb_secret_[\w-]{8,}/
 const JWT = /eyJ[\w-]+\.(eyJ[\w-]+)\.[\w-]+/g
+const SOURCE_MAP_LINK = /[#@]\s*sourceMappingURL=/
 
 /**
  * @param {string} dir
@@ -24,6 +26,9 @@ const problems = []
 for (const file of walk(DIST)) {
   const text = readFileSync(file, 'utf8')
   if (SECRET_KEY.test(text)) problems.push(`${file}: contains an sb_secret_ key`)
+  if (/\.(js|css)$/.test(file) && SOURCE_MAP_LINK.test(text)) {
+    problems.push(`${file}: links its source map (use build.sourcemap = 'hidden')`)
+  }
   for (const match of text.matchAll(JWT)) {
     try {
       const segment = match[1]
@@ -40,4 +45,4 @@ if (problems.length > 0) {
   console.error(problems.join('\n'))
   process.exit(1)
 }
-console.log('No server-side keys in the build.')
+console.log('No server-side keys or source map links in the build.')

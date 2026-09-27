@@ -25,6 +25,15 @@
 - **«Μνήμη»:** SQL function αντί για materialized view, με διορθωμένους κανόνες (§4).
 - **Λιτότερη Φάση 1:** το drag & drop, οι φωτογραφίες και η εισαγωγή επαφών πάνε στη v1, και η λίστα αναμονής στη Φάση 2 ή στη v1. Για την εισαγωγή από άλλη πλατφόρμα: script για την πρώτη επιχείρηση στη Φάση 3, οδηγός με UI στο onboarding (Φάση 5).
 - **Βάση:** η αξιολόγηση της v0.3 (106 ευρήματα, Σεπτέμβριος 2026).
+- **Σκλήρυνση πριν τη Φάση 1** (27/9/2026, στα 0001–0003):
+  - Κάθε εγγραφή ραντεβού δηλώνει ποιος ενεργεί. Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη απορρίπτεται, αντί να θεωρηθεί `system`.
+  - Οι συναινέσεις δεν αλλάζουν ποτέ, μόνο ανακαλούνται.
+  - Ωράρια και εξαιρέσεις χωρίς επικαλύψεις.
+  - `appointments.verified_via` και `clients.phone_verified_at` (ADR-0006).
+  - Ουδέτερος λόγος άδειας (`leave` αντί για `sick`).
+  - Κλειστό signup.
+  - Τα slug, ζώνη ώρας και νόμισμα δεν αλλάζουν από την εφαρμογή.
+  - Source maps κρυφά.
 
 ---
 
@@ -241,12 +250,15 @@
 
 **Υλοποίηση**
 - Η λογική ζει σε **μία** SQL function, `private.client_memory_impl(p_business_id, p_as_of)`: STABLE, SECURITY DEFINER, με `search_path = ''`. Υπολογίζει τη στιγμή της ανάγνωσης, πάνω σε **όλα** τα ραντεβού της επιχείρησης. Έτσι η φάση ενός πελάτη είναι ίδια για τον owner και για τον επαγγελματία.
-- Η ίδια η function ελέγχει ότι ο καλών είναι μέλος της `p_business_id`. Με ξένη επιχείρηση πετάει σφάλμα.
-- Το API την καλεί μέσω ενός λεπτού wrapper στο `public` (§7), που κρύβει τα ποσά από το staff. Τα ποσά φαίνονται μόνο σε owner/manager.
+- Η ίδια η function κάνει **όλους** τους ελέγχους, όχι το wrapper:
+  - ότι ο καλών είναι μέλος της `p_business_id` (με ξένη επιχείρηση πετάει σφάλμα)
+  - τον ρόλο του: για το staff τα πεδία ποσών (LTV, έσοδα σε κίνδυνο) επιστρέφουν `null`
+- Το API την καλεί μέσω ενός λεπτού wrapper στο `public` (§7), χωρίς δική του λογική. Τα ποσά φαίνονται μόνο σε owner/manager.
 - **Όχι** materialized view, γιατί δεν υποστηρίζει RLS. Αν γίνει αργό: πίνακας cache ανά επιχείρηση, με RLS.
 - Tests σε pgTAP:
   - έτοιμα σενάρια με σταθερό `p_as_of`
   - «owner και staff βλέπουν την ίδια φάση»
+  - «ως staff τα ποσά είναι `null`», και όταν καλείται απευθείας η `_impl`
   - «ξένη επιχείρηση → σφάλμα»
 
   Η λογική υπάρχει **μόνο** σε SQL.
@@ -269,7 +281,7 @@
 3. Ο επαγγελματίας καταχωρεί τηλεφωνικό ραντεβού σε <10″, και walk-in χωρίς τηλέφωνο.
 4. (v1) Ο owner ανοίγει «Κινδυνεύουν» → στέλνει win-back → ο πελάτης κλείνει.
 5. (Φάση 5) Νέα επιχείρηση: εγγραφή → κλάδος → υπηρεσίες από πρότυπο → live σε <15′.
-6. Ο επαγγελματίας αρρώστησε: άδεια για σήμερα → για κάθε ραντεβού, ανάθεση σε άλλον ή ακύρωση με SMS.
+6. Ο επαγγελματίας λείπει έκτακτα (π.χ. αρρώστησε): άδεια για σήμερα → για κάθε ραντεβού, ανάθεση σε άλλον ή ακύρωση με SMS. Η άδεια καταγράφεται ως `leave`, χωρίς αιτία: η ασθένεια είναι δεδομένο υγείας (GDPR άρ. 9).
 
 ---
 
@@ -352,10 +364,12 @@
   - Το API βλέπει μόνο λεπτά wrappers στο `public` (SECURITY **INVOKER**) με ρητό `GRANT EXECUTE` ανά ρόλο. Στο `public` δεν υπάρχει καμία SECURITY DEFINER function (το ελέγχει test).
   - Entry points: `public_business_profile` (Φάση 0), `available_slots`, `book_appointment` (μόνο `service_role`, μέσω της Edge Function OTP), `busy_calendar`, `client_memory`, `merge_clients`, `erase_client`.
   - Το `EXECUTE` είναι κλειστό για το `PUBLIC`, και σε global επίπεδο, αφού οι προεπιλογές ανά schema δεν αρκούν. Ανοίγει ρητά ανά function.
+  - Οι προεπιλογές δηλώνονται ρητά `for role postgres`, δηλαδή τον ρόλο που δημιουργεί αντικείμενα: migrations, CLI, dashboard. Test στο `01_security` φτιάχνει νέο πίνακα και νέες functions και ελέγχει ότι κανένας ρόλος του API δεν τα βλέπει χωρίς GRANT.
   - Οι trigger functions (events, audit) είναι SECURITY DEFINER και δεν χρειάζονται GRANT στους ρόλους του API.
 - **Ποιος ενεργεί (`actor_type`):**
   - Κάθε RPC και job δηλώνει ποιος ενεργεί με `set_config('anaklo.actor_type', …, true)`: οι RPCs κράτησης/διαχείρισης `client`, τα cron `system`, η εισαγωγή `import`.
-  - Αλλιώς ισχύει `staff` όταν υπάρχει συνδεδεμένος χρήστης, και `system` στην αντίθετη περίπτωση.
+  - Αν δεν δηλωθεί τίποτα, ο συνδεδεμένος χρήστης είναι `staff`.
+  - **Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη, η εγγραφή απορρίπτεται** (`42501`). Το `system` διορθώνει οποιαδήποτε έκβαση, οπότε μια Edge Function ή ένα job που ξέχασε να δηλωθεί δεν πρέπει ποτέ να περάσει για `system`. Άγνωστη τιμή απορρίπτεται επίσης (`22023`).
 - **Ζώνη ώρας:** μόνο ονόματα IANA τύπου Area/Location που υπάρχουν στο `pg_timezone_names`. Τιμές όπως `UTC+2` απορρίπτονται, γιατί η Postgres τις διαβάζει ανάποδα (UTC−2).
 - **Λίστες τιμών:** βρίσκονται στο `supabase/functions/_shared/domain.ts` (για το UI, μέσω `z.enum`). Ένα Vitest test αποτυγχάνει αν διαφωνήσουν με τα CHECK των migrations.
 - **Τύποι δεδομένων:**
@@ -375,6 +389,8 @@ businesses            id, slug (μορφή + δεσμευμένα), name, vertic
                                          correction_window_days, allow_any_staff,
                       theme jsonb, settings jsonb (μη κρίσιμες προτιμήσεις, ελέγχονται με Zod),
                       messaging_enabled, created_at
+                      -- UPDATE ανά στήλη για owner/manager· slug, timezone, currency, vertical ΜΟΝΟ
+                      --   μέσω RPC του owner (σπασμένα links, μετατόπιση ωρών, αλλαγή νοήματος ποσών)
 business_members      business_id, user_id, role (owner|manager|staff), staff_id?   -- σύνδεση login → προφίλ
 staff                 id, business_id, display_name, photo_url, color, sort, active
 service_categories    id, business_id, name, sort
@@ -383,20 +399,30 @@ services              id, business_id, category_id?, name, duration_min, buffer_
 staff_services        business_id, staff_id, service_id, custom_duration_min?, custom_price_cents?
 working_hours         id, business_id, staff_id, weekday (0=Κυριακή … 6=Σάββατο), start_time, end_time
                       -- πολλά διαστήματα ανά ημέρα· end_time > start_time (όχι πάνω από τα μεσάνυχτα)
+                      -- exclusion: ποτέ επικάλυψη για ίδιο επαγγελματία/ημέρα (τα διαδοχικά επιτρέπονται)
 schedule_exceptions   id, business_id, staff_id? (null = όλο το μαγαζί), local_date,
                       kind (closed|open), start_time?, end_time?, note
-time_off              id, business_id, staff_id, starts_at, ends_at, reason (vacation|sick|personal|other)
-clients               id, business_id, full_name, phone_e164?, email?, birthday?, locale,
-                      search_text, source (online|staff|import), external_ref?, merged_into_id?,
-                      erased_at?, created_at
+                      -- exclusion ανά εύρος (μαγαζί ή επαγγελματίας) και ημερομηνία: το closed πιάνει
+                      --   όλη τη μέρα, τα open δεν επικαλύπτονται
+time_off              id, business_id, staff_id, starts_at, ends_at, reason (vacation|leave|personal|other)
+                      -- ουδέτερες τιμές: καμία δεν αποκαλύπτει δεδομένα υγείας (GDPR άρ. 9)
+clients               id, business_id, full_name, phone_e164?, phone_verified_at?, email?, birthday?,
+                      locale, search_text, source (online|staff|import), external_ref?,
+                      merged_into_id?, erased_at?, created_at
+                      -- phone_verified_at: τελευταίο OTP γι' αυτόν τον αριθμό· μηδενίζεται όταν αλλάξει
+                      --   ο αριθμός (εκτός αν το ίδιο UPDATE τον επαληθεύει)
 client_consents       id, business_id, client_id, purpose (marketing_sms|marketing_email|photos_record|photos_publish),
                       legal_basis (consent|soft_opt_in), granted, source (booking_form|staff_ui|import|link),
                       policy_version, given_by (client|guardian), created_at, withdrawn_at
+                      -- αποδεικτικό: trigger σε ΚΑΘΕ UPDATE (και για service_role) επιτρέπει μόνο
+                      --   withdrawn_at null → now(), μία φορά (και created_by → null από το FK,
+                      --   όταν σβήνεται ο λογαριασμός που την κατέγραψε)
 client_notes          id, business_id, client_id, author_id, body, created_at
 appointments          id, business_id, client_id? (null = ανώνυμο walk-in), staff_id (not null),
                       starts_at, ends_at (τέλος υπηρεσίας), buffer_after_min,
                       status (booked|confirmed|completed|no_show|cancelled),
                       source (online|phone|walkin|staff|import), referrer?,
+                      verified_via? (otp|trusted_device — υποχρεωτικό ΜΟΝΟ και ΠΑΝΤΑ σε online),
                       total_cents, charged_cents?, cancelled_by? (client|business|system),
                       cancel_reason? (client_request|staff_unavailable|shop_closed|rescheduled|duplicate|other
                                       — κωδικός, ποτέ ελεύθερο κείμενο),
@@ -440,6 +466,8 @@ import_batches        business_id, source, file_name, imported_by, stats, create
     where (status in ('booked', 'confirmed'));
   ```
   Τα buffers τα επιβάλλουν η διαθεσιμότητα και η κράτηση (§8), όχι το constraint. Έτσι ο επαγγελματίας μπορεί συνειδητά να «στριμώξει» ένα ραντεβού.
+  - Δύο ταυτόχρονες online κρατήσεις δεν μπορούν να πέσουν μέσα σε buffer: το `book_appointment` ξαναελέγχει τη διαθεσιμότητα (με τα buffers) κάτω από advisory lock ανά επιχείρηση και τοπική ημέρα (§8 βήμα 7).
+  - Γι' αυτό **δεν** μπαίνει `blocked_until` στο constraint. Εκτός από το «στρίμωγμα», θα χρειαζόταν και στήλη με trigger: το `timestamptz + interval` δεν είναι immutable, άρα δεν γίνεται ούτε generated column ούτε έκφραση σε index.
 - **`appointment_events` από την πρώτη μέρα:**
   - Ο trigger τρέχει σε κάθε INSERT και σε κάθε UPDATE των `status`, `starts_at`, `ends_at`, `staff_id`.
   - Το API έχει μόνο SELECT. Γράφει μόνο ο trigger.
@@ -704,6 +732,10 @@ anaklo/
   - το link διαχείρισης δεν αλλάζει τίποτα με GET
 
 **Προσωπικό**
+- **Κανένας λογαριασμός χωρίς πρόσκληση:** το signup του Supabase Auth είναι κλειστό (`config.toml` και ίδια ρύθμιση στο dashboard κάθε project).
+  - Οι owners μπαίνουν από το onboarding (Φάση 5).
+  - Το προσωπικό μπαίνει με πρόσκληση από Edge Function με `service_role` (Φάση 1).
+  - Η σύνδεση με κωδικό email δουλεύει μόνο για υπάρχοντες χρήστες.
 - Ο owner έχει MFA (TOTP) για εξαγωγή, διαγραφή και διαχείριση μελών.
 - Αν αφαιρεθεί ένα μέλος, η πρόσβαση κόβεται αμέσως, γιατί το RLS ελέγχει τη συμμετοχή σε κάθε αίτημα.
 - Ο service worker δεν κρατά offline λίστες πελατών ή φωτογραφίες.
@@ -712,6 +744,7 @@ anaklo/
 - RLS παντού, με αυτόματα tests Α/Β (§13).
 - Φωτογραφίες σε ιδιωτικό Storage με signed URLs, στη διαδρομή `{business_id}/{client_id}/…`.
 - Sentry χωρίς προσωπικά δεδομένα (φίλτρο για αριθμούς `+30…`).
+- Source maps: `build.sourcemap = 'hidden'`, δηλαδή κανένα bundle δεν δείχνει το map του (το ελέγχει το `postbuild`). Από τη Φάση 1 ανεβαίνουν στο Sentry κατά το build και σβήνονται από το `dist` πριν το deploy.
 - Στη σελίδα κράτησης δεν φορτώνουν γραμματοσειρές ή analytics τρίτων.
 - Διακόπτης `messaging_enabled` και ημερήσιο όριο αποστολών.
 - Λογαριασμοί παρόχων σε mailbox της Nous με 2FA και password manager.
@@ -783,7 +816,7 @@ anaklo/
 | Τύπος | Εργαλείο | Τι καλύπτει |
 |---|---|---|
 | Unit | Vitest (σε UTC) | `money`, `dates`, `phone`, `sms` (GSM-7, 1 SMS ανά πρότυπο, link byte προς byte), λίστες τιμών ίδιες με τα CHECK, κατάλογοι i18n el = en, θέμα/αντίθεση, λογική UI |
-| Βάση | pgTAP (`supabase test db`, τοπικά και στο CI) | RLS και απομόνωση Α/Β · allow-list δικαιωμάτων (πίνακες και functions για `anon`/`authenticated`) · σύνθετα FK · διπλοκράτηση · μεταβάσεις και διορθώσεις κατάστασης · events σε κάθε αλλαγή · αναζήτηση ΓΙΩΡΓΟΣ/Γιώργος/giorgos · συναινέσεις · ζώνες ώρας · διαθεσιμότητα (αλλαγή ώρας, μεσάνυχτα, εξαιρέσεις, μισή μέρα, δεύτερη ζώνη) · κράτηση (επανέλεγχος, idempotency) · «μνήμη» (σενάρια, σταθερό `as_of`) · ανωνυμοποίηση |
+| Βάση | pgTAP (`supabase test db`, τοπικά και στο CI) | RLS και απομόνωση Α/Β · allow-list δικαιωμάτων (πίνακες, στήλες και functions για `anon`/`authenticated`) · προεπιλεγμένα δικαιώματα νέων αντικειμένων · σύνθετα FK · διπλοκράτηση · ωράρια/εξαιρέσεις χωρίς επικαλύψεις · μεταβάσεις και διορθώσεις κατάστασης · δηλωμένος actor · events σε κάθε αλλαγή · αναζήτηση ΓΙΩΡΓΟΣ/Γιώργος/giorgos · συναινέσεις (αμετάβλητες, μόνο ανάκληση) · επαλήθευση τηλεφώνου · ζώνες ώρας · διαθεσιμότητα (αλλαγή ώρας, μεσάνυχτα, εξαιρέσεις, μισή μέρα, δεύτερη ζώνη) · κράτηση (επανέλεγχος, idempotency) · «μνήμη» (σενάρια, σταθερό `as_of`) · ανωνυμοποίηση |
 | E2E | Playwright (κινητό viewport) | Οι ροές του §5 |
 | Συσκευές | Πραγματικό iPhone + Android | Πριν από κάθε release, σύντομος χειροκίνητος έλεγχος: Instagram in-app (iOS/Android), Facebook in-app, Safari, εγκατεστημένη PWA με push |
 | Μέγεθος | CI | Αρχικό JS σελίδας κράτησης ≤ 120KB gzip |
@@ -829,16 +862,13 @@ anaklo/
 - τα `/app` και `/demo-barber` ανοίγουν σε μέγεθος κινητού
 - τα migrations έχουν περάσει στο dev project με `npm run db:push`
 
-> Κατάσταση (27/9/2026): τα τοπικά κριτήρια πέρασαν:
-> - pgTAP 82/82
-> - Vitest 120/120
-> - Playwright 10/10
-> - σελίδα κράτησης 100.7 KB
->
-> Εκκρεμούν όσα θέλουν λογαριασμούς (GitHub, Supabase dev, πρώτο CI run, `db:push`).
+> Κατάσταση (27/9/2026): η Φάση 0 ολοκληρώθηκε.
+> - GitHub, CI πράσινο, migrations στο `anaklo-dev` με pgTAP 107/107 στο remote.
+> - Μετά τη σκλήρυνση πριν τη Φάση 1 (βλ. «Τι άλλαξε»), τοπικά: pgTAP 141/141, Vitest 178/178, Playwright 10/10, σελίδα κράτησης 100.9 KB. Mutation tests: κάθε διόρθωση που αναιρείται σπάει τουλάχιστον ένα test.
+> - `anaklo-dev`: signup κλειστό, pgTAP 138/138 στην πρώτη εκδοχή της σκλήρυνσης. Εκκρεμεί ένα ακόμη `npm run db:reset:dev` + `npm run db:test:dev` (141) για τη διόρθωση του guard συναινέσεων (διαγραφή λογαριασμού).
 
 **Φάση 1 — Πυρήνας κράτησης (4–5 εβδομάδες)**
-8. Υπηρεσίες, προσωπικό, ωράρια, άδειες, εξαιρέσεις.
+8. Υπηρεσίες, προσωπικό (πρόσκληση μέλους μέσω Edge Function, αφού το signup είναι κλειστό), ωράρια, άδειες, εξαιρέσεις. Αλλαγή slug/ζώνης ώρας/νομίσματος μόνο με RPC του owner.
 9. `available_slots` + `book_appointment` (SQL), με pgTAP.
 10. Σελίδα κράτησης:
     - θέμα από τις ρυθμίσεις, server handler με Open Graph
@@ -851,14 +881,14 @@ anaklo/
     - γρήγορο ραντεβού / walk-in
     - μετακίνηση με επιλογή ώρας
     - αυτόματη ολοκλήρωση + σήμανση εξαιρέσεων
-    - ροή «αρρώστησε»
+    - ροή «έκτακτη απουσία» (άδεια `leave` + ανάθεση/ακύρωση της ημέρας)
 12. Καρτέλα πελάτη: ιστορικό, σημειώσεις, αναζήτηση, συγχώνευση διπλών (`merge_clients`), ανωνυμοποίηση (`erase_client` + `suppression_list`), με pgTAP.
 13. Ειδοποιήσεις:
     - επιλογή παρόχου SMS, `sms.ts` (GSM-7)
     - επιβεβαίωση + υπενθύμιση
     - push προσωπικού, καθημερινό email
     - dispatcher + dedupe, όρια δαπάνης
-14. Παρακολούθηση: Sentry, uptime, heartbeats για τα cron, runbooks.
+14. Παρακολούθηση: Sentry (με upload των hidden source maps και διαγραφή τους από το `dist`), uptime, heartbeats για τα cron, runbooks.
 
 **Φάση 2 — Η «μνήμη» (2–3 εβδομάδες)**
 15. `client_memory()`, φάσεις, ετικέτες, ταμπλό πελατολογίου (κάθε κάρτα με ενέργεια).

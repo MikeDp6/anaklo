@@ -81,13 +81,13 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "buffer_after_min": number,"business_id": string,"cancel_reason": string | null,"cancelled_by": string | null,"charged_cents": number | null,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_at": string,"external_ref": string | null,"id": string,"idempotency_key": string | null,"referrer": string | null,"source": string,"staff_id": string,"starts_at": string,"status": string,"total_cents": number
+                    "buffer_after_min": number,"business_id": string,"cancel_reason": string | null,"cancelled_by": string | null,"charged_cents": number | null,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_at": string,"external_ref": string | null,"id": string,"idempotency_key": string | null,"referrer": string | null,"source": string,"staff_id": string,"starts_at": string,"status": string,"total_cents": number,"verified_via": string | null
                   }
                   Insert: {
-                    "buffer_after_min"?: number,"business_id": string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source": string,"staff_id": string,"starts_at": string,"status"?: string,"total_cents"?: number
+                    "buffer_after_min"?: number,"business_id": string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source": string,"staff_id": string,"starts_at": string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
                   }
                   Update: {
-                    "buffer_after_min"?: number,"business_id"?: string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source"?: string,"staff_id"?: string,"starts_at"?: string,"status"?: string,"total_cents"?: number
+                    "buffer_after_min"?: number,"business_id"?: string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source"?: string,"staff_id"?: string,"starts_at"?: string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
                   }
                   Relationships: [
                     {
@@ -219,13 +219,13 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "birthday": string | null,"business_id": string,"created_at": string,"email": string | null,"erased_at": string | null,"external_ref": string | null,"full_name": string,"id": string,"locale": string,"merged_into_id": string | null,"phone_e164": string | null,"search_text": string,"source": string
+                    "birthday": string | null,"business_id": string,"created_at": string,"email": string | null,"erased_at": string | null,"external_ref": string | null,"full_name": string,"id": string,"locale": string,"merged_into_id": string | null,"phone_e164": string | null,"phone_verified_at": string | null,"search_text": string,"source": string
                   }
                   Insert: {
-                    "birthday"?: string | null,"business_id": string,"created_at"?: string,"email"?: string | null,"erased_at"?: string | null,"external_ref"?: string | null,"full_name": string,"id"?: string,"locale"?: string,"merged_into_id"?: string | null,"phone_e164"?: string | null,"search_text"?: string,"source": string
+                    "birthday"?: string | null,"business_id": string,"created_at"?: string,"email"?: string | null,"erased_at"?: string | null,"external_ref"?: string | null,"full_name": string,"id"?: string,"locale"?: string,"merged_into_id"?: string | null,"phone_e164"?: string | null,"phone_verified_at"?: string | null,"search_text"?: string,"source": string
                   }
                   Update: {
-                    "birthday"?: string | null,"business_id"?: string,"created_at"?: string,"email"?: string | null,"erased_at"?: string | null,"external_ref"?: string | null,"full_name"?: string,"id"?: string,"locale"?: string,"merged_into_id"?: string | null,"phone_e164"?: string | null,"search_text"?: string,"source"?: string
+                    "birthday"?: string | null,"business_id"?: string,"created_at"?: string,"email"?: string | null,"erased_at"?: string | null,"external_ref"?: string | null,"full_name"?: string,"id"?: string,"locale"?: string,"merged_into_id"?: string | null,"phone_e164"?: string | null,"phone_verified_at"?: string | null,"search_text"?: string,"source"?: string
                   }
                   Relationships: [
                     {

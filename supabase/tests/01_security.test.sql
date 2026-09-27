@@ -7,7 +7,7 @@ create extension if not exists pgtap with schema extensions;
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(13);
+select plan(17);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -50,7 +50,7 @@ select is(
     'appointments:SELECT',
     'audit_log:SELECT',
     'business_members:DELETE', 'business_members:INSERT', 'business_members:SELECT', 'business_members:UPDATE',
-    'businesses:SELECT', 'businesses:UPDATE',
+    'businesses:SELECT',
     'client_consents:SELECT',
     'client_notes:DELETE', 'client_notes:SELECT',
     'clients:SELECT',
@@ -76,6 +76,19 @@ select is(
     'clients.birthday', 'clients.email', 'clients.full_name', 'clients.locale', 'clients.phone_e164'
   ]::text[],
   'the app may update only these client, consent and note columns'
+);
+
+select is(
+  (select array_agg(c.column_name::text order by c.column_name)
+   from information_schema.column_privileges c
+   where c.table_schema = 'public' and c.grantee = 'authenticated' and c.privilege_type = 'UPDATE'
+     and c.table_name = 'businesses'),
+  array[
+    'allow_any_staff', 'auto_complete_after_min', 'booking_enabled', 'cancel_min_notice_min',
+    'correction_window_days', 'locale', 'max_advance_days', 'messaging_enabled', 'min_notice_min',
+    'name', 'phone_e164', 'settings', 'slot_step_min', 'theme'
+  ]::text[],
+  'the app may update only these business columns (never slug, timezone, currency or vertical)'
 );
 
 select is(
@@ -149,6 +162,35 @@ select is(
      and t.privilege_type in ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE')),
   null::text[],
   'events and the audit log are append-only for every API role (written by triggers/functions)'
+);
+
+-- ---------------------------------------------------------------------------------------------
+-- Default privileges: whatever postgres creates next (a new migration, the dashboard) starts
+-- closed. Probes are created here and vanish with the rollback.
+-- ---------------------------------------------------------------------------------------------
+create table public.zz_default_acl_probe (id int);
+create function public.zz_default_acl_probe() returns int language sql set search_path = '' as $$ select 1 $$;
+create function private.zz_default_acl_probe() returns int language sql set search_path = '' as $$ select 1 $$;
+
+select ok(
+  not has_table_privilege('anon', 'public.zz_default_acl_probe', 'select')
+    and not has_table_privilege('authenticated', 'public.zz_default_acl_probe', 'select')
+    and not has_table_privilege('service_role', 'public.zz_default_acl_probe', 'select'),
+  'a new table in public is not readable by any API role until granted'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.zz_default_acl_probe()', 'execute')
+    and not has_function_privilege('authenticated', 'public.zz_default_acl_probe()', 'execute')
+    and not has_function_privilege('service_role', 'public.zz_default_acl_probe()', 'execute'),
+  'a new function in public is not executable by any API role (nor PUBLIC) until granted'
+);
+
+select ok(
+  not has_function_privilege('anon', 'private.zz_default_acl_probe()', 'execute')
+    and not has_function_privilege('authenticated', 'private.zz_default_acl_probe()', 'execute')
+    and not has_function_privilege('service_role', 'private.zz_default_acl_probe()', 'execute'),
+  'a new function in private is not executable by the API roles until granted'
 );
 
 select * from finish();

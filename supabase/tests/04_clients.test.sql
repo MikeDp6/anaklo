@@ -1,11 +1,12 @@
--- Clients: Greek/Greeklish search, non-unique phones, consent rules, anonymisation shape.
+-- Clients: Greek/Greeklish search, non-unique phones, phone verification, consent rules,
+-- anonymisation shape.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(17);
+select plan(20);
 
 insert into public.businesses (id, slug, name, vertical, timezone)
 values ('d1000000-0000-4000-8000-000000000001', 'shop-d', 'Shop D', 'barber', 'Europe/Athens');
@@ -96,6 +97,35 @@ select throws_ok(
   '23514',
   null,
   'phones must be E.164'
+);
+
+-- ---------------------------------------------------------------------------------------------
+-- Phone verification (ADR-0006) belongs to the number
+-- ---------------------------------------------------------------------------------------------
+select throws_ok(
+  $$insert into public.clients (business_id, full_name, phone_verified_at, source)
+    values ('d1000000-0000-4000-8000-000000000001', 'No phone', now(), 'online')$$,
+  '23514',
+  null,
+  'a client without a phone cannot be phone-verified'
+);
+
+update public.clients set phone_verified_at = now() where id = 'd3000000-0000-4000-8000-000000000001';
+update public.clients set phone_e164 = '+306900000811' where id = 'd3000000-0000-4000-8000-000000000001';
+
+select is(
+  (select phone_verified_at from public.clients where id = 'd3000000-0000-4000-8000-000000000001'),
+  null,
+  'changing the number clears its verification'
+);
+
+update public.clients set phone_e164 = '+306900000812', phone_verified_at = now()
+where id = 'd3000000-0000-4000-8000-000000000001';
+
+select isnt(
+  (select phone_verified_at from public.clients where id = 'd3000000-0000-4000-8000-000000000001'),
+  null,
+  'the OTP flow can set a new number and its verification together'
 );
 
 -- ---------------------------------------------------------------------------------------------

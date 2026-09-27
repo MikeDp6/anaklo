@@ -18,6 +18,9 @@ declare
   v_client uuid;
   v_i int;
 begin
+  -- Appointment writes must declare who acts (private.current_actor_type); the seed is the system.
+  perform set_config('anaklo.actor_type', 'system', true);
+
   insert into public.businesses (id, slug, name, vertical, timezone, phone_e164, booking_enabled, theme)
   values (
     v_business, 'demo-barber', 'Demo Barber', 'barber', v_tz, '+302610000000', true,
@@ -94,11 +97,11 @@ begin
   where business_id = v_business and starts_at < now();
 
   -- A few upcoming bookings.
-  insert into public.appointments (business_id, client_id, staff_id, starts_at, ends_at, status, source, total_cents)
+  insert into public.appointments (business_id, client_id, staff_id, starts_at, ends_at, status, source, verified_via, total_cents)
   select v_business, c.id, v_nikos,
          ((current_date + 2) + make_time(10 + row_number() over () :: int, 0, 0)) at time zone v_tz,
          ((current_date + 2) + make_time(10 + row_number() over () :: int, 30, 0)) at time zone v_tz,
-         'booked', 'online', 1300
+         'booked', 'online', 'otp', 1300
   from (select id from public.clients where business_id = v_business order by created_at limit 3) c;
 end;
 $$;

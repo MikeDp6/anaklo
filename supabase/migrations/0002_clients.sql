@@ -75,6 +75,9 @@ create table public.clients (
   business_id uuid not null references public.businesses (id) on delete restrict,
   full_name text not null,
   phone_e164 text constraint clients_phone check (phone_e164 ~ '^\+[1-9][0-9]{7,14}$'),
+  -- last time the client proved this number with an OTP (ADR-0006); a staff-typed number is
+  -- unverified. Cleared automatically when the number changes.
+  phone_verified_at timestamptz,
   email text constraint clients_email check (char_length(email) <= 254 and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   birthday date,
   locale text not null default 'el' constraint clients_locale check (locale in ('el', 'en')),
@@ -89,6 +92,7 @@ create table public.clients (
     (erased_at is null and char_length(full_name) between 1 and 120)
     or (erased_at is not null and full_name = '' and phone_e164 is null and email is null and birthday is null)
   ),
+  constraint clients_phone_verified_needs_phone check (phone_verified_at is null or phone_e164 is not null),
   constraint clients_business_id_key unique (business_id, id),
   constraint clients_merged_into_fk foreign key (business_id, merged_into_id)
     references public.clients (business_id, id) on delete restrict,
@@ -115,6 +119,26 @@ $$;
 create trigger clients_search_text
   before insert or update of full_name, phone_e164 on public.clients
   for each row execute function private.set_client_search_text();
+
+-- A verification belongs to a number, not to the client: a new number starts unverified, unless
+-- the same statement verifies it (the OTP flow sets both columns together).
+create function private.reset_phone_verification()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.phone_e164 is distinct from old.phone_e164
+     and new.phone_verified_at is not distinct from old.phone_verified_at then
+    new.phone_verified_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger clients_phone_verification
+  before update of phone_e164 on public.clients
+  for each row execute function private.reset_phone_verification();
 
 -- ---------------------------------------------------------------------------------------------
 -- client_consents: records, not booleans. Marketing needs a legal basis (SPEC §11).
@@ -153,13 +177,25 @@ create table public.client_consents (
 create index client_consents_client_idx on public.client_consents (business_id, client_id, purpose);
 
 -- A consent record is evidence: the only change ever allowed is a withdrawal, once, stamped now.
--- A withdrawn consent can never be reactivated (a new grant is a new record).
-create function private.guard_consent_withdrawal()
+-- A withdrawn consent can never be reactivated (a new grant is a new record). The trigger fires
+-- on EVERY update and compares whole rows, so it also binds service_role and future columns:
+-- purpose, basis, source, dates or the client can never be rewritten.
+-- One exception: deleting the auth user who recorded a consent makes the FK set created_by to
+-- null. That change alone passes, otherwise no staff account could ever be deleted.
+create function private.guard_consent_update()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
+  if old.created_by is not null and new.created_by is null
+     and (to_jsonb(new) - 'created_by') = (to_jsonb(old) - 'created_by') then
+    return new;
+  end if;
+  if (to_jsonb(new) - 'withdrawn_at') is distinct from (to_jsonb(old) - 'withdrawn_at') then
+    raise exception 'a consent record cannot be changed, only withdrawn'
+      using errcode = '23514';
+  end if;
   if old.withdrawn_at is not null or new.withdrawn_at is null then
     raise exception 'a consent can only be withdrawn once and never reactivated'
       using errcode = '23514';
@@ -169,9 +205,9 @@ begin
 end;
 $$;
 
-create trigger client_consents_withdrawal
-  before update of withdrawn_at on public.client_consents
-  for each row execute function private.guard_consent_withdrawal();
+create trigger client_consents_guard_update
+  before update on public.client_consents
+  for each row execute function private.guard_consent_update();
 
 -- ---------------------------------------------------------------------------------------------
 -- client_notes

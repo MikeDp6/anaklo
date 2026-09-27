@@ -14,17 +14,20 @@ create extension if not exists pg_trgm with schema extensions;
 -- Nothing created by migrations is reachable through the Data API unless granted explicitly.
 -- Functions: PostgreSQL grants EXECUTE to PUBLIC globally and per-schema defaults cannot undo
 -- that, so the global default is revoked too. Behaviour no longer depends on CLI/cloud defaults.
-alter default privileges revoke execute on functions from public;
-alter default privileges in schema public revoke all on tables from anon, authenticated, service_role;
-alter default privileges in schema public revoke all on sequences from anon, authenticated, service_role;
-alter default privileges in schema public revoke execute on functions from public, anon, authenticated, service_role;
+-- Default privileges belong to the role that creates the objects. `for role postgres` names it
+-- explicitly (migrations, the CLI and the dashboard all create objects as postgres), so the
+-- rules do not silently depend on which login happened to run this file.
+alter default privileges for role postgres revoke execute on functions from public;
+alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke execute on functions from public, anon, authenticated, service_role;
 
 -- `private` is never exposed through the Data API. API roles need USAGE only so that public
 -- wrappers and RLS policies can call the specific functions granted to them.
 create schema if not exists private;
 revoke all on schema private from public;
 grant usage on schema private to anon, authenticated, service_role;
-alter default privileges in schema private revoke execute on functions from public, anon, authenticated, service_role;
+alter default privileges for role postgres in schema private revoke execute on functions from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------------------------
 -- Pure helpers
@@ -273,7 +276,15 @@ create table public.working_hours (
   end_time time not null,
   constraint working_hours_order check (end_time > start_time),
   constraint working_hours_staff_fk foreign key (business_id, staff_id)
-    references public.staff (business_id, id) on delete restrict
+    references public.staff (business_id, id) on delete restrict,
+  -- Several intervals per day (split shift), never overlapping: an overlap would double the
+  -- free time availability sees. There is no range type for `time`, so the interval is placed on
+  -- a fixed date; back-to-back intervals ('[)') are allowed.
+  constraint working_hours_no_overlap exclude using gist (
+    staff_id with =,
+    weekday with =,
+    tsrange(date '2000-01-01' + start_time, date '2000-01-01' + end_time, '[)') with &&
+  )
 );
 
 create index working_hours_staff_idx on public.working_hours (business_id, staff_id, weekday);
@@ -294,7 +305,19 @@ create table public.schedule_exceptions (
     or (kind = 'open' and start_time is not null and end_time is not null and end_time > start_time)
   ),
   constraint schedule_exceptions_staff_fk foreign key (business_id, staff_id)
-    references public.staff (business_id, id) on delete restrict
+    references public.staff (business_id, id) on delete restrict,
+  -- Per scope (the shop, or one staff member) and date: 'closed' covers the whole day, so it
+  -- conflicts with anything else on that date; 'open' intervals may be several but never overlap.
+  -- A shop exception and a staff exception on the same date are different scopes (precedence).
+  constraint schedule_exceptions_no_overlap exclude using gist (
+    business_id with =,
+    (coalesce(staff_id, '00000000-0000-0000-0000-000000000000'::uuid)) with =,
+    tsrange(
+      coalesce(local_date + start_time, local_date::timestamp),
+      coalesce(local_date + end_time, (local_date + 1)::timestamp),
+      '[)'
+    ) with &&
+  )
 );
 
 create index schedule_exceptions_date_idx on public.schedule_exceptions (business_id, local_date);
@@ -305,8 +328,9 @@ create table public.time_off (
   staff_id uuid not null,
   starts_at timestamptz not null,
   ends_at timestamptz not null,
-  -- a closed list on purpose: free text here tends to collect health data
-  reason text not null default 'other' constraint time_off_reason check (reason in ('vacation', 'sick', 'personal', 'other')),
+  -- A closed list on purpose, and deliberately neutral: free text or a 'sick' value would record
+  -- health data about the employee (GDPR art. 9). 'leave' covers any absence without a reason.
+  reason text not null default 'other' constraint time_off_reason check (reason in ('vacation', 'leave', 'personal', 'other')),
   created_at timestamptz not null default now(),
   constraint time_off_order check (ends_at > starts_at),
   constraint time_off_staff_fk foreign key (business_id, staff_id)
@@ -453,7 +477,18 @@ create policy audit_log_select on public.audit_log for select to authenticated
 -- ---------------------------------------------------------------------------------------------
 -- Grants (anon gets nothing on tables)
 -- ---------------------------------------------------------------------------------------------
-grant select, update on public.businesses to authenticated;
+-- businesses: owner/manager edit the profile and the booking policy. slug, timezone, currency
+-- and vertical are not updatable through the API, not even by the owner: a slug change breaks
+-- every shared link, a time zone change moves the local time of every future appointment and a
+-- currency change alters the meaning of every amount. They change only through owner-only RPCs
+-- that handle those consequences (settings, Phase 1/5).
+grant select on public.businesses to authenticated;
+grant update (
+  name, locale, phone_e164, booking_enabled,
+  slot_step_min, min_notice_min, max_advance_days, cancel_min_notice_min,
+  auto_complete_after_min, correction_window_days, allow_any_staff,
+  theme, settings, messaging_enabled
+) on public.businesses to authenticated;
 grant select, insert, update, delete on public.business_members to authenticated;
 grant select, insert, update, delete on public.staff to authenticated;
 grant select, insert, update, delete on public.service_categories to authenticated;

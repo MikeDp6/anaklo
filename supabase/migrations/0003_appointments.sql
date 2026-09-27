@@ -19,6 +19,9 @@ create table public.appointments (
   source text not null
     constraint appointments_source check (source in ('online', 'phone', 'walkin', 'staff', 'import')),
   referrer text constraint appointments_referrer_length check (char_length(referrer) <= 100),
+  -- how the client proved the phone of an ONLINE booking (ADR-0006); every other source is
+  -- entered by the business. Lets no-show rates and OTP costs be measured per path.
+  verified_via text constraint appointments_verified_via check (verified_via in ('otp', 'trusted_device')),
   total_cents integer not null default 0 constraint appointments_total check (total_cents >= 0),
   charged_cents integer constraint appointments_charged check (charged_cents >= 0),
   cancelled_by text constraint appointments_cancelled_by check (cancelled_by in ('client', 'business', 'system')),
@@ -35,6 +38,7 @@ create table public.appointments (
   constraint appointments_cancelled_consistency check ((status = 'cancelled') = (cancelled_by is not null)),
   constraint appointments_cancel_reason_only_cancelled check (cancel_reason is null or status = 'cancelled'),
   constraint appointments_charged_only_completed check (charged_cents is null or status = 'completed'),
+  constraint appointments_online_verified check ((source = 'online') = (verified_via is not null)),
   constraint appointments_business_id_key unique (business_id, id),
   constraint appointments_client_fk foreign key (business_id, client_id)
     references public.clients (business_id, id) on delete restrict,
@@ -42,6 +46,8 @@ create table public.appointments (
     references public.staff (business_id, id) on delete restrict,
   -- Double booking is impossible at database level. Buffers are enforced by availability and
   -- book_appointment (Phase 1), not here, so staff can deliberately squeeze an appointment in.
+  -- book_appointment re-checks availability (buffers included) under an advisory lock per
+  -- business and local day, so two concurrent online bookings cannot land in a buffer either.
   constraint appointments_no_overlap exclude using gist (
     staff_id with =,
     tstzrange(starts_at, ends_at, '[)') with &&
@@ -98,22 +104,32 @@ create table public.appointment_events (
 
 create index appointment_events_appointment_idx on public.appointment_events (business_id, appointment_id, occurred_at);
 
--- Who is acting. Every RPC and job sets `anaklo.actor_type` transaction-locally
+-- Who is acting. Every RPC and job declares it transaction-locally
 -- (set_config('anaklo.actor_type', 'client' | 'system' | 'import', true)): the booking/manage
--- RPCs 'client', cron jobs 'system', the importer 'import'. Without it, a signed-in user is
--- 'staff' and anything else is 'system'.
+-- RPCs 'client', cron and service jobs 'system', the importer 'import'. A signed-in user who
+-- declares nothing is 'staff'. Anything else fails: 'system' may correct any outcome, so a
+-- writer that forgot to declare itself must never be taken for the system.
 create function private.current_actor_type()
 returns text
-language sql
+language plpgsql
 stable
 set search_path = ''
 as $$
-  select case
-    when current_setting('anaklo.actor_type', true) in ('client', 'staff', 'system', 'import')
-      then current_setting('anaklo.actor_type', true)
-    when (select auth.uid()) is not null then 'staff'
-    else 'system'
-  end;
+declare
+  v_declared text := nullif(current_setting('anaklo.actor_type', true), '');
+begin
+  if v_declared in ('client', 'staff', 'system', 'import') then
+    return v_declared;
+  end if;
+  if v_declared is not null then
+    raise exception 'unknown anaklo.actor_type: %', v_declared using errcode = '22023';
+  end if;
+  if (select auth.uid()) is not null then
+    return 'staff';
+  end if;
+  raise exception 'no actor: declare anaklo.actor_type (client, system or import) before writing appointments'
+    using errcode = '42501';
+end;
 $$;
 
 -- SECURITY DEFINER: the API roles have SELECT only on appointment_events; only this trigger writes.
