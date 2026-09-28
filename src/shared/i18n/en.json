@@ -82,6 +82,15 @@
   },
   "errors": {
     "pageNotFoundTitle": "This page does not exist",
-    "pageNotFoundBody": "The link you followed leads nowhere."
+    "pageNotFoundBody": "The link you followed leads nowhere.",
+    "AN001": "This time was just booked. Please choose another time.",
+    "AN002": "Choose a range of up to 14 days.",
+    "AN003": "The service you chose is not available. Please choose again.",
+    "AN004": "This request was already sent with different details. Refresh the page and try again.",
+    "AN005": "This time is outside working hours. Confirm that you want to book outside working hours.",
+    "AN006": "This time falls in the break after another appointment. Confirm that you want to squeeze it in.",
+    "AN007": "The client was not found. Choose or add the client again.",
+    "AN008": "This professional is not available. Please choose someone else.",
+    "AN009": "Online booking is not available right now."
   }
 }

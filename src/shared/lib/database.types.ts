@@ -81,13 +81,13 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "buffer_after_min": number,"business_id": string,"cancel_reason": string | null,"cancelled_by": string | null,"charged_cents": number | null,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_at": string,"external_ref": string | null,"id": string,"idempotency_key": string | null,"referrer": string | null,"source": string,"staff_id": string,"starts_at": string,"status": string,"total_cents": number,"verified_via": string | null
+                    "buffer_after_min": number,"business_id": string,"cancel_reason": string | null,"cancelled_by": string | null,"charged_cents": number | null,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_at": string,"external_ref": string | null,"id": string,"idempotency_key": string | null,"referrer": string | null,"request_hash": string | null,"source": string,"staff_id": string,"starts_at": string,"status": string,"total_cents": number,"verified_via": string | null
                   }
                   Insert: {
-                    "buffer_after_min"?: number,"business_id": string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source": string,"staff_id": string,"starts_at": string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
+                    "buffer_after_min"?: number,"business_id": string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"request_hash"?: string | null,"source": string,"staff_id": string,"starts_at": string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
                   }
                   Update: {
-                    "buffer_after_min"?: number,"business_id"?: string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"source"?: string,"staff_id"?: string,"starts_at"?: string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
+                    "buffer_after_min"?: number,"business_id"?: string,"cancel_reason"?: string | null,"cancelled_by"?: string | null,"charged_cents"?: number | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"external_ref"?: string | null,"id"?: string,"idempotency_key"?: string | null,"referrer"?: string | null,"request_hash"?: string | null,"source"?: string,"staff_id"?: string,"starts_at"?: string,"status"?: string,"total_cents"?: number,"verified_via"?: string | null
                   }
                   Relationships: [
                     {
@@ -156,13 +156,13 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"locale": string,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"settings": NonNullable<Json>,"slot_step_min": number,"slug": string,"theme": NonNullable<Json>,"timezone": string,"vertical": string
+                    "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"settings": NonNullable<Json>,"slot_step_min": number,"slug": string,"theme": NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Insert: {
-                    "allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug": string,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug": string,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Update: {
-                    "allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug"?: string,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug"?: string,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
                   }
                   Relationships: [
                     
@@ -417,10 +417,26 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "public_business_profile":
+            "available_slots":
+{ Args: { "p_from": string,"p_service_ids": (string)[],"p_slug": string,"p_staff_id": string,"p_to": string }; Returns: {
+              "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
+            }[]
+                           },
+"public_booking_catalogue":
+{ Args: { "p_slug": string }; Returns: Json
+                           },
+"public_business_profile":
 { Args: { "p_slug": string }; Returns: {
               "locale": string,"name": string,"slug": string,"theme": Json,"timezone": string,"vertical": string
             }[]
+                           },
+"staff_available_slots":
+{ Args: { "p_business_id": string,"p_exclude_appointment_id"?: string,"p_from": string,"p_service_ids": (string)[],"p_staff_id": string,"p_to": string }; Returns: {
+              "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
+            }[]
+                           },
+"staff_book_appointment":
+{ Args: { "p_allow_buffer_overlap"?: boolean,"p_allow_outside_hours"?: boolean,"p_business_id": string,"p_client_id"?: string,"p_idempotency_key"?: string,"p_new_client"?: Json,"p_service_ids": (string)[],"p_source"?: string,"p_staff_id": string,"p_starts_at": string }; Returns: Json
                            }
           }
           Enums: {

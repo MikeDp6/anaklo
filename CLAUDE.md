@@ -41,6 +41,7 @@ npm run check:secrets # τρέχει αυτόματα μετά το build: κα�
 npm run db:start     # τοπικό Supabase (Docker)
 npm run db:reset     # migrations + seed στην τοπική βάση
 npm run db:test      # pgTAP
+npm run test:race    # ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (θέλει db:start· όχι μαζί με e2e)
 npm run db:push      # ΝΕΑ migrations στο συνδεδεμένο (remote) project
 npm run db:reset:dev # ξαναχτίζει τη remote DEV βάση (μόνο πριν τα πραγματικά δεδομένα)
 npm run db:test:dev  # pgTAP πάνω στη remote DEV βάση (rollback, δεν αφήνει δεδομένα)

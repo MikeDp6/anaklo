@@ -21,9 +21,11 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.db.config.ts",
     "playwright.config.ts",
     "eslint.config.js",
     "scripts",
-    "e2e"
+    "e2e",
+    "tests"
   ]
 }

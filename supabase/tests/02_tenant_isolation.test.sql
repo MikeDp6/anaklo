@@ -8,7 +8,7 @@ set local role postgres;
 set local search_path = public, extensions;
 -- Fixture appointments are written by the system (appointment writes must declare an actor).
 select set_config('anaklo.actor_type', 'system', true);
-select plan(18);
+select plan(22);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres)
@@ -202,6 +202,103 @@ select throws_ok(
 );
 
 set local role postgres;
+
+-- ---------------------------------------------------------------------------------------------
+-- Generic loop over every business-scoped RPC (phase-1 plan, «Απομόνωση επιχειρήσεων στις RPCs»):
+-- each function in public that authenticated may execute and that takes p_business_id is called
+-- by a member of A (the owner at aal2 with a fresh authenticator code, and a staff member) with
+-- the id of B and NULL in every other argument. Membership is checked first, so every call must
+-- fail with 42501, whatever else the arguments would have caused. New RPCs join automatically.
+-- ---------------------------------------------------------------------------------------------
+create temp table tenant_rpc_calls (proname text, signature text, caller text, outcome text) on commit drop;
+
+-- Signed-in users declare no actor (a declared 'system' would outrank the JWT).
+select set_config('anaklo.actor_type', '', true);
+
+do $loop$
+declare
+  v_caller record;
+  v_fn record;
+  v_outcome text;
+begin
+  for v_caller in
+    select c.label, c.claims
+    from (values
+      ('owner (aal2)', json_build_object(
+          'sub', 'a0000000-0000-4000-8000-00000000000a', 'role', 'authenticated', 'aal', 'aal2',
+          'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint))
+        )::text),
+      ('staff', json_build_object(
+          'sub', 'a0000000-0000-4000-8000-0000000000a2', 'role', 'authenticated', 'aal', 'aal1',
+          'amr', json_build_array(json_build_object('method', 'otp', 'timestamp', extract(epoch from now())::bigint))
+        )::text)
+    ) c (label, claims)
+  loop
+    for v_fn in
+      select
+        p.proname::text as proname,
+        p.oid::regprocedure::text as signature,
+        format('%I.%I', n.nspname, p.proname) as qualified,
+        (select coalesce(string_agg(
+                  case when a.mode = 'v' then 'variadic ' else '' end
+                  || case when a.name = 'p_business_id'
+                          then quote_literal('b1000000-0000-4000-8000-000000000001') || '::uuid'
+                          else 'null::' || format_type(a.typ, null) end,
+                  ', ' order by a.ord), '')
+         from unnest(
+                coalesce(p.proallargtypes, p.proargtypes::oid[]),
+                p.proargnames,
+                coalesce(p.proargmodes, array_fill('i'::"char", array[p.pronargs::int]))
+              ) with ordinality as a (typ, name, mode, ord)
+         where a.mode in ('i', 'b', 'v')) as args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and has_function_privilege('authenticated', p.oid, 'execute')
+        and 'p_business_id' = any (coalesce(p.proargnames, '{}'::text[]))
+      order by 2
+    loop
+      perform set_config('request.jwt.claims', v_caller.claims, true);
+      execute 'set local role authenticated';
+      begin
+        execute format('select * from %s(%s)', v_fn.qualified, v_fn.args);
+        v_outcome := 'no error';
+      exception when others then
+        v_outcome := sqlstate;
+      end;
+      execute 'set local role postgres';
+      insert into tenant_rpc_calls values (v_fn.proname, v_fn.signature, v_caller.label, v_outcome);
+    end loop;
+  end loop;
+  perform set_config('request.jwt.claims', '', true);
+end
+$loop$;
+
+select set_config('anaklo.actor_type', 'system', true);
+
+select ok(
+  (select count(distinct signature) from tenant_rpc_calls) >= 2,
+  'the generic loop found at least 2 business-scoped RPCs'
+);
+
+select ok(
+  array['staff_available_slots', 'staff_book_appointment'] <@ (select array_agg(proname) from tenant_rpc_calls),
+  'the loop covers staff_available_slots and staff_book_appointment'
+);
+
+select is(
+  (select array_agg(signature || ' -> ' || outcome order by signature)
+   from tenant_rpc_calls where caller = 'owner (aal2)' and outcome <> '42501'),
+  null::text[],
+  'the owner of A (aal2, fresh code) gets 42501 from every business-scoped RPC called with the id of B'
+);
+
+select is(
+  (select array_agg(signature || ' -> ' || outcome order by signature)
+   from tenant_rpc_calls where caller = 'staff' and outcome <> '42501'),
+  null::text[],
+  'a staff member of A gets 42501 from every business-scoped RPC called with the id of B'
+);
 
 select * from finish();
 rollback;

@@ -35,6 +35,14 @@ describe('proxy allow-list', () => {
     expect(isAllowedProxyRoute('POST', '/rest/v1/clients')).toBe(false)
     expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/public_business_profile/')).toBe(false)
   })
+
+  it('lets the booking page reach the catalogue and slot RPCs (1.2) and nothing else of 0004', () => {
+    expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/public_booking_catalogue')).toBe(true)
+    expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/available_slots')).toBe(true)
+    expect(isAllowedProxyRoute('GET', '/rest/v1/rpc/available_slots')).toBe(false)
+    expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/staff_available_slots')).toBe(false)
+    expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/staff_book_appointment')).toBe(false)
+  })
 })
 
 describe('isUuid', () => {

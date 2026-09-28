@@ -52,6 +52,9 @@ export type ProxyRoute = { readonly method: 'GET' | 'POST'; readonly path: strin
  */
 export const PROXY_ALLOW_LIST: readonly ProxyRoute[] = [
   { method: 'POST', path: '/rest/v1/rpc/public_business_profile' },
+  // 1.2: the booking page's catalogue and free slots (anon RPCs, 0004)
+  { method: 'POST', path: '/rest/v1/rpc/public_booking_catalogue' },
+  { method: 'POST', path: '/rest/v1/rpc/available_slots' },
   { method: 'GET', path: '/functions/v1/health' },
   { method: 'POST', path: '/functions/v1/spike-td' },
 ]

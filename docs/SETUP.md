@@ -46,6 +46,7 @@ npm run db:start
 | `npm run lint` | ESLint |
 | `npm test` | Vitest (τρέχει πάντα σε UTC, όποια ώρα κι αν έχει ο υπολογιστής) |
 | `npm run db:test` | pgTAP: RLS, δικαιώματα, διπλοκράτηση, events κ.λπ. |
+| `npm run test:race` | Ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (20 στην ίδια ώρα → 1 ραντεβού). Θέλει `db:start`· μην το τρέχεις μαζί με το `e2e` (συνδέουν τον ίδιο owner). |
 | `npm run e2e` | Playwright σε μέγεθος κινητού (Chrome + WebKit). Θέλει να τρέχει το `db:start`. Από το βήμα 1.1 θέλει και `PROXY_SECRET` και `APP_ENV=local` στο `.env.local`. |
 | `npm run build`, μετά `npm run size` | Build και έλεγχος ότι η σελίδα κράτησης μένει ≤ 120 KB gzip |
 | `npm run gen:types` | Ξαναφτιάχνει το `src/shared/lib/database.types.ts` από την τοπική βάση. Τρέξ' το μετά από κάθε αλλαγή σχήματος: το CI ελέγχει με το `check:types` ότι είναι ενημερωμένο. |

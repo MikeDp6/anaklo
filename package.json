@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:race": "vitest run --config vitest.db.config.ts",
     "e2e": "playwright test",
     "size": "node scripts/check-size.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",

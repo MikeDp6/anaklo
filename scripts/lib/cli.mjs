@@ -202,8 +202,9 @@ export function runNpmScript(script, env) {
 }
 
 /**
- * Local stack address and secret key, from `supabase status` (the stack must be running).
- * @returns {{ apiUrl: string, secretKey: string }}
+ * Local stack address and keys, from `supabase status` (the stack must be running). Used by
+ * `provision:local` and the database integration tests (`npm run test:race`).
+ * @returns {{ apiUrl: string, publishableKey: string, secretKey: string }}
  */
 export function localSupabase() {
   const result = runTool('supabase', ['status', '-o', 'json'], { capture: true })
@@ -217,13 +218,14 @@ export function localSupabase() {
     // handled below
   }
   const apiUrl = typeof status.API_URL === 'string' ? status.API_URL : ''
+  const publishableKey = typeof status.PUBLISHABLE_KEY === 'string' ? status.PUBLISHABLE_KEY : ''
   const secretKey = typeof status.SECRET_KEY === 'string' ? status.SECRET_KEY : ''
-  if (result.status !== 0 || !apiUrl || !secretKey) {
+  if (result.status !== 0 || !apiUrl || !publishableKey || !secretKey) {
     throw new Error('Could not read the local stack from `supabase status`. Run: npm run db:start')
   }
   const host = new URL(apiUrl).hostname
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
     throw new Error(`supabase status reports a non-local API URL (${apiUrl}); refusing.`)
   }
-  return { apiUrl, secretKey }
+  return { apiUrl, publishableKey, secretKey }
 }
