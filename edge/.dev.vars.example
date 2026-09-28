@@ -1,0 +1,7 @@
+# Local values for `npm run edge:dev` (wrangler dev against the local Supabase stack, after
+# `npm run build`). Copy to edge/.dev.vars (gitignored). These override the vars in wrangler.jsonc.
+APP_ENV=local
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_REGION=
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+PROXY_SECRET=local-dev-proxy-secret-change-me

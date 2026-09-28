@@ -26,6 +26,8 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
+      # Edge Functions: deno check + deno lint (the pinned deno npm devDependency)
+      - run: npm run fn:check
       - run: npm test
       - run: npm run build
         env:
@@ -37,6 +39,11 @@ jobs:
   database-e2e:
     name: pgTAP + Playwright (local Supabase)
     runs-on: ubuntu-latest
+    # One value for Vite (the /api proxy middleware) and the edge runtime ([edge_runtime.secrets]
+    # resolves env(PROXY_SECRET) from the environment). Test-only, not a real secret; ≥ 16 chars.
+    env:
+      PROXY_SECRET: ci-local-proxy-secret-not-a-secret
+      APP_ENV: local
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -44,8 +51,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Start Supabase (migrations + seed)
-        run: npx supabase start -x studio,imgproxy,logflare,vector,edge-runtime,mailpit,supavisor
+      # edge-runtime and mailpit stay ON: /api/functions/v1/* needs the functions, and the pro
+      # sign-in e2e reads the email code from Mailpit.
+      - name: Start Supabase (migrations + seed, Edge Functions, Mailpit)
+        run: npx supabase start -x studio,imgproxy,logflare,vector,supavisor
       - name: pgTAP
         run: npx supabase test db
       - name: Generated DB types are up to date

@@ -14,3 +14,8 @@ export function resolveBookingRoute(pathname: string): BookingRoute {
   if (match?.[1]) return { kind: 'business', slug: match[1].toLowerCase() }
   return { kind: 'not-found' }
 }
+
+/** TEMPORARY (step 1.1): `?spike=td` shows the trusted-device test panel on a business page. */
+export function isTrustedDeviceSpike(search: string): boolean {
+  return new URLSearchParams(search).get('spike') === 'td'
+}

@@ -1,0 +1,15 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.brand {
+  color: var(--color-brand);
+  font-weight: 700;
+}

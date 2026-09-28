@@ -3,6 +3,11 @@ import '@/styles/tokens.css'
 import '@/styles/base.css'
 import { mount } from '../shared/mount'
 import { BookingApp } from './BookingApp'
-import { resolveBookingRoute } from './route'
+import { isTrustedDeviceSpike, resolveBookingRoute } from './route'
 
-await mount(<BookingApp route={resolveBookingRoute(window.location.pathname)} />)
+await mount(
+  <BookingApp
+    route={resolveBookingRoute(window.location.pathname)}
+    spike={isTrustedDeviceSpike(window.location.search)}
+  />,
+)

@@ -11,7 +11,8 @@
     "build": "vite build",
     "postbuild": "node scripts/check-secrets.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
+    "edge:dev": "wrangler dev --config edge/wrangler.jsonc",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json && tsc -p tsconfig.edge.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -28,7 +29,15 @@
     "db:test:dev": "supabase test db --linked",
     "db:push": "supabase db push",
     "db:reset:dev": "node scripts/db-reset-dev.mjs",
+    "fn:check": "node scripts/fn-check.mjs",
+    "fn:serve": "supabase functions serve --env-file .env.local",
+    "fn:deploy:dev": "node scripts/fn-deploy-dev.mjs",
+    "provision:dev": "node scripts/provision-business.mjs",
+    "provision:local": "node scripts/provision-business.mjs --local",
+    "deploy:dev": "node scripts/deploy-dev.mjs",
+    "secrets:dev": "node scripts/secrets-dev.mjs",
     "gen:types": "node scripts/gen-types.mjs",
+    "gen:icons": "node scripts/gen-icons.mjs",
     "prepare": "husky",
     "check:types": "node scripts/gen-types.mjs --check"
   },
@@ -46,6 +55,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260927.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "7.0.1",
@@ -54,6 +64,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
+    "deno": "2.9.6",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",
@@ -67,7 +78,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
     "vite": "8.3.1",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "wrangler": "4.142.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [

@@ -1,0 +1,6 @@
+.panel {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: 0 var(--space-4) var(--space-7);
+}

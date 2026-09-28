@@ -19,7 +19,66 @@
   },
   "pro": {
     "todayTitle": "Today",
-    "todayPlaceholder": "Here you will see today's appointments, the gaps and which clients are overdue."
+    "todayPlaceholder": "Here you will see today's appointments, the gaps and which clients are overdue.",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "loadErrorTitle": "The app did not load",
+    "loadErrorBody": "Check your connection and try again.",
+    "login": {
+      "title": "Sign in",
+      "intro": "Enter your email. We will send you a 6-digit code.",
+      "emailLabel": "Email",
+      "emailInvalid": "Enter a valid email.",
+      "sendCode": "Send me a code",
+      "sendingCode": "Sending…",
+      "codeSentNeutral": "If this email has an account, we have sent you a code.",
+      "codeFor": "Email: {{email}}",
+      "codeHint": "The code expires in 10 minutes.",
+      "codeLabel": "6-digit code",
+      "codeInvalidFormat": "The code has 6 digits.",
+      "verify": "Sign in",
+      "verifying": "Signing in…",
+      "resend": "Send a new code",
+      "changeEmail": "Different email",
+      "errorNetwork": "Cannot reach the server. Check your internet connection and try again.",
+      "errorTooManyRequests": "Too many attempts. Wait a few minutes and try again.",
+      "errorCodeInvalid": "The code is wrong or has expired. Try again or ask for a new code."
+    },
+    "noAccess": {
+      "title": "No access",
+      "body": "Your account does not belong to any business. Ask the owner to add you, or sign in with a different email."
+    },
+    "install": {
+      "title": "Add to your Home Screen first",
+      "intro": "Anaklo works as an app on your Home Screen. That is where you sign in and get notifications.",
+      "stepShare": "Tap the Share button (the square with the arrow pointing up).",
+      "stepAdd": "Choose “Add to Home Screen”.",
+      "stepOpen": "Open Anaklo from your Home Screen and sign in there.",
+      "note": "Signing in here, in the browser, does not carry over to the app."
+    },
+    "push": {
+      "title": "Notifications (test)",
+      "enable": "Turn on notifications",
+      "test": "Test push",
+      "statusLoading": "Loading notifications…",
+      "statusOff": "Notifications are off on this device.",
+      "statusOn": "Notifications are on on this device.",
+      "statusDenied": "Notifications are blocked. Change this in the device settings.",
+      "statusUnsupported": "This device or browser does not support notifications.",
+      "statusNeedsInstall": "Add the app to your Home Screen first.",
+      "statusFailed": "Notifications did not load. Try again later.",
+      "testSent": "The test notification was sent.",
+      "testFailed": "The test notification was not sent. Try again."
+    }
+  },
+  "spike": {
+    "title": "Trusted device test",
+    "checking": "Checking…",
+    "trusted": "Trusted device: the cookie was read.",
+    "issued": "A new cookie was just written. Close the app, open it again and check again.",
+    "none": "There is no cookie on this device.",
+    "error": "The test failed. Try again.",
+    "again": "Check again"
   },
   "errors": {
     "pageNotFoundTitle": "This page does not exist",

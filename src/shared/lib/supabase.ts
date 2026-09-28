@@ -9,5 +9,11 @@ import { readProEnv } from './env'
 const { supabaseUrl, publishableKey } = readProEnv()
 
 export const supabase = createClient<Database>(supabaseUrl, publishableKey, {
-  auth: { persistSession: true, autoRefreshToken: true },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    // Staff sign in with a 6-digit email code, never a link (ADR-0009 §1): no session is ever
+    // read from the URL, so a crafted link cannot plant one.
+    detectSessionInUrl: false,
+  },
 })

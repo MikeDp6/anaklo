@@ -469,7 +469,13 @@ suppression_list      business_id, phone_hmac (HMAC-SHA256 με μυστικό �
 business_slug_aliases business_id, slug, created_at
                       -- παλιά slugs → 301 στο τρέχον (1.7, change_business_identity)· SELECT για τα μέλη,
                       --   καμία εγγραφή από το API· κανένα slug ή alias δεν περνά σε άλλη επιχείρηση
-push_subscriptions    ανά μέλος, RLS user_id = auth.uid()   -- μόνο αν το ADR-0010 καταλήξει σε VAPID (1.5a)
+push_subscriptions    user_id, provider (onesignal|vapid), subscription_id (OneSignal) ή endpoint και
+                      κλειδιά (VAPID), created_at
+                      -- 1.5a, και για τους δύο παρόχους (ADR-0010 §2)· ανά χρήστη, όχι ανά επιχείρηση·
+                      --   UNIQUE subscription_id: ένα κοινό κινητό ανήκει σε έναν χρήστη τη φορά
+                      -- RLS user_id = auth.uid()· εγγραφή μόνο με register/unregister_push_subscription
+                      --   (η νέα καταχώριση μετακινεί τη συσκευή στον καλούντα)
+                      -- push μόνο με include_subscription_ids από εδώ, ποτέ με external_id
 private: platform_settings (πλατφορμικός διακόπτης SMS, όρια· 1.3), job_runs (heartbeats των cron· 1.4)
                       -- platform_settings.fresh_totp_max_age_seconds (1.7): παράθυρο φρέσκου κωδικού,
                       --   προεπιλογή 300, CHECK 0–300 (οι ρυθμίσεις μόνο το αυστηραίνουν)· το τοπικό/e2e
@@ -628,7 +634,7 @@ anaklo/
 3. **Καμία λογική επιχείρησης στα components:** component → hook → lib → api.
 4. **Κάθε εξωτερική είσοδος περνά από Zod**, και στο frontend και στις Edge Functions.
 5. **Καμία καρφωτή φράση**, ούτε σε SMS, email, push ή validation: όλα από i18n. Εξαιρέσεις θέσης (με test el = en):
-   - τα κείμενα των SMS στο `supabase/functions/_shared/sms-templates.ts` (el/en, ADR-0007), που αποδίδονται με το `renderSms` (§12), και τα κείμενα push στο `_shared/push-templates.ts` (el/en, ADR-0010, από το 1.5a), γιατί τα στέλνουν οι Edge Functions
+   - τα κείμενα των SMS στο `supabase/functions/_shared/sms-templates.ts` (el/en, ADR-0007), που αποδίδονται με το `renderSms` (§12), και τα κείμενα push στο `_shared/push-templates.ts` (el/en, ADR-0010, από το 1.1), γιατί τα στέλνουν οι Edge Functions
    - το email σύνδεσης προσωπικού, στατικό και δίγλωσσο στο πρότυπο του Supabase (`supabase/templates/`, ADR-0009), μέχρι το Send Email Hook
    - τα email ασφαλείας (αλλαγή συσκευής κωδικών χωρίς άδεια) στο `supabase/functions/_shared/security-email-templates.ts` (el/en, 1.9), γιατί τα στέλνει ο dispatch
 6. Χρήματα μόνο μέσω `money.ts`, ημερομηνίες μόνο μέσω `dates.ts`, τηλέφωνα μόνο μέσω `phone.ts`, SMS μόνο μέσω `sms.ts`.

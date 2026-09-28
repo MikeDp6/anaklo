@@ -1,0 +1,33 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-line);
+}
+
+.title {
+  font-size: var(--text-lg);
+}
+
+.status {
+  color: var(--color-muted);
+}
+
+.secondary {
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-brand);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

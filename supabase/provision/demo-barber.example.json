@@ -1,0 +1,88 @@
+{
+  "business": {
+    "slug": "demo-provision",
+    "name": "Demo Provision Barber",
+    "vertical": "barber",
+    "timezone": "Europe/Athens",
+    "currency": "EUR",
+    "locale": "el",
+    "phone": "2610000001",
+    "booking_enabled": true,
+    "messaging_enabled": true,
+    "policy": {
+      "slot_step_min": 15,
+      "min_notice_min": 60,
+      "max_advance_days": 60,
+      "cancel_min_notice_min": 120,
+      "auto_complete_after_min": 720,
+      "correction_window_days": 3,
+      "allow_any_staff": true
+    },
+    "theme": {
+      "primary": "#2F6B5E",
+      "accent": "#1F1F1F",
+      "surface": "light",
+      "radius": 12,
+      "font": "manrope"
+    }
+  },
+  "categories": [{ "name": "Μαλλιά" }, { "name": "Γένια" }],
+  "services": [
+    {
+      "name": "Κούρεμα",
+      "category": "Μαλλιά",
+      "duration_min": 30,
+      "buffer_after_min": 5,
+      "price_cents": 1300
+    },
+    {
+      "name": "Κούρεμα + γένια",
+      "category": "Μαλλιά",
+      "duration_min": 45,
+      "buffer_after_min": 5,
+      "price_cents": 1800
+    },
+    { "name": "Γένια", "category": "Γένια", "duration_min": 15, "price_cents": 700 },
+    {
+      "name": "Χρώμα γενιών",
+      "category": "Γένια",
+      "duration_min": 20,
+      "price_cents": 900,
+      "online_bookable": false
+    }
+  ],
+  "staff": [
+    {
+      "display_name": "Σταύρος",
+      "color": "#2F6B5E",
+      "login": { "email": "owner@demo-provision.test", "role": "owner" },
+      "services": "all",
+      "hours": {
+        "tue": ["09:00-14:00", "17:00-21:00"],
+        "wed": ["09:00-14:00", "17:00-21:00"],
+        "thu": ["09:00-14:00", "17:00-21:00"],
+        "fri": ["09:00-14:00", "17:00-21:00"],
+        "sat": ["09:00-16:00"]
+      }
+    },
+    {
+      "display_name": "Μάριος",
+      "color": "#8A5A44",
+      "login": { "email": "barber@demo-provision.test", "role": "staff" },
+      "services": [{ "service": "Κούρεμα", "custom_duration_min": 35 }, "Κούρεμα + γένια", "Γένια"],
+      "hours": {
+        "tue": ["10:00-18:00"],
+        "wed": ["10:00-18:00"],
+        "fri": ["12:00-21:00"],
+        "sat": ["09:00-12:00", "12:00-16:00"]
+      }
+    },
+    {
+      "display_name": "Βοηθός",
+      "color": "#4F7CAC",
+      "services": ["Κούρεμα"],
+      "hours": { "sat": ["10:00-14:00"] }
+    }
+  ],
+  "members": [{ "email": "manager@demo-provision.test", "role": "manager" }]
+}

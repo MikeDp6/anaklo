@@ -156,12 +156,15 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:5173/app/"
+# Anaklo: LOCAL values only (ADR-0009 §7). Remote Auth settings are set by hand from the
+# docs/SETUP.md checklist — never `supabase config push` (it would ship these local values).
+site_url = "http://localhost:5173/app/"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:5173/app/"]
+# A list of URLs (globs allowed) that auth providers are permitted to redirect to post authentication.
+additional_redirect_urls = ["http://localhost:5173/app/**", "http://127.0.0.1:5173/app/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
+# Anaklo: 1-hour access token + refresh token rotation (ADR-0009 §19).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
 # jwt_issuer = ""
@@ -199,7 +202,8 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# Anaklo: raised locally so e2e (Chromium + WebKit + retries) never hits it (ADR-0009 §7).
+email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -235,7 +239,8 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Anaklo: staff sign in with a 6-digit email code that expires in 10 minutes (ADR-0009 §1).
+otp_expiry = 600
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -251,6 +256,13 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# Anaklo: `signInWithOtp` for an existing (confirmed) user sends the "magic link" template, which
+# also carries the code. Code only, NO link: a link would open Safari, outside the installed iOS
+# app (ADR-0009 §1). Static bilingual text, the documented rule-8 exception (ADR-0009 §6).
+[auth.email.template.magic_link]
+subject = "Κωδικός σύνδεσης Anaklo / Anaklo sign-in code"
+content_path = "./supabase/templates/sign-in-code.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
@@ -273,11 +285,13 @@ max_frequency = "5s"
 # 4152127777 = "123456"
 
 # Configure logged in session timeouts.
-# [auth.sessions]
+# Anaklo: 30 days of inactivity end the session; no absolute time-box (ADR-0009 §19). The Free
+# dev project has no such setting, so the app enforces it on the client as well.
+[auth.sessions]
 # Force log out after the specified duration.
 # timebox = "24h"
 # Force log out if the user has been inactive longer than the specified duration.
-# inactivity_timeout = "8h"
+inactivity_timeout = "720h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]
@@ -386,8 +400,37 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Secrets of the LOCAL edge runtime (`npm run db:start`, `npm run fn:serve`). `env(NAME)` is
+# resolved by the CLI from the process environment first, then from `.env.development.local`,
+# `.env.local`, `.env.development`, `.env` in `supabase/` and then in the project root, so the
+# root `.env.local` (from `.env.example`) is enough locally; CI sets PROXY_SECRET as job env.
+# Unset, the CLI passes the literal "env(PROXY_SECRET)", which `requireProxy` refuses (500).
+# The remote project gets its secrets from `npm run secrets:dev`, never from this file.
+[edge_runtime.secrets]
+PROXY_SECRET = "env(PROXY_SECRET)"
+
+# Edge Functions (ADR-0008 §3). Every function needs its own section: fn:check fails without an
+# explicit verify_jwt and the shared import map (the CLI only looks for a deno.json inside the
+# function's own folder). verify_jwt = false only where the function checks the caller itself.
+[functions.health]
+enabled = true
+# Behind the /api proxy (publishable key, not a JWT): checks the proxy secret in code.
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# TEMPORARY (step 1.1): delete with supabase/functions/spike-td at the end of the step.
+[functions.spike-td]
+enabled = true
+# Behind the /api proxy: checks the proxy secret in code.
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# TEMPORARY (ADR-0010 §3, at the latest until 1.5a): delete with supabase/functions/spike-push.
+[functions.spike-push]
+enabled = true
+# Called by the pro app directly with the user's JWT; also re-checked in code.
+verify_jwt = true
+import_map = "./functions/deno.json"
 
 [analytics]
 enabled = true

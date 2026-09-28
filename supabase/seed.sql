@@ -105,3 +105,47 @@ begin
   from (select id from public.clients where business_id = v_business order by created_at limit 3) c;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Synthetic staff accounts for local sign-in and e2e (ADR-0009): email code only, no passwords.
+-- Fixed UUIDs and *.test emails, shared with the e2e specs:
+--   owner    ...a001  owner@demo-barber.test     owner,   staff Νίκος
+--   manager  ...a002  manager@demo-barber.test   manager, no staff row
+--   staff    ...a003  alex@demo-barber.test      staff,   staff Άλεξ
+--   none     ...a004  nomember@demo-barber.test  no membership (the "no access" screen)
+-- GoTrue scans the token columns as strings: they must be empty strings, not NULL, or sign-in
+-- answers 500. Members write no appointments here, so no actor is declared.
+-- ---------------------------------------------------------------------------------------------
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+select
+  '00000000-0000-0000-0000-000000000000', s.id, 'authenticated', 'authenticated', s.email, '', now(),
+  '', '', '', '',
+  '', '', '', '',
+  '{"provider": "email", "providers": ["email"]}', '{}', now(), now()
+from (values
+  ('00000000-0000-4000-8000-00000000a001'::uuid, 'owner@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a002'::uuid, 'manager@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a003'::uuid, 'alex@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a004'::uuid, 'nomember@demo-barber.test')
+) as s (id, email)
+on conflict do nothing;
+
+insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
+select
+  u.id::text, u.id,
+  jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'phone_verified', false),
+  'email', now(), now()
+from auth.users u
+where u.email like '%@demo-barber.test'
+on conflict do nothing;
+
+insert into public.business_members (business_id, user_id, role, staff_id) values
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a001', 'owner', '00000000-0000-4000-8000-000000000101'),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a002', 'manager', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a003', 'staff', '00000000-0000-4000-8000-000000000102')
+on conflict do nothing;

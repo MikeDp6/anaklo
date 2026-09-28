@@ -10,12 +10,19 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+# Playwright signed-in state (storageState files hold live sessions)
+e2e/.auth/
 
 # env & secrets
 .env
 .env.*
 !.env.example
 *.local
+# wrangler (the Worker in edge/): local state and local secrets (copy .dev.vars.example)
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 
 # supabase local state
 supabase/.temp/

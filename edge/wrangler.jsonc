@@ -1,0 +1,29 @@
+// The Cloudflare Worker of dev.anaklo.gr (ADR-0008). Deployed only by `npm run deploy:dev`
+// (scripts/deploy-dev.mjs), after `npm run build` and after every dist/**/*.map is deleted.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "anaklo-dev",
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-01",
+  // No usage telemetry from this project's wrangler runs.
+  "send_metrics": false,
+  "assets": {
+    "directory": "../dist",
+    "binding": "ASSETS",
+    // "none": ASSETS.fetch('/index.html') returns the shell itself (the default answers 307),
+    // and navigations without a matching file reach the Worker (/<slug>, /api, /app/*).
+    "html_handling": "none",
+    "not_found_handling": "none",
+  },
+  "vars": {
+    "APP_ENV": "dev",
+    "SUPABASE_URL": "https://vsugxkoewqwvllzcnnxs.supabase.co",
+    "SUPABASE_REGION": "eu-west-1",
+  },
+  // Secrets (never in this file, never VITE_*): PROXY_SECRET (same value as the Edge Functions)
+  // and SUPABASE_PUBLISHABLE_KEY. Set with `wrangler secret put` by `npm run secrets:dev`
+  // (scripts/secrets-dev.mjs). For `npm run edge:dev`, copy .dev.vars.example to .dev.vars.
+  //
+  // Custom domain: enable once the anaklo.gr zone is on Cloudflare (then workers.dev can go).
+  // "routes": [{ "pattern": "dev.anaklo.gr", "custom_domain": true }],
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBookingRoute } from './route'
+import { isTrustedDeviceSpike, resolveBookingRoute } from './route'
 
 describe('resolveBookingRoute', () => {
   it('serves the landing page at /', () => {
@@ -16,5 +16,14 @@ describe('resolveBookingRoute', () => {
 
   it.each(['/a', '/demo-barber/extra', '/κουρειο', '/-bad', '/bad-'])('%s is not found', (path) => {
     expect(resolveBookingRoute(path)).toEqual({ kind: 'not-found' })
+  })
+})
+
+describe('isTrustedDeviceSpike', () => {
+  it('is on only for ?spike=td', () => {
+    expect(isTrustedDeviceSpike('?spike=td')).toBe(true)
+    expect(isTrustedDeviceSpike('?a=1&spike=td')).toBe(true)
+    expect(isTrustedDeviceSpike('')).toBe(false)
+    expect(isTrustedDeviceSpike('?spike=push')).toBe(false)
   })
 })

@@ -4,6 +4,12 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 
+// No options: `--help` or any other argument is refused before anything runs.
+if (process.argv.length > 2) {
+  console.log('Usage: npm run db:reset:dev   (no arguments; resets the linked DEV database)')
+  process.exit(process.argv.slice(2).every((arg) => arg === '--help' || arg === '-h') ? 0 : 2)
+}
+
 /** @param {string} file */
 function readEnvFile(file) {
   if (!existsSync(file)) return {}

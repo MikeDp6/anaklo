@@ -19,10 +19,10 @@ Booking → Memory → Retention. Πρώτος κλάδος: **κουρεία**.
 - Styling: **CSS variables (design tokens) + CSS modules**. ΟΧΙ Tailwind.
 - Supabase (Postgres + RLS, Auth μόνο για προσωπικό, Storage, Realtime, Edge Functions, pg_cron), **EU** (dev: `anaklo-dev`, eu-west-1 Ιρλανδία), ξεχωριστό project. Ποτέ άλλο project του λογαριασμού.
 - Διαθεσιμότητα και κράτηση: **SQL functions** (ADR-0003). Edge Functions μόνο για παρενέργειες (OTP, SMS, push, email).
-- Push **μόνο προσωπικού** (ADR-0010, proposed): OneSignal αν περάσει η δοκιμή του 1.1 σε PWA εγκατεστημένη στην αρχική οθόνη iPhone, αλλιώς Web Push (VAPID). Πάροχος SMS (επιλογή στη Φάση 1, κριτήρια SPEC §18), Resend (email, EU), Sentry (EU).
+- Push **μόνο προσωπικού** (ADR-0010, proposed): OneSignal αν περάσει η δοκιμή του 1.1 σε PWA εγκατεστημένη στην αρχική οθόνη iPhone, αλλιώς Web Push (VAPID). **Καμία ταυτότητα στον client** (ποτέ `OneSignal.login`/`external_id`, ποτέ Identity Verification στο web app): αποστολή μόνο με `include_subscription_ids` (`_shared/onesignal.ts`), και ποια συνδρομή ανήκει σε ποιον το αποφασίζει ο server (`push_subscriptions` από το 1.5a). Πάροχος SMS (επιλογή στη Φάση 1, κριτήρια SPEC §18), Resend (email, EU), Sentry (EU).
 - Hosting: **Cloudflare Workers**: static assets + **ένας** Worker (`edge/`, από το 1.1) για σελίδα κράτησης, `/app`, `/<slug>` (Open Graph) και σκληρυμένο `/api` proxy που κατέχει το cookie της έμπιστης συσκευής (ADR-0008). Domains `anaklo.gr` / `dev.anaklo.gr`.
 - Σύνδεση προσωπικού (ADR-0009): κωδικός email 6 ψηφίων, signup κλειστό. Owner/manager: κωδικός email + εφαρμογή κωδικών (TOTP, από το 1.7) σε κάθε νέα σύνδεση, υποχρεωτική πρόταση 2ης συσκευής, επαναφορά μόνο από τη Nous (runbook `mfa-reset.md`), συνεδρία λήγει μετά από 30 ημέρες αδράνειας («Inactivity timeout» 720h στο prod και φύλακας στην εφαρμογή, γιατί το Free δεν το έχει)· staff μόνο κωδικός email, ποτέ TOTP· στο UI ποτέ «TOTP/MFA/2FA» (Vitest στις τιμές i18n).
-- Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.logout()` (κοινά κινητά)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
+- Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.User.PushSubscription.optOut()` (κοινά κινητά· από το 1.5a και `unregister_push_subscription`)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
 - **Χωρίς Realtime στη Φάση 1:** refetch on focus και κάθε 60″, μαζί με push.
 - Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.9).
 - PWA πρώτα. Native (Capacitor) μόνο αν αποφασιστεί ρητά.
@@ -46,7 +46,17 @@ npm run db:reset:dev # ξαναχτίζει τη remote DEV βάση (μόνο �
 npm run db:test:dev  # pgTAP πάνω στη remote DEV βάση (rollback, δεν αφήνει δεδομένα)
 npm run gen:types    # τύποι βάσης → src/shared/lib/database.types.ts (μετά από κάθε αλλαγή σχήματος)
 npm run check:types  # αποτυγχάνει αν οι τύποι δεν ταιριάζουν με την τοπική βάση (τρέχει στο CI)
+npm run fn:check     # deno check + deno lint στις Edge Functions (τρέχει στο CI)
+npm run fn:serve     # functions με επιπλέον env από .env.local (το db:start ήδη τις σερβίρει)
+npm run edge:dev     # ο Worker τοπικά (wrangler), μετά από build· θέλει edge/.dev.vars
+npm run provision:local # provisioning του συνθετικού example στην τοπική βάση
+npm run gen:icons    # εικονίδια PWA (public/app/*.png)
+npm run fn:deploy:dev # Edge Functions στο remote DEV (μέρος του deploy:dev)
+npm run deploy:dev   # migrations → functions → build → σβήσιμο .map → Worker (μόνο DEV)
+npm run secrets:dev  # μυστικά functions + Worker από --env-file ΕΚΤΟΣ repo
+npm run provision:dev # επιχείρηση από JSON ΕΚΤΟΣ repo στο remote DEV
 ```
+Τα `*:dev` και το `db:push` αγγίζουν remote project: τα τρέχει μόνο ο χρήστης, ποτέ ο agent (ούτε με `--help`). Τα δικά μας scripts (`scripts/*.mjs`) αρνούνται άγνωστα ορίσματα πριν κάνουν οτιδήποτε.
 Χρησιμοποίησε πάντα τα npm scripts (όχι `>` στο PowerShell: γράφει UTF-16).
 **Πριν πεις ότι κάτι τελείωσε:** τρέξε `typecheck`, `lint`, `test` και, αν άλλαξε η βάση, `db:reset` + `db:test` (και `build` αν άλλαξαν ρυθμίσεις/εξαρτήσεις). Αν κάτι αποτυγχάνει, πες το καθαρά.
 
@@ -56,7 +66,7 @@ src/app/              routes, layout, providers
 src/features/<name>/  components/, hooks/, api.ts, schema.ts, *.test.ts
                       (booking, calendar, clients, services, staff, insights, settings)
 src/shared/ui/        design system components
-src/shared/lib/       επανεξάγει τα _shared (money, dates, phone, sms, sms-templates, domain)
+src/shared/lib/       επανεξάγει τα _shared (money, dates, phone, sms, sms-templates, domain, onesignal)
                       + supabase client (μόνο pro), publicApi (fetch /api), env, theme, database.types.ts
 src/shared/i18n/      i18next, el.json, en.json (ίδια κλειδιά — το ελέγχει test)
 src/styles/tokens.css design tokens
@@ -65,7 +75,14 @@ supabase/migrations/  0001_*.sql … (αριθμημένα)
 supabase/tests/       pgTAP (*.test.sql)
 supabase/functions/_shared/  κώδικας κοινός web + Edge Functions (Deno): money, dates, phone, sms,
                       sms-templates, domain (+ Vitest tests). Alias `@fn-shared`, imports με `.ts`.
-e2e/                  Playwright
+                      proxy-contract (συμβόλαιο /api ⇄ functions), http, cors, push-templates.
+supabase/functions/<name>/index.ts  Edge Functions (Deno)· καθεμία με [functions.<name>] στο config.toml
+supabase/templates/   πρότυπα email του Auth (κωδικός σύνδεσης, χωρίς link)
+supabase/provision/   ΜΟΝΟ συνθετικά *.example.json (τα πραγματικά ζουν εκτός repo)
+edge/                 Cloudflare Worker (ADR-0008): api-proxy, cookies, inject, booking-shell, worker,
+                      wrangler.jsonc. Τα ίδια modules τρέχουν ως middleware του Vite.
+scripts/              npm scripts (Node)· scripts/lib/ κοινά helpers + Vitest (*.test.mjs)
+e2e/                  Playwright (e2e/lib: fixtures, login μέσω Mailpit, seed users)
 docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
 ```
 
@@ -77,7 +94,7 @@ docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
 5. **Χρήματα:** πάντα integer cents, μόνο μέσω `money.ts`. Ποτέ float.
 6. **Ημερομηνίες:** `timestamptz` (UTC) στη βάση· εμφάνιση στη ζώνη `businesses.timezone` μέσω `dates.ts`. **Ποτέ καρφωτό `Europe/Athens`.** Ωράρια = τοπικές ώρες.
 7. **Τηλέφωνα:** E.164 (`+3069…`) μόνο μέσω `phone.ts`. Το τηλέφωνο **δεν** είναι μοναδικό κλειδί πελάτη.
-8. **Καμία καρφωτή φράση UI**, ούτε σε SMS/email/push/validation — όλα i18n. Εξαιρέσεις θέσης: τα κείμενα SMS στο `supabase/functions/_shared/sms-templates.ts` (ADR-0007), τα κείμενα push στο `supabase/functions/_shared/push-templates.ts` (ADR-0010, από το 1.5a) και τα κείμενα των email ασφαλείας στο `supabase/functions/_shared/security-email-templates.ts` (ADR-0009, από το 1.9), el/en με test el = en, γιατί τα στέλνουν οι Edge Functions· το στατικό δίγλωσσο πρότυπο του email σύνδεσης στο `supabase/templates/` (ADR-0009 §6), γιατί το στέλνει το Auth, μέχρι το Send Email Hook.
+8. **Καμία καρφωτή φράση UI**, ούτε σε SMS/email/push/validation — όλα i18n. Εξαιρέσεις θέσης: τα κείμενα SMS στο `supabase/functions/_shared/sms-templates.ts` (ADR-0007), τα κείμενα push στο `supabase/functions/_shared/push-templates.ts` (ADR-0010, από το 1.1) και τα κείμενα των email ασφαλείας στο `supabase/functions/_shared/security-email-templates.ts` (ADR-0009, από το 1.9), el/en με test el = en, γιατί τα στέλνουν οι Edge Functions· το στατικό δίγλωσσο πρότυπο του email σύνδεσης στο `supabase/templates/` (ADR-0009 §6), γιατί το στέλνει το Auth, μέχρι το Send Email Hook.
 9. **SMS μόνο μέσω `renderSms`/`prepareSms`:** μετατροπή σε GSM-7 (ελληνικά σε κεφαλαία χωρίς τόνους, look-alike → λατινικά· τα λατινικά/links μένουν ίδια), χωρίς €. Κάθε πρότυπο έχει τεστ ότι με τις μεγαλύτερες τιμές βγαίνει **1 SMS** και το link φτάνει byte-byte.
 10. Components < ~200 γραμμές. Αν μεγαλώνουν, σπάσ' τα.
 11. **Configuration, όχι forks:** καμία λογική τύπου `if (business.slug === '…')`. Οι διαφορές πάνε σε `settings`/`theme`/πρότυπα κλάδου.

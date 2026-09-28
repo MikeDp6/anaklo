@@ -1,0 +1,2 @@
+# Never upload source maps with the Worker assets (ADR-0008 §7). Vite copies this file to dist/.
+*.map

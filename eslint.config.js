@@ -45,7 +45,13 @@ export default defineConfig([
     'playwright-report',
     'test-results',
     'supabase/.temp',
+    // wrangler's local state and bundles (`npm run edge:dev`)
+    '**/.wrangler',
     'src/shared/lib/database.types.ts',
+    // Edge Function entrypoints run on Deno (Deno globals, npm: import map): `npm run fn:check`
+    // type-checks and lints them. The pure `_shared` modules stay linted here too.
+    'supabase/functions/*/**',
+    '!supabase/functions/_shared/**',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
