@@ -1,5 +1,5 @@
 // TEMPORARY (step 1.1 device test of the trusted-device cookie, ADR-0006/0008 §4).
-// Delete this folder, the `spike` i18n keys and the `?spike=td` switch at the end of 1.1.
+// Delete this folder, the `spike` i18n keys and the `?spike=td` switch after the 1.10 device tests.
 import { z } from 'zod/mini'
 import { postPublicApi } from '@/shared/lib/publicApi'
 

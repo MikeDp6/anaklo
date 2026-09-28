@@ -8,10 +8,10 @@ import { AuthUnknownError, isAuthApiError, isAuthRetryableFetchError } from '@su
  * and the per-IP limit (`over_request_rate_limit`), which do not depend on the email, say more.
  */
 export type LoginMessageKey =
-  | 'pro.login.codeSentNeutral'
-  | 'pro.login.errorNetwork'
-  | 'pro.login.errorTooManyRequests'
-  | 'pro.login.errorCodeInvalid'
+  | 'login.codeSentNeutral'
+  | 'login.errorNetwork'
+  | 'login.errorTooManyRequests'
+  | 'login.errorCodeInvalid'
 
 export interface SendCodeResult {
   /** True when the screen moves on to the code step. */
@@ -24,14 +24,14 @@ export interface VerifyCodeResult {
   readonly messageKey: LoginMessageKey | null
 }
 
-const NEUTRAL: SendCodeResult = { codeStep: true, messageKey: 'pro.login.codeSentNeutral' }
+const NEUTRAL: SendCodeResult = { codeStep: true, messageKey: 'login.codeSentNeutral' }
 
 /** `error` is what `signInWithOtp` returned (or threw); null means it succeeded. */
 export function mapSendCodeError(error: unknown): SendCodeResult {
   if (error === null || error === undefined) return NEUTRAL
-  if (isNetworkError(error)) return { codeStep: false, messageKey: 'pro.login.errorNetwork' }
+  if (isNetworkError(error)) return { codeStep: false, messageKey: 'login.errorNetwork' }
   if (isRequestRateLimit(error)) {
-    return { codeStep: false, messageKey: 'pro.login.errorTooManyRequests' }
+    return { codeStep: false, messageKey: 'login.errorTooManyRequests' }
   }
   return NEUTRAL
 }
@@ -39,12 +39,12 @@ export function mapSendCodeError(error: unknown): SendCodeResult {
 /** `error` is what `verifyOtp` returned (or threw); null means the user is signed in. */
 export function mapVerifyCodeError(error: unknown): VerifyCodeResult {
   if (error === null || error === undefined) return { signedIn: true, messageKey: null }
-  if (isNetworkError(error)) return { signedIn: false, messageKey: 'pro.login.errorNetwork' }
+  if (isNetworkError(error)) return { signedIn: false, messageKey: 'login.errorNetwork' }
   if (isRequestRateLimit(error)) {
-    return { signedIn: false, messageKey: 'pro.login.errorTooManyRequests' }
+    return { signedIn: false, messageKey: 'login.errorTooManyRequests' }
   }
   // Wrong, expired or already used code, and an unknown email, all look the same.
-  return { signedIn: false, messageKey: 'pro.login.errorCodeInvalid' }
+  return { signedIn: false, messageKey: 'login.errorCodeInvalid' }
 }
 
 /**

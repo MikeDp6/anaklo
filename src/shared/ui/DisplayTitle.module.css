@@ -1,0 +1,35 @@
+/* G2: 32–56px in the apps (up to 96px only on the marketing site). */
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: var(--display-tracking);
+  line-height: 1.08;
+  color: var(--color-ink);
+  overflow-wrap: break-word;
+}
+
+.md {
+  font-size: var(--text-2xl);
+}
+
+.lg {
+  font-size: clamp(var(--text-2xl), 8vw, var(--text-3xl));
+}
+
+.xl {
+  font-size: clamp(2.25rem, 11vw, var(--text-4xl));
+}
+
+.accent {
+  color: var(--color-accent);
+}
+
+.onDark {
+  color: var(--color-ink-on-dark);
+}
+
+.onDark.accent {
+  color: var(--color-accent-on-dark);
+}

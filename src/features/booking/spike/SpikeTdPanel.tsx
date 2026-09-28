@@ -13,7 +13,7 @@ const STATUS_KEYS = {
 } as const satisfies Record<SpikeTdStatus, string>
 
 export default function SpikeTdPanel() {
-  const { t } = useTranslation()
+  const { t } = useTranslation('booking')
   const spike = useTrustedDeviceSpike()
 
   const body = spike.isFetching
@@ -29,7 +29,7 @@ export default function SpikeTdPanel() {
         title={t('spike.title')}
         body={body}
         action={
-          <Button onClick={() => void spike.refetch()} disabled={spike.isFetching}>
+          <Button onClick={spike.refetch} disabled={spike.isFetching}>
             {t('spike.again')}
           </Button>
         }

@@ -10,18 +10,18 @@ import { Page } from '@/shared/ui/Page'
  * Retry runs the guards again; sign-out is the way out of a session that keeps failing.
  */
 export function RouteErrorPage() {
-  const { t } = useTranslation()
+  const { t } = useTranslation(['pro', 'common'])
   const { revalidate, state } = useRevalidator()
   return (
     <Page>
       <Notice
         tone="error"
         headingLevel={1}
-        title={t('pro.loadErrorTitle')}
-        body={t('pro.loadErrorBody')}
+        title={t('loadErrorTitle')}
+        body={t('loadErrorBody')}
         action={
           <Button onClick={() => void revalidate()} disabled={state === 'loading'}>
-            {t('common.retry')}
+            {t('common:retry')}
           </Button>
         }
       />

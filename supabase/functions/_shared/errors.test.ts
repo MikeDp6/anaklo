@@ -7,7 +7,9 @@ const ROOT = process.cwd()
 const MIGRATIONS_DIR = join(ROOT, 'supabase', 'migrations')
 
 function catalogue(locale: 'el' | 'en'): unknown {
-  return JSON.parse(readFileSync(join(ROOT, 'src', 'shared', 'i18n', `${locale}.json`), 'utf8'))
+  return JSON.parse(
+    readFileSync(join(ROOT, 'src', 'shared', 'i18n', locale, 'common.json'), 'utf8'),
+  )
 }
 
 function lookup(tree: unknown, path: string[]): unknown {
@@ -74,7 +76,24 @@ describe('domainErrorCode', () => {
 
   it('narrows strings with isDomainErrorCode', () => {
     expect(isDomainErrorCode('AN009')).toBe(true)
+    expect(isDomainErrorCode('AN020')).toBe(true)
     expect(isDomainErrorCode('an009')).toBe(false)
     expect(isDomainErrorCode(1)).toBe(false)
+  })
+})
+
+describe('domain error list', () => {
+  it('numbers the codes without gaps, AN001 upwards', () => {
+    const expected = DOMAIN_ERROR_CODES.map((_, index) => `AN${String(index + 1).padStart(3, '0')}`)
+    expect(DOMAIN_ERROR_CODES).toEqual(expected)
+  })
+
+  it('never shows clients staff-security words (TOTP, MFA, 2FA) in an error text', () => {
+    for (const locale of ['el', 'en'] as const) {
+      for (const code of DOMAIN_ERROR_CODES) {
+        const text = lookup(catalogue(locale), ['errors', code])
+        expect(String(text), `${locale}: errors.${code}`).not.toMatch(/totp|mfa|2fa/i)
+      }
+    }
   })
 })

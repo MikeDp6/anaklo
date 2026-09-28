@@ -403,11 +403,20 @@ deno_version = 2
 # Secrets of the LOCAL edge runtime (`npm run db:start`, `npm run fn:serve`). `env(NAME)` is
 # resolved by the CLI from the process environment first, then from `.env.development.local`,
 # `.env.local`, `.env.development`, `.env` in `supabase/` and then in the project root, so the
-# root `.env.local` (from `.env.example`) is enough locally; CI sets PROXY_SECRET as job env.
+# root `.env.local` (from `.env.example`) is enough locally; CI sets the same names as job env.
 # Unset, the CLI passes the literal "env(PROXY_SECRET)", which `requireProxy` refuses (500).
 # The remote project gets its secrets from `npm run secrets:dev`, never from this file.
 [edge_runtime.secrets]
 PROXY_SECRET = "env(PROXY_SECRET)"
+# public-booking and manage (step 1.3, contract §7): LOCAL values from `.env.local`, not secrets.
+# Unset, the literal "env(NAME)" counts as unset: ANAKLO_ENV falls back to prod, which refuses
+# the fake SMS adapter and the test numbers, so both functions answer 500 not_configured.
+ANAKLO_ENV = "env(ANAKLO_ENV)"
+SITE_HOST = "env(SITE_HOST)"
+SMS_PROVIDER = "env(SMS_PROVIDER)"
+OTP_TEST_NUMBERS = "env(OTP_TEST_NUMBERS)"
+OTP_TEST_CODE = "env(OTP_TEST_CODE)"
+SMS_ALLOWED_RECIPIENTS = "env(SMS_ALLOWED_RECIPIENTS)"
 
 # Edge Functions (ADR-0008 §3). Every function needs its own section: fn:check fails without an
 # explicit verify_jwt and the shared import map (the CLI only looks for a deno.json inside the
@@ -418,7 +427,21 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/deno.json"
 
-# TEMPORARY (step 1.1): delete with supabase/functions/spike-td at the end of the step.
+# The online booking of the booking page (step 1.3). Behind the /api proxy: checks the proxy
+# secret in code (publishable key, not a JWT).
+[functions.public-booking]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# The manage link /m/<token> (step 1.3). Behind the /api proxy: checks the proxy secret in code.
+[functions.manage]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# TEMPORARY: delete with supabase/functions/spike-td after the device tests of 1.10 (contract 1.3
+# decision 19).
 [functions.spike-td]
 enabled = true
 # Behind the /api proxy: checks the proxy secret in code.

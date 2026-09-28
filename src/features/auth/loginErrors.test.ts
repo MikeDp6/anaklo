@@ -7,9 +7,9 @@ import {
 import { describe, expect, it } from 'vitest'
 import { mapSendCodeError, mapVerifyCodeError } from './loginErrors'
 
-const neutral = { codeStep: true, messageKey: 'pro.login.codeSentNeutral' }
-const network = { codeStep: false, messageKey: 'pro.login.errorNetwork' }
-const tooMany = { codeStep: false, messageKey: 'pro.login.errorTooManyRequests' }
+const neutral = { codeStep: true, messageKey: 'login.codeSentNeutral' }
+const network = { codeStep: false, messageKey: 'login.errorNetwork' }
+const tooMany = { codeStep: false, messageKey: 'login.errorTooManyRequests' }
 
 describe('mapSendCodeError (ADR-0009 §4: the screen never reveals which emails exist)', () => {
   it('success → the neutral message and the code step', () => {
@@ -75,16 +75,16 @@ describe('mapVerifyCodeError', () => {
   ])('wrong, expired or unknown (%s) → one message for all', (code, status) => {
     expect(
       mapVerifyCodeError(new AuthApiError('Token has expired or is invalid', status, code)),
-    ).toEqual({ signedIn: false, messageKey: 'pro.login.errorCodeInvalid' })
+    ).toEqual({ signedIn: false, messageKey: 'login.errorCodeInvalid' })
   })
 
   it('network and per-IP limit keep their own messages', () => {
     expect(mapVerifyCodeError(new AuthRetryableFetchError('Failed to fetch', 0))).toEqual({
       signedIn: false,
-      messageKey: 'pro.login.errorNetwork',
+      messageKey: 'login.errorNetwork',
     })
     expect(
       mapVerifyCodeError(new AuthApiError('Too many', 429, 'over_request_rate_limit')),
-    ).toEqual({ signedIn: false, messageKey: 'pro.login.errorTooManyRequests' })
+    ).toEqual({ signedIn: false, messageKey: 'login.errorTooManyRequests' })
   })
 })

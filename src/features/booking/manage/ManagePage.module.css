@@ -1,0 +1,78 @@
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.facts dt {
+  color: var(--color-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: end;
+}
+
+.facts[data-cancelled='true'] dd {
+  text-decoration: line-through;
+}
+
+.badge {
+  align-self: flex-start;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.alert {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.moved {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.movedText {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}

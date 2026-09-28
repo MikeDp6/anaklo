@@ -1,0 +1,147 @@
+{
+  "landing": {
+    "tagline": "Not just an appointment book. It remembers every client.",
+    "body": "Appointments and a smart client book for barbershops, hair salons and beauty centres."
+  },
+  "notFoundTitle": "Booking page not found",
+  "notFoundBody": "Check the link or ask the business for it.",
+  "errorTitle": "The page did not load",
+  "errorBody": "Check your connection and try again.",
+  "og": {
+    "description": "Book online at {{name}}."
+  },
+  "cover": {
+    "eyebrow": "Online booking"
+  },
+  "header": {
+    "back": "Back",
+    "progress": "Booking progress",
+    "stepOf": "Step {{current}} of {{total}}",
+    "complete": "Done"
+  },
+  "service": {
+    "eyebrow": "Service",
+    "title": "What can we do for you?",
+    "empty": "There are no services to book online yet."
+  },
+  "staff": {
+    "eyebrow": "Professional",
+    "title": "With whom?",
+    "any": "Anyone",
+    "anyHint": "The first free time",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "{{current}} of {{total}}"
+  },
+  "slot": {
+    "eyebrow": "Day and time",
+    "title": "When suits you?",
+    "dates": "Dates",
+    "times": "Free times, {{date}}",
+    "earlier": "Earlier days",
+    "later": "Later days",
+    "none": "There are no free times on these days.",
+    "loadError": "The free times did not load."
+  },
+  "summary": {
+    "title": "Your appointment",
+    "service": "Service",
+    "staff": "With",
+    "when": "When",
+    "price": "Price",
+    "anyStaff": "Anyone"
+  },
+  "details": {
+    "eyebrow": "Details",
+    "title": "Which mobile should get the confirmation?",
+    "name": "Full name",
+    "phone": "Mobile",
+    "phoneHint": "The first time on this device you will get an SMS with a code.",
+    "nameRequired": "Please enter your name.",
+    "phoneInvalid": "Please enter a Greek mobile number (69…).",
+    "marketing": "I do not want to receive offers by SMS from the shop.",
+    "notice": "The shop keeps your name and mobile only for your appointments and their notifications.",
+    "submit": "Continue",
+    "sending": "Please wait…"
+  },
+  "otp": {
+    "eyebrow": "Confirm your mobile",
+    "title": "Enter the code",
+    "sentTo": "We sent a 6-digit code by SMS to {{phone}}.",
+    "code": "Code from the SMS",
+    "submit": "Confirm",
+    "checking": "Checking…",
+    "resend": "Send a new code",
+    "resendIn": "New code in {{seconds}}″",
+    "resent": "We sent a new code.",
+    "changePhone": "Change number"
+  },
+  "client": {
+    "eyebrow": "Almost done",
+    "title": "Booking as",
+    "other": "Someone else · {{name}}",
+    "submit": "Book the appointment",
+    "booking": "Booking your appointment…"
+  },
+  "taken": {
+    "title": "{{time}} was just taken",
+    "body": "Free times nearby:",
+    "none": "No free times nearby.",
+    "all": "All times"
+  },
+  "call": {
+    "action": "Call {{phone}}"
+  },
+  "done": {
+    "eyebrow": "Done",
+    "title": "You are booked",
+    "sms": "You will get an SMS with the confirmation and the link to manage it.",
+    "manage": "Change or cancel",
+    "google": "Google Calendar",
+    "ics": "Add to calendar (.ics)",
+    "map": "Directions",
+    "again": "Book another appointment",
+    "forget": "Do not remember this device",
+    "forgotten": "This device no longer remembers you.",
+    "calendarTitle": "{{service}} · {{business}}",
+    "calendarDescription": "Change or cancel: {{link}}"
+  },
+  "nextVisit": {
+    "vertical_one": "Most clients come back in {{count}} week.",
+    "vertical_other": "Most clients come back in {{count}} weeks.",
+    "business_one": "Our clients usually come back in {{count}} week.",
+    "business_other": "Our clients usually come back in {{count}} weeks."
+  },
+  "manage": {
+    "eyebrow": "Your appointment",
+    "cancelledStatus": "Cancelled",
+    "closedStatus": "No longer changeable",
+    "changeUntil": "Change or cancel online until {{date}}, {{time}}.",
+    "tooLate": "To change or cancel, please call the shop.",
+    "cancel": "Cancel appointment",
+    "cancelConfirm": "Are you sure you want to cancel the appointment?",
+    "cancelYes": "Yes, cancel",
+    "cancelNo": "No",
+    "cancelling": "Cancelling…",
+    "cancelled": "The appointment is cancelled",
+    "reschedule": "Change time",
+    "rescheduleTitle": "Choose a new time",
+    "move": "Move to {{date}}, {{time}}",
+    "moving": "Moving…",
+    "moved": "The appointment has moved",
+    "keep": "Keep the same time",
+    "newBooking": "Book a new appointment"
+  },
+  "units": {
+    "minutes": "{{count}}′"
+  },
+  "spike": {
+    "title": "Trusted device test",
+    "checking": "Checking…",
+    "trusted": "Trusted device: the cookie was read.",
+    "issued": "A new cookie was just written. Close the app, open it again and check again.",
+    "none": "There is no cookie on this device.",
+    "error": "The test failed. Try again.",
+    "again": "Check again"
+  }
+}

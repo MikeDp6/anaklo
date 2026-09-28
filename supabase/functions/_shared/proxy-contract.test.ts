@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isAllowedProxyRoute,
   isUuid,
+  PROXY_ALLOW_LIST,
   trustedDeviceCookieAttributes,
   trustedDeviceCookieName,
 } from './proxy-contract.ts'
@@ -42,6 +43,51 @@ describe('proxy allow-list', () => {
     expect(isAllowedProxyRoute('GET', '/rest/v1/rpc/available_slots')).toBe(false)
     expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/staff_available_slots')).toBe(false)
     expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/staff_book_appointment')).toBe(false)
+  })
+
+  it('adds exactly the two booking functions and the short-code fallback (1.3)', () => {
+    expect(isAllowedProxyRoute('POST', '/functions/v1/public-booking')).toBe(true)
+    expect(isAllowedProxyRoute('POST', '/functions/v1/manage')).toBe(true)
+    expect(isAllowedProxyRoute('POST', '/rest/v1/rpc/public_slug_for_code')).toBe(true)
+    // Nothing changes on GET, and no other method or near-miss path gets through.
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      expect(isAllowedProxyRoute(method, '/functions/v1/public-booking')).toBe(false)
+      expect(isAllowedProxyRoute(method, '/functions/v1/manage')).toBe(false)
+    }
+    expect(isAllowedProxyRoute('GET', '/rest/v1/rpc/public_slug_for_code')).toBe(false)
+    expect(isAllowedProxyRoute('POST', '/functions/v1/manage/')).toBe(false)
+    expect(isAllowedProxyRoute('POST', '/functions/v1/public-booking/start')).toBe(false)
+  })
+
+  it('never reaches the service-role RPCs of 0005 directly (only through the functions)', () => {
+    const serviceRoleRpcs = [
+      'otp_start',
+      'otp_verify',
+      'clients_for_phone',
+      'book_appointment',
+      'trusted_device_revoke',
+      'manage_view',
+      'manage_slots',
+      'manage_cancel',
+      'manage_reschedule',
+      'claim_messages',
+      'record_send_result',
+    ]
+    for (const rpc of serviceRoleRpcs) {
+      for (const method of ['GET', 'POST']) {
+        expect(isAllowedProxyRoute(method, `/rest/v1/rpc/${rpc}`), `${method} ${rpc}`).toBe(false)
+      }
+    }
+    // Nor any table of 0005.
+    for (const table of ['otp_challenges', 'trusted_devices', 'booking_tokens', 'messages_log']) {
+      expect(isAllowedProxyRoute('GET', `/rest/v1/${table}`)).toBe(false)
+      expect(isAllowedProxyRoute('POST', `/rest/v1/${table}`)).toBe(false)
+    }
+  })
+
+  it('lists every route once', () => {
+    const keys = PROXY_ALLOW_LIST.map((route) => `${route.method} ${route.path}`)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })
 

@@ -1,0 +1,294 @@
+/*
+ * Motion classes of docs/design/MOTION.md §4 (codes G1–G7, E1–E19 as in §2–3), global so every
+ * entry can use them. Only transform and opacity move (plus the exceptions of ADR-0011 §3.1:
+ * label colour in E1, stroke-dashoffset in E15/E18, background-position in E17). Hover effects
+ * only with a mouse; touch gets E16. The reduced-motion block at the end is mandatory.
+ */
+
+/* ---------- E1 liquid fill (hover, main CTAs) ---------- */
+.btn-fill {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--radius-pill);
+  transition: color var(--dur-fill) var(--ease-in-out);
+}
+
+.btn-fill::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 100%;
+  width: 180%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--fill-color, var(--lux-espresso-deep));
+  transform: translate(-50%, 0);
+  transition: transform var(--dur-fill) var(--ease-in-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-fill:hover:not(:disabled) {
+    color: var(--fill-ink, var(--lux-cream));
+  }
+
+  .btn-fill:hover:not(:disabled)::before {
+    transform: translate(-50%, -65%);
+  }
+}
+
+/* ---------- E2 text roll (hover). On touch the copy is not rendered and text wraps normally. */
+.roll > span + span {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .roll {
+    display: inline-block;
+    height: 1.25em;
+    line-height: 1.25em;
+    overflow: hidden;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .roll > span,
+  .roll > span + span {
+    display: block;
+    transition: transform var(--dur-base) var(--ease-in-out);
+  }
+
+  :is(a, button):hover:not(:disabled) .roll > span {
+    transform: translateY(-100%);
+  }
+}
+
+/* ---------- E16 press ---------- */
+.pressable {
+  transition: transform var(--dur-press) ease;
+}
+
+.pressable:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* E1 + E16 on the same element: one transition list for both. */
+.btn-fill.pressable {
+  transition:
+    color var(--dur-fill) var(--ease-in-out),
+    transform var(--dur-press) ease;
+}
+
+/* ---------- E3/E4 entrances (useInView → data-inview) ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-y, 16px));
+}
+
+.reveal[data-inview='true'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--reveal-dur, var(--dur-slow)) var(--ease-out),
+    transform var(--reveal-dur, var(--dur-slow)) var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal--eyebrow {
+  --reveal-y: 10px;
+  --reveal-dur: 500ms;
+}
+
+/* E4 in the apps moves 16px (50px is for the marketing site). */
+.reveal--block {
+  --reveal-y: 16px;
+  --reveal-dur: 800ms;
+  --reveal-delay: 100ms;
+}
+
+/* ---------- E5 title word by word ---------- */
+.split-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+[data-inview='true'] .split-word {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 600ms var(--ease-out),
+    transform 600ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger));
+}
+
+/* ---------- G5/E8 offset frame (the card's background lives on a child) ---------- */
+.framed {
+  position: relative;
+  isolation: isolate;
+}
+
+.framed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--color-accent);
+  border-radius: inherit;
+  transform: translate(0, 0);
+  transition: transform var(--dur-slow) var(--ease-out) 150ms;
+}
+
+.framed[data-inview='true']::after {
+  transform: translate(var(--frame-offset), var(--frame-offset));
+}
+
+/* ---------- E14 booking steps ---------- */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes step-back {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.step-enter {
+  animation: step-in 420ms var(--ease-out) both;
+}
+
+.step-enter-back {
+  animation: step-back 420ms var(--ease-out) both;
+}
+
+/* ---------- E15 confirmation ---------- */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes halo {
+  from {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--len, 48);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.confirm-pop {
+  animation: pop 500ms var(--ease-out) both;
+}
+
+.confirm-halo {
+  opacity: 0; /* final state, also without animation */
+  animation: halo 1100ms ease-out 200ms both;
+}
+
+.confirm-check {
+  stroke-dasharray: var(--len, 48);
+  animation: draw 450ms ease-out 350ms both;
+}
+
+/* ---------- E17 skeleton (sand) ---------- */
+@keyframes shimmer {
+  from {
+    background-position: -380px 0;
+  }
+  to {
+    background-position: 380px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton) 0%,
+    var(--color-skeleton-shine) 50%,
+    var(--color-skeleton) 100%
+  );
+  background-color: var(--color-skeleton);
+  background-size: 760px 100%;
+  animation: shimmer 1.3s linear infinite;
+  border-radius: 12px;
+}
+
+/* ---------- E18 rhythm ring: fills from empty to --ring-to (its final offset) ---------- */
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: var(--circ);
+  }
+  to {
+    stroke-dashoffset: var(--ring-to, 0);
+  }
+}
+
+.ring-progress {
+  stroke-dasharray: var(--circ);
+  stroke-dashoffset: var(--ring-to, 0);
+  animation: ring-fill 1.2s cubic-bezier(0.3, 0.7, 0.2, 1) 0.35s backwards;
+}
+
+/* ---------- E19 progress bar (style: transform: scaleX(…)) ---------- */
+.progress-bar {
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* ---------- MANDATORY: no motion, everything at its final place ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .reveal,
+  .split-word {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .framed::after {
+    transform: translate(var(--frame-offset), var(--frame-offset)) !important;
+  }
+
+  .roll > span {
+    transform: none !important;
+  }
+}

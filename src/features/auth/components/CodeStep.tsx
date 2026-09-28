@@ -25,11 +25,11 @@ export function CodeStep({
   onResend: () => void
   onChangeEmail: () => void
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('pro')
   const inputId = useId()
   const errorId = useId()
   const [code, setCode] = useState('')
-  const neutral = message === 'pro.login.codeSentNeutral'
+  const neutral = message === 'login.codeSentNeutral'
   const error = formError ?? (neutral ? null : message)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -40,13 +40,13 @@ export function CodeStep({
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       <div role="status" className={styles.sent}>
-        {neutral && <p>{t('pro.login.codeSentNeutral')}</p>}
-        <p className={styles.muted}>{t('pro.login.codeFor', { email })}</p>
-        <p className={styles.muted}>{t('pro.login.codeHint')}</p>
+        {neutral && <p>{t('login.codeSentNeutral')}</p>}
+        <p className={styles.muted}>{t('login.codeFor', { email })}</p>
+        <p className={styles.muted}>{t('login.codeHint')}</p>
       </div>
       <div className={styles.field}>
         <label htmlFor={inputId} className={styles.label}>
-          {t('pro.login.codeLabel')}
+          {t('login.codeLabel')}
         </label>
         <input
           id={inputId}
@@ -69,14 +69,14 @@ export function CodeStep({
         </p>
       )}
       <Button type="submit" disabled={verifying}>
-        {verifying ? t('pro.login.verifying') : t('pro.login.verify')}
+        {verifying ? t('login.verifying') : t('login.verify')}
       </Button>
       <div className={styles.secondaryActions}>
         <button type="button" className={styles.link} onClick={onResend} disabled={sending}>
-          {t('pro.login.resend')}
+          {t('login.resend')}
         </button>
         <button type="button" className={styles.link} onClick={onChangeEmail}>
-          {t('pro.login.changeEmail')}
+          {t('login.changeEmail')}
         </button>
       </div>
     </form>

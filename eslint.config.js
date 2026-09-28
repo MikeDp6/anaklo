@@ -29,6 +29,13 @@ const NO_HEAVY_LIBS_ON_BOOKING_PAGE = {
   regex: '^(react-hook-form|@hookform/.*|react-router(/.*)?)$',
   message: 'Keep the booking page ≤ 120 KB: no form library, no router (route.ts).',
 }
+// Phase 1 §1.3 budget tactics 1 and 3: Intl-only dates, no TanStack Query on the booking page.
+const BOOKING_PAGE_BUDGET = {
+  regex:
+    '^(@tanstack/.*|date-fns(/.*)?|@date-fns/.*)$|(^|/)shared/lib/dates(\\.ts)?$|(^|/)_shared/dates(\\.ts)?$',
+  message:
+    'The booking page uses @/shared/lib/localDates (Intl only) and plain hooks: no date-fns, no TanStack Query.',
+}
 
 /**
  * @param {...{ regex: string, message: string }} patterns
@@ -89,9 +96,22 @@ export default defineConfig([
     ],
     rules: restrict(ONLY_ZOD_MINI, NO_SUPABASE_ON_BOOKING_PAGE, NO_HEAVY_LIBS_ON_BOOKING_PAGE),
   },
-  // Tests may name real time zones as test data (Playwright emulates the visitor's zone).
+  // The booking page's own code: also no date-fns and no TanStack Query (the shared app code
+  // above still serves the pro app, which uses both).
   {
-    files: ['**/*.test.{ts,tsx}', 'e2e/**/*.ts', 'playwright.config.ts'],
+    files: ['src/app/booking/**/*.{ts,tsx}', 'src/features/booking/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: restrict(
+      ONLY_ZOD_MINI,
+      NO_SUPABASE_ON_BOOKING_PAGE,
+      NO_HEAVY_LIBS_ON_BOOKING_PAGE,
+      BOOKING_PAGE_BUDGET,
+    ),
+  },
+  // Tests may name real time zones as test data (Playwright emulates the visitor's zone).
+  // testFixtures.ts: test data shared by the Vitest files of a feature (never bundled).
+  {
+    files: ['**/*.test.{ts,tsx}', 'src/**/testFixtures.ts', 'e2e/**/*.ts', 'playwright.config.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

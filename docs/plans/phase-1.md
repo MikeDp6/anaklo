@@ -1,33 +1,40 @@
 # Πλάνο Φάσης 1 — Πυρήνας κράτησης
 
 - Κατάσταση: **εγκρίθηκε 2026-09-27** (Μιχάλης), με τις αλλαγές C1–C5 και τις προσθήκες TOTP της ίδιας μέρας (δεύτερη συσκευή, ανάκτηση από τη Nous, πολιτική session· βλ. 1.7). **2026-09-28:** εγκρίθηκε ο φρέσκος κωδικός για τις κρίσιμες ενέργειες (C6, βλ. 1.7 και 1.9)
-- Διάρκεια: **37 εργάσιμες + 3 buffer** (~8 εβδομάδες)· σύνοψη στο [SPEC §14](../SPEC.md#14-βήματα-υλοποίησης)
-- Πηγές: SPEC v0.4, ADR-0001–0010 (τα 0008–0010 γράφτηκαν μαζί με αυτό το πλάνο), ο κώδικας στο `d648dd8` (migrations 0001–0003, pgTAP 01–07). Αν κάτι εδώ συγκρούεται με το SPEC ή με ADR, σταματάμε και ρωτάμε.
+- **2026-09-28, δύο ακόμη αποφάσεις του Μιχάλη:**
+  - **Τοπικά πρώτα (C7):** μένουμε σε localhost. Χωρίς domain, deploy στο Cloudflare, πραγματικό πάροχο SMS και δοκιμές σε συσκευές μέχρι το νέο τελικό βήμα **1.10**· τα SMS περνούν από τον ψεύτικο adapter και τους δοκιμαστικούς αριθμούς του dev. Τα migrations μπορούν να σταλούν στο `anaklo-dev` όποτε θέλει ο Μιχάλης (προαιρετικό), αλλά το πλάνο δεν εξαρτάται από αυτό πριν το 1.10.
+  - **Κατεύθυνση σχεδιασμού Δ «Ζεστή πολυτέλεια» (C8, [ADR-0011](../adr/0011-design-direction-motion.md), [MOTION.md](../design/MOTION.md)):** υλοποιείται σταδιακά μέσα στα βήματα, όχι ως ξεχωριστή φάση· tokens, μοτίβα και `src/shared/motion` στο 1.3, και κάθε κίνηση μαζί με την οθόνη που τη χρησιμοποιεί.
+- Πρόοδος: **1.1** (τοπικό μέρος, `b315e6c`) και **1.2** (`cba7970`) ολοκληρώθηκαν· το **1.3** υλοποιήθηκε τοπικά (όλα τα tests πράσινα, εκκρεμούν commit και CI)· επόμενο το 1.4.
+- Διάρκεια: **38 εργάσιμες + 3 buffer** (~8,5 εβδομάδες)· σύνοψη στο [SPEC §14](../SPEC.md#14-βήματα-υλοποίησης)
+- Πηγές: SPEC v0.4, ADR-0001–0011 (τα 0008–0010 γράφτηκαν μαζί με αυτό το πλάνο, το 0011 με τη C8), `docs/design/MOTION.md`, ο κώδικας στο `d648dd8` (migrations 0001–0003, pgTAP 01–07). Αν κάτι εδώ συγκρούεται με το SPEC ή με ADR, σταματάμε και ρωτάμε.
 
-| Βήμα   | Περιεχόμενο                                                                | Μέρες | Τέλος (μέρα) | Migration                    | pgTAP                                          |
-| ------ | -------------------------------------------------------------------------- | ----- | ------------ | ---------------------------- | ---------------------------------------------- |
-| 1.1    | Υποδομή: Worker, proxy, σύνδεση προσωπικού, toolchain, provisioning, δοκιμές σε συσκευές | 5     | 5            | —                            | —                                              |
-| 1.2    | Διαθεσιμότητα και κράτηση σε SQL                                           | 4,5   | 9,5          | `0004_availability_booking`  | `08_availability`, `09_booking` (+ `01`, `02`) |
-| 1.3    | Online κράτηση end-to-end                                                  | 6,5   | 16           | `0005_public_booking`        | `10_public_booking`                            |
-| 1.4    | PWA επαγγελματία                                                           | 3,5   | 19,5         | `0006_day_ops`               | `11_day_ops`                                   |
-| 1.5    | Ειδοποιήσεις (1.5a + 1.5b)                                                 | 3,5   | 23           | `0007_messaging` (μόνο 1.5a) | `12_messaging`                                 |
-| 1.6    | Οθόνες ρυθμίσεων και έκτακτη απουσία                                       | 4     | 27           | `0008_schedule_ops`          | `07_schedules` (επέκταση), `13_schedule_ops`   |
-| 1.7    | Ασφάλεια και μέλη: TOTP, δεύτερη συσκευή, ανάκτηση, φρέσκος κωδικός, προσκλήσεις, ταυτότητα | 5     | 32           | `0009_members_identity`      | `14_members_identity`                          |
-| 1.8    | Καρτέλα πελάτη, συγχώνευση, ανωνυμοποίηση                                  | 2,5   | 34,5         | `0010_client_ops`            | `15_client_ops`                                |
-| 1.9    | Παρακολούθηση, ανίχνευση αλλαγών στις συσκευές κωδικών, τελική πρόβα      | 2,5   | 37           | `0011_health`                | `16_health`                                    |
-| Buffer |                                                                            | 3     | 40           |                              |                                                |
+| Βήμα   | Περιεχόμενο                                                                                                  | Μέρες | Τέλος (μέρα) | Migration                   | pgTAP                                          |
+| ------ | ------------------------------------------------------------------------------------------------------------ | ----- | ------------ | --------------------------- | ---------------------------------------------- |
+| 1.1    | Υποδομή, τοπικά: Worker και proxy (και ως middleware του Vite), σύνδεση προσωπικού, toolchain, provisioning ✓ | 4     | 4            | —                           | —                                              |
+| 1.2    | Διαθεσιμότητα και κράτηση σε SQL ✓                                                                           | 4,5   | 8,5          | `0004_availability_booking` | `08_availability`, `09_booking` (+ `01`, `02`) |
+| 1.3    | Online κράτηση end-to-end, με τη βάση σχεδιασμού και κίνησης (Δ)                                             | 7     | 15,5         | `0005_public_booking`       | `10_public_booking`                            |
+| 1.4    | PWA επαγγελματία                                                                                             | 4     | 19,5         | `0006_day_ops`              | `11_day_ops`                                   |
+| 1.5    | Ειδοποιήσεις (ψεύτικος adapter SMS)                                                                          | 2     | 21,5         | `0007_messaging`            | `12_messaging`                                 |
+| 1.6    | Οθόνες ρυθμίσεων και έκτακτη απουσία                                                                         | 4     | 25,5         | `0008_schedule_ops`         | `07_schedules` (επέκταση), `13_schedule_ops`   |
+| 1.7    | Ασφάλεια και μέλη: TOTP, δεύτερη συσκευή, ανάκτηση, φρέσκος κωδικός, προσκλήσεις, ταυτότητα                  | 5     | 30,5         | `0009_members_identity`     | `14_members_identity`                          |
+| 1.8    | Καρτέλα πελάτη, συγχώνευση, ανωνυμοποίηση                                                                    | 2,5   | 33           | `0010_client_ops`           | `15_client_ops`                                |
+| 1.9    | Heartbeats και `health`, runbooks, ανίχνευση αλλαγών στις συσκευές κωδικών                                   | 1,5   | 34,5         | `0011_health`               | `16_health`                                    |
+| 1.10   | Ανάπτυξη, λογαριασμοί και συσκευές: remote dev, domain, Resend, OneSignal, πάροχος SMS, Sentry, τελική πρόβα | 3,5   | 38           | —                           | όλα με `db:test:dev`                           |
+| Buffer |                                                                                                              | 3     | 41           |                             |                                                |
 
-«Μέρα Ν» = εργάσιμη μέρα της Φάσης 1. Αν η μέρα 1 είναι η Δευτέρα 2026-09-28: η 2026-10-28 είναι αργία, η μέρα 37 πέφτει 2026-11-18 και το buffer τελειώνει 2026-11-23. Η αλλαγή ώρας της 2026-10-25 πέφτει μέσα στο 1.5a.
+«Μέρα Ν» = εργάσιμη μέρα της Φάσης 1. Η μέρα 1 είναι η Δευτέρα 2026-09-28· με την αργία της 2026-10-28, η μέρα 38 πέφτει 2026-11-19 και το buffer τελειώνει 2026-11-24. Η αλλαγή ώρας της 2026-10-25 πέφτει μέσα στο 1.5.
+
+Από 37 σε 38 μέρες (2026-09-28): το 1.1 κράτησε μόνο το τοπικό μέρος (5 → 4), το 1.5 μόνο το παλιό 1.5a (3,5 → 2) και το 1.9 μόνο heartbeats, runbooks και ανίχνευση (2,5 → 1,5)· όσα αφαιρέθηκαν μαζεύονται στο νέο 1.10 (3,5). Η βάση σχεδιασμού και κίνησης προσθέτει +0,5 στο 1.3 (6,5 → 7) και +0,5 στο 1.4 (3,5 → 4). Σύνολο +1.
 
 ## Αποφάσεις
 
 | Θέμα                            | Απόφαση                                                                                                                                                                                                                                                                    | Τεκμηρίωση                                        |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | D1 Hosting                      | Cloudflare Workers: static assets και **ένας** Worker για τη σελίδα κράτησης, το `/app`, το `/<slug>` με Open Graph και το `/api` proxy, που κρατά και το cookie της έμπιστης συσκευής.                                                                                    | ADR-0008 (1.1)· SPEC §6, §18 ερ. 2                |
-| D2 Domains                      | `anaklo.gr` (prod), `dev.anaklo.gr` (dev), DNS στο Cloudflare από τη μέρα 1. Resend σε sending subdomain (π.χ. `mail.anaklo.gr`), περιοχή EU.                                                                                                                              | ADR-0008· ADR-0007 (link ≤ 40)                    |
-| D3 Λογαριασμοί SMS              | 2–3 δοκιμαστικοί λογαριασμοί σε ελληνικούς παρόχους (π.χ. Apifon, Routee, Yuboto) από τη μέρα 1, επιλογή γύρω στη μέρα 12. Συμβάσεις, sender ID και DPA υπογράφει ο Μιχάλης προσωπικά μέχρι να υπάρξει η Nous.                                                             | SPEC §18 ερ. 1, 4                                 |
+| D2 Domains                      | `anaklo.gr` (prod), `dev.anaklo.gr` (dev), DNS στο Cloudflare στο 1.10 (C7). Resend σε sending subdomain (π.χ. `mail.anaklo.gr`), περιοχή EU.                                                                                                                              | ADR-0008· ADR-0007 (link ≤ 40)                    |
+| D3 Λογαριασμοί SMS              | 2–3 δοκιμαστικοί λογαριασμοί σε ελληνικούς παρόχους (π.χ. Apifon, Routee, Yuboto), επιλογή στο 1.10 (C7)· οι αιτήσεις μπορούν να ξεκινήσουν νωρίτερα, γιατί το KYC και το sender ID θέλουν χρόνο. Συμβάσεις, sender ID και DPA υπογράφει ο Μιχάλης προσωπικά μέχρι να υπάρξει η Nous. | SPEC §18 ερ. 1, 4                                 |
 | D4 Σύνδεση προσωπικού           | Κωδικός email 6 ψηφίων: `signInWithOtp` με `shouldCreateUser: false`, μετά `verifyOtp` με `type: 'email'`. Όχι magic links (ανοίγουν στο Safari, έξω από την εγκατεστημένη PWA), όχι κωδικοί πρόσβασης, όχι SMS. Emails Auth μέσω Resend SMTP. Signup κλειστό.             | ADR-0009 (1.1)· SPEC §11                          |
-| D5 Push                         | OneSignal αν περάσει η δοκιμή του 1.1, αλλιώς απλό Web Push (VAPID).                                                                                                                                                                                                       | ADR-0010 (προτεινόμενο μέχρι τη δοκιμή)· SPEC §6, §12 |
+| D5 Push                         | OneSignal αν περάσει η δοκιμή του 1.10 (αρχικά 1.1, C7), αλλιώς απλό Web Push (VAPID).                                                                                                                                                                                     | ADR-0010 (προτεινόμενο μέχρι τη δοκιμή)· SPEC §6, §12 |
 | D6 Μέλη και ταυτότητα           | Προσκλήσεις μελών (Edge Function) και RPC του owner για slug, ζώνη ώρας και νόμισμα **μέσα** στη Φάση 1 (1.7). Το `vertical` γράφεται μόνο στη δημιουργία και δεν αλλάζει στη Φάση 1.                                                                                       | SPEC §11, §14· ADR-0005                           |
 | D7 Αναβολές                     | Στη Φάση 3: καθημερινό email στον owner, UI συγχώνευσης πελατών, Realtime.                                                                                                                                                                                                 | SPEC §14                                          |
 | D8 «Στρίμωγμα» σε buffer        | Μόνο σε λειτουργία προσωπικού, με ρητό flag και προειδοποίηση, ποτέ πάνω σε χρόνο υπηρεσίας. Η online κράτηση σέβεται πάντα τα buffers. Το `blocked_until` μένει απορριφθέν.                                                                                               | SPEC §7, §8                                       |
@@ -36,15 +43,17 @@
 | C1 Σειρά περικοπών              | Sentry στη σελίδα κράτησης → μετακίνηση από το link διαχείρισης → οθόνες πολιτικής κρατήσεων. Οι οθόνες κλεισιμάτων **δεν** κόβονται.                                                                                                                                      | SPEC §14                                          |
 | C2 Χωρίς Realtime               | Το ημερολόγιο κάνει refetch όταν η εφαρμογή ξαναπάρει focus και κάθε 60″, μαζί με το push.                                                                                                                                                                                 | SPEC §6, §14                                      |
 | C3 TOTP                         | Οι restrictive πολιτικές `aal2` στο `business_members` (Φάση 0) απαιτούν MFA: ροή εγγραφής TOTP για owner/manager **πριν** τις προσκλήσεις. Με τις προσθήκες της 2026-09-27 (δεύτερη συσκευή, οθόνη χαμένης συσκευής, διαδικασία reset της Nous, πολιτική session, οδηγός σε απλή γλώσσα) το κόστος είναι ~2,5 μέρες, από τις οποίες ~0,5 ήταν ήδη στο πλάνο για το step-up της ανωνυμοποίησης: **καθαρά +2 μέρες** (+1 η αρχική C3, +1 οι προσθήκες). Σχέδιο στο 1.7. | ADR-0009· SPEC §11                                |
-| C4 Κριτήρια SMS                 | Pass/fail: GSM-7 χωρίς αυτόματη μετατροπή σε UCS-2, delivery webhooks, αλφαριθμητικό sender ID, προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης. Πίνακας στο 1.5b.                                                                                                         | SPEC §6, §18 ερ. 1· ADR-0007                      |
-| C5 Δοκιμή push                  | Στο 1.1, με την PWA **εγκατεστημένη στην αρχική οθόνη iPhone** (iOS ≥ 16.4).                                                                                                                                                                                               | SPEC §6· ADR-0010                                 |
+| C4 Κριτήρια SMS                 | Pass/fail: GSM-7 χωρίς αυτόματη μετατροπή σε UCS-2, delivery webhooks, αλφαριθμητικό sender ID, προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης. Πίνακας στο 1.10.                                                                                                         | SPEC §6, §18 ερ. 1· ADR-0007                      |
+| C5 Δοκιμή push                  | Στο 1.10 (αρχικά 1.1, C7), με την PWA **εγκατεστημένη στην αρχική οθόνη iPhone** (iOS ≥ 16.4).                                                                                                                                                                             | SPEC §6· ADR-0010                                 |
 | C6 Φρέσκος κωδικός              | **2026-09-28** (Μιχάλης, «Ναι στο step-up»). Οι κρίσιμες ενέργειες θέλουν session `aal2` **και** κωδικό από την εφαρμογή κωδικών των τελευταίων 5′ (`totp` στο `amr` του JWT), με έλεγχο στον server μέσα σε κάθε `_impl` (`private.require_fresh_totp()`), ποτέ μόνο στο UI: ανωνυμοποίηση πελάτη, αλλαγές μελών/ρόλων (και προσθήκη/αφαίρεση owner), αλλαγή slug/ζώνης ώρας/νομίσματος, εξαγωγή πελατολογίου, αλλαγή/αφαίρεση συσκευών κωδικών, απενεργοποίηση επιχείρησης. Όχι στις καθημερινές ενέργειες. Το `business_members` αλλάζει μόνο μέσω RPC. Το Supabase Pro δεν έχει hook που να αρνείται αλλαγές παραγόντων, άρα: αφαίρεση συσκευής μόνο μέσω `manage-factors`, προσθήκη μόνο με άδεια, ανίχνευση κάθε μη εγκεκριμένης αλλαγής (1.9): ο νέος ξένος παράγοντας σβήνεται, μια αφαίρεση δεν αναστρέφεται· και στις δύο ανάκληση sessions και ειδοποίηση. Το ερώτημα της φρεσκάδας έκλεισε με αυτή την απόφαση. Κόστος **+2 μέρες** (+1 στο 1.7, +1 στο 1.9). | ADR-0005, ADR-0009· SPEC §11 |
+| C7 Τοπικά πρώτα                 | **2026-09-28** (Μιχάλης). Τα 1.1–1.9 τρέχουν μόνο σε localhost: τοπικό Supabase, τα modules του Worker ως middleware του Vite, ψεύτικος adapter SMS με τους δοκιμαστικούς αριθμούς, ψεύτικη αποστολή push και email που καταγράφονται. Ό,τι θέλει remote, domain, εξωτερικό λογαριασμό ή πραγματική συσκευή πάει στο **1.10**: dashboard και μυστικά του `anaklo-dev`, `deploy:dev`, `provision:dev`, domain/DNS/Worker, Resend, OneSignal και go/no-go του push, πάροχος SMS (το παλιό 1.5b, ADR-0012), Sentry και uptime, όλες οι δοκιμές σε συσκευές, καθαρισμός των spikes, τελική πρόβα. Το `db:push` στο `anaklo-dev` μένει προαιρετικό μέχρι τότε. Καθαρά **+1 μέρα** (βλ. πίνακα βημάτων). | SPEC §14 |
+| C8 Σχεδιασμός Δ                 | **2026-09-28** (Μιχάλης). Κατεύθυνση Δ «Ζεστή πολυτέλεια» ως προεπιλεγμένη εμφάνιση, με προδιαγραφή το `docs/design/MOTION.md`, σταδιακά μέσα στα βήματα: βάση στο 1.3 (+0,5), κίνηση της εφαρμογής στο 1.4 (+0,5), τα υπόλοιπα μέσα στις μέρες των 1.6–1.8. Νέα εξάρτηση μόνο το `@fontsource/gfs-didot`. Το site μάρκετινγκ με το πλήρες επίπεδο κίνησης πάει στη Φάση 5. | ADR-0011· SPEC §10 |
 
 **Τεχνικές αποφάσεις (D10)**
 
 - Το staff κλείνει ραντεβού και για συναδέλφους (κοινό κινητό του μαγαζιού), αλλά μετακινεί, ακυρώνει και σημειώνει μόνο τα δικά του. Owner και manager: όλα.
 - OTP: 3 ανά αριθμό/ώρα, 10 ανά IP/ώρα, 40 ανά επιχείρηση/ημέρα, πλατφορμικό ημερήσιο όριο (π.χ. 300 στο dev). Μόνο +3069, και μόνο αφού επιλεγεί ώρα που είναι ακόμη ελεύθερη.
-- Dev: `OTP_TEST_NUMBERS` με σταθερό κωδικό, `SMS_ALLOWED_RECIPIENTS`, έως 30 SMS/ημέρα, όλα απορρίπτονται στην εκκίνηση όταν `ANAKLO_ENV=prod`. Τοπικά και στο CI: ψεύτικος adapter. Μόνο το `anaklo-dev` στη Φάση 1· επιχειρήσεις demo και πιλότου από script provisioning (JSON εκτός repo).
+- Dev: `OTP_TEST_NUMBERS` με σταθερό κωδικό, `SMS_ALLOWED_RECIPIENTS`, έως 30 SMS/ημέρα, όλα απορρίπτονται στην εκκίνηση όταν `ANAKLO_ENV=prod`. Τοπικά και στο CI: ψεύτικος adapter, και μέχρι το 1.10 μόνο τοπικά (C7). Μόνο το `anaklo-dev` στη Φάση 1· επιχειρήσεις demo και πιλότου από script provisioning (JSON εκτός repo).
 - Υπενθύμιση 24ω πριν (προεπιλογή) ή το προηγούμενο απόγευμα (ρύθμιση)· ώρες ησυχίας 22:00–09:00 τοπική ώρα. Ένας planner σε SQL, `private.plan_messages_impl`, που τον καλούν ρητά οι RPCs· κανένας γενικός trigger στο `appointments`.
 - Link διαχείρισης: **νέο token σε κάθε μήνυμα** και σε κάθε idempotent επανάληψη κράτησης· το `messages_log` κρατά μόνο `booking_token_id`. Link νέας κράτησης: `/r/<code>` (σταθερός κωδικός επιχείρησης), ώστε κάθε link να χωρά στα 40 σύμβολα όποιο κι αν είναι το slug.
 - Μετά το `verify`: **εφάπαξ verification grant** (~10′, μόνο στη μνήμη της σελίδας). Το cookie της έμπιστης συσκευής χρησιμεύει μόνο για να μη ζητηθεί OTP την επόμενη φορά· αν το ρίξει ο browser, η ροή δεν κολλά.
@@ -80,9 +89,9 @@
 
 **Migrations**
 
-- Ένα migration ανά βήμα, με τη σειρά του πίνακα (0004–0011)· το 1.5b δεν έχει. Κανένα βήμα δεν χρειάζεται migration μεταγενέστερου βήματος. Κάθε πίνακας έρχεται με RLS, πολιτικές και ρητά GRANT στο ίδιο αρχείο.
+- Ένα migration ανά βήμα, με τη σειρά του πίνακα (0004–0011)· το 1.10 δεν έχει. Κανένα βήμα δεν χρειάζεται migration μεταγενέστερου βήματος. Κάθε πίνακας έρχεται με RLS, πολιτικές και ρητά GRANT στο ίδιο αρχείο.
 - Ο planner έχει σταθερή υπογραφή από το 0004: `private.plan_messages_impl(p_appointment_id uuid, p_change text)`, με κενό σώμα. Τα 0005 και 0007 αλλάζουν μόνο το σώμα του (`create or replace`), οπότε οι καλούντες δεν αλλάζουν.
-- Αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα): `npm run db:reset:dev` → `npm run secrets:dev` → `npm run provision:dev` → `npm run db:test:dev` → `npm run deploy:dev`. Το reset σβήνει τα δεδομένα του provisioning (και τα μέλη) και ίσως τα μυστικά του Vault· το `secrets:dev` κάνει upsert, άρα ξανατρέχει χωρίς πρόβλημα. Τα cron jobs τα ξαναφτιάχνουν τα migrations με `cron.schedule('<όνομα>', …)`. Μετά από κάθε αλλαγή σχήματος: `npm run gen:types`.
+- Αλλαγή σε migration που έχει ήδη σταλεί στο `anaklo-dev` (μόνο πριν τα πραγματικά δεδομένα· πριν το 1.10 μόνο αν ο Μιχάλης έχει κάνει `db:push`): `npm run db:reset:dev` → `npm run secrets:dev` → `npm run provision:dev` → `npm run db:test:dev` → `npm run deploy:dev`. Το reset σβήνει τα δεδομένα του provisioning (και τα μέλη) και ίσως τα μυστικά του Vault· το `secrets:dev` κάνει upsert, άρα ξανατρέχει χωρίς πρόβλημα. Τα cron jobs τα ξαναφτιάχνουν τα migrations με `cron.schedule('<όνομα>', …)`. Μετά από κάθε αλλαγή σχήματος: `npm run gen:types`.
 
 **Δικαιώματα**
 
@@ -104,8 +113,28 @@
 - Open Graph και κείμενα ημερολογίου (Google Calendar, .ics) από το namespace `booking`. Ο Worker δεν έχει δικά του κείμενα: για άγνωστο slug επιστρέφει το κέλυφος της SPA με status 404.
 - Κωδικοί σφαλμάτων τομέα (`AN0xx`, π.χ. `AN001 slot_taken`) στο `_shared/errors.ts`, με test ότι κάθε κωδικός έχει κλειδί i18n.
 
+**Σχεδιασμός και κίνηση (Κατεύθυνση Δ, ADR-0011)**
+
+- Προδιαγραφή το `docs/design/MOTION.md`, με τους κωδικούς του: G1–G7 (μοτίβα), E1–E19 (κινήσεις). Όχι ξεχωριστή δουλειά: η βάση (tokens, γραμματοσειρές, `src/shared/motion/`, restyle του `src/shared/ui/`) στο 1.3, και κάθε κίνηση μαζί με την οθόνη που τη χρησιμοποιεί.
+- **Μόνο `transform` και `opacity`**, ποτέ ιδιότητες διάταξης. Εξαιρέσεις μόνο όσες ορίζει το MOTION.md χωρίς layout: χρώμα ετικέτας (E1), φόντο κεφαλίδας (E13), `stroke-dashoffset` (E15, E18), `background-position` (E17).
+- **`prefers-reduced-motion: reduce` → καμία κίνηση**, το περιεχόμενο αμέσως στην τελική θέση, με test.
+- **Χωρίς βιβλιοθήκη κίνησης:** μόνο CSS και τα `useReducedMotion`, `useInView`, `useCountUp`, `SplitWords`, `RollText`, `motion.css` του `src/shared/motion/`.
+- **Hover μόνο με ποντίκι** (`(hover: hover) and (pointer: fine)`)· σε αφή μόνο E16 (`scale(.97)`).
+- **Η κίνηση δεν καθυστερεί ποτέ ενέργεια:** κουμπιά ενεργά όσο «ανεβαίνουν», καμία αναμονή animation πριν από αίτημα ή πλοήγηση· E15 μόνο μετά την απάντηση του server.
+- **Επίπεδα:** σελίδα κράτησης μεσαίο (χωρίς E7 και E11)· εφαρμογή επαγγελματία ελάχιστο· πλήρες μόνο στο site μάρκετινγκ (Φάση 5).
+- Χρώματα μόνο από tokens: τα components διαβάζουν τα σημασιολογικά `--color-*`, που τροφοδοτεί η παλέτα `--lux-*`, ώστε τα θέματα επιχείρησης να αλλάζουν το brand με τις εγγυήσεις του `theme.ts`. Χρυσό μόνο σε σκούρο φόντο. Κείμενα των `SplitWords`/`RollText` μόνο από i18n· ποσά του E6 μόνο μέσω `money.ts`.
+- **Definition of Done ανά οθόνη με κίνηση** (MOTION.md §6):
+  1. Playwright με `page.emulateMedia({ reducedMotion: 'reduce' })`: όλα ορατά αμέσως, στην τελική θέση.
+  2. CLS ≈ 0: καμία εμφάνιση δεν μετακινεί τη διάταξη.
+  3. Σελίδα κράτησης ≤ 120 KB JS gzip (`npm run size`).
+  4. Κείμενο πάνω στο G6 ≥ 4.5:1 και ζεύγη κειμένου/φόντου των tokens σε AA (Vitest με το `contrastRatio` του `theme.ts`).
+  5. Χρυσό μόνο σε σκούρο φόντο· σε ανοιχτό, μπρονζέ.
+  6. Κανένα hover σε αφή: project κινητού του Playwright τοπικά, πραγματικό iPhone στο 1.10.
+  7. Ο αναγνώστης οθόνης διαβάζει ολόκληρο τον τίτλο του `SplitWords` (`getByRole('heading', { name })`).
+
 **Περιβάλλον και deploy**
 
+- **Τοπικά πρώτα (C7):** μέχρι το 1.10 όλα τρέχουν και ελέγχονται στο localhost (τοπικό Supabase, Vite με τα modules του Worker, Mailpit, ψεύτικοι αποστολείς SMS, push και email). Κανένα βήμα πριν το 1.10 δεν εξαρτάται από το `anaklo-dev`, από domain ή από εξωτερικό λογαριασμό· τα scripts του remote (`deploy:dev`, `secrets:dev`, `provision:dev`) υπάρχουν από το 1.1 και τρέχουν στο 1.10. Όπου ένα βήμα γράφει «στο dev», μέχρι τότε σημαίνει τοπικά.
 - **Ποτέ `supabase config push`.** Το `config.toml` ισχύει μόνο τοπικά· οι ρυθμίσεις Auth του remote μπαίνουν με το χέρι από τη λίστα του `docs/SETUP.md`. Το `verify_jwt` ανά function μένει στο `[functions.<name>]` (το διαβάζει το `functions deploy`).
 - Τα `dist/**/*.map` σβήνονται μετά το build και πριν από κάθε `wrangler deploy`, από το 1.1 (δεύτερη ασφάλεια: `public/.assetsignore` με `*.map`, που το Vite αντιγράφει στο `dist/`· ένα `.assetsignore` στη ρίζα δεν μετρά, και το `dist/` αδειάζει σε κάθε build). Το `deploy:dev` αποτυγχάνει αν βρει `.map`.
 - Σειρά deploy: **migration → Edge Functions → Worker** (`scripts/deploy-dev.mjs`, που ελέγχει πρώτα το συνδεδεμένο project). Τα μυστικά του Worker είναι Worker secrets, ποτέ στο bundle.
@@ -115,33 +144,30 @@
 
 1. `typecheck`, `lint`, `test`, `e2e`· από το 1.1 και `fn:check`· από το 1.2 και `test:race`.
 2. Αν άλλαξε η βάση: `db:reset`, `db:test`, `check:types`. Αν άλλαξαν η σελίδα κράτησης, ρυθμίσεις ή εξαρτήσεις: `build` και `size`.
-3. Ο Μιχάλης: `db:push` → `secrets:dev` → `db:test:dev` → `deploy:dev`· μετά από `db:reset:dev`: `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev`.
-4. ADR, `SETUP.md` και CLAUDE.md όπου άλλαξε κανόνας· SPEC §7 για νέους πίνακες· μια γραμμή κατάστασης στο SPEC §14.
+3. Αν άλλαξε οθόνη: το Definition of Done της κίνησης (παραπάνω).
+4. Ο Μιχάλης, **προαιρετικά μέχρι το 1.10** (υποχρεωτικά από εκεί και μετά): `db:push` → `db:test:dev`· από το 1.10 ολόκληρο: `db:push` → `secrets:dev` → `db:test:dev` → `deploy:dev`, και μετά από `db:reset:dev`: `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev`.
+5. ADR, `SETUP.md` και CLAUDE.md όπου άλλαξε κανόνας· SPEC §7 για νέους πίνακες· μια γραμμή κατάστασης στο SPEC §14.
 
 ## Προαπαιτούμενα
 
-Τι κάνει ο Μιχάλης και πότε:
+Τι κάνει ο Μιχάλης και πότε. Μέχρι το 1.10 τίποτα από αυτά δεν μπλοκάρει τη δουλειά (C7):
 
-| Πότε                   | Τι                                                                                                                                                                                                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Μέρα 1, **βήμα 0**     | `npm run db:reset:dev` + `npm run db:test:dev` (141/141), πριν από οτιδήποτε άλλο: η διόρθωση του guard συναινέσεων δεν έχει φτάσει ακόμη στο `anaklo-dev`.                                                                                                                                |
-| Μέρα 1                 | Επιβεβαίωση κατοχύρωσης του anaklo.gr. Λογαριασμός Cloudflare στο mailbox της Nous με 2FA, ζώνη `anaklo.gr` με nameservers στο Cloudflare, API token για το wrangler (Workers + DNS της ζώνης) στο password manager.                                                                       |
-| Μέρα 1                 | Resend (περιοχή EU): επαλήθευση του `mail.anaklo.gr` με SPF, DKIM και DMARC· API key στο password manager.                                                                                                                                                                                 |
-| Μέρα 1                 | SMS (D3): αιτήσεις για 2–3 δοκιμαστικούς λογαριασμούς στο όνομα του Μιχάλη, γραπτή ερώτηση σε κάθε πάροχο για τα 4 κριτήρια του C4, έναρξη καταχώρισης sender ID (θέλει χρόνο).                                                                                                            |
-| Μέρα 2                 | OneSignal (mailbox της Nous, 2FA): Web app για `https://dev.anaklo.gr`, custom service worker `/app/sw.js`, scope `/app/`, Identity Verification **κλειστό** (υποστηρίζει μόνο τα mobile SDKs· ADR-0010 §2)· app id και κλειδί REST στο password manager. |
-| Μέρα 2                 | iPhone με iOS ≥ 16.4 (ιδανικά 17+) και ένα Android, με Instagram και Facebook συνδεδεμένα. Στο iPhone η PWA θα εγκατασταθεί **στην αρχική οθόνη** για τη δοκιμή push (C5).                                                                                                                 |
-| Μέρα 3                 | Dashboard του `anaklo-dev` με τη λίστα του `SETUP.md` (παρακάτω), αφού επαληθευτεί το domain στο Resend.                                                                                                                                                                                   |
-| Μέρα 3                 | `npm run secrets:dev` (Edge Functions, Worker, Vault) από το password manager (`PROXY_SECRET`, `OTP_HMAC_KEY` και `PHONE_HMAC_KEY` στο Vault ως `otp_hmac_key`/`phone_hmac_key`, με `supabase link` στο dev· OneSignal: app id και κλειδί REST· Resend· αργότερα dispatch και πάροχος SMS) και μετά `npm run provision:dev` με το JSON από φάκελο **εκτός** repo (επιχείρηση demo, emails δοκιμαστικών λογαριασμών). |
-| Μέρες 3–5              | Δοκιμές σε συσκευές του 1.1: εγκατάσταση της PWA στην αρχική οθόνη, άδεια push μέσα από την εγκατεστημένη εφαρμογή, cookie στους in-app browsers.                                                                                                                                          |
-| Μέρες ~5–10            | SIM σε Cosmote, Vodafone και Nova (αρκούν καρτοκινητά) για τον πίνακα του 1.5b.                                                                                                                                                                                                            |
-| Μέρα ~8                | Έλεγχος 3 ημερών: η εγκατεστημένη PWA είναι ακόμη συνδεδεμένη.                                                                                                                                                                                                                             |
-| Μέρα ~12               | Επιλογή παρόχου SMS με τα κριτήρια C4 → σύμβαση, DPA, τελικό sender ID, προπληρωμή ή σκληρό όριο δαπάνης.                                                                                                                                                                                  |
-| Πριν το 1.7 (μέρα ~27) | Εφαρμογή κωδικών στο iPhone (Google Authenticator, Microsoft Authenticator ή οι ενσωματωμένοι «Κωδικοί») και εφαρμογή κωδικών σε δεύτερη συσκευή (π.χ. το Android), για τη δοκιμή της δεύτερης συσκευής. Στοιχεία επικοινωνίας της Nous (email, τηλέφωνο) για την οθόνη «Χάσατε τη συσκευή σας;». Έγκριση του runbook `mfa-reset.md` (επαλήθευση ταυτότητας). |
-| Μέρα ~28 (1η του 1.7)  | `npm run db:test:dev` για τον έλεγχο trigger στο `auth.mfa_factors` (C6, βλ. 1.7). Στο τέλος του 1.7, ο έλεγχος του `amr` και με το χέρι στο `dev.anaklo.gr`.                                                                                                                              |
-| Πριν το 1.9 (μέρα ~34) | Sentry (EU): projects `booking`, `pro`, `functions` και auth token για source maps. Λογαριασμός uptime monitor (δωρεάν). Έγκριση των κειμένων των email ασφαλείας (el/en: μη εγκεκριμένη αλλαγή συσκευής κωδικών)· το κλειδί Resend φτάνει και στο `dispatch` με το `secrets:dev`. |
-| Τέλος κάθε βήματος     | `npm run db:push` → `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`. Μετά από `db:reset:dev`: `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev`.                                                                                                        |
+| Πότε | Τι |
+| --- | --- |
+| Όποτε θέλει (προαιρετικό) | `npm run db:push` + `npm run db:test:dev`, για να ακολουθεί το `anaklo-dev` τα migrations. Η εκκρεμότητα της Φάσης 0 (`npm run db:reset:dev` + `npm run db:test:dev`, για τη διόρθωση του guard συναινέσεων) κλείνει με την πρώτη τέτοια ενημέρωση, το αργότερο στην αρχή του 1.10. |
+| Πριν το 1.7 (μέρα ~25) | Στοιχεία επικοινωνίας της Nous (email, τηλέφωνο) για την οθόνη «Χάσατε τη συσκευή σας;». Έγκριση του runbook `mfa-reset.md` (επαλήθευση ταυτότητας). |
+| Πριν το 1.9 (μέρα ~33) | Έγκριση των κειμένων των email ασφαλείας (el/en: μη εγκεκριμένη αλλαγή συσκευής κωδικών). |
+| Πριν το 1.10, όσο νωρίτερα γίνεται | SMS (D3): αιτήσεις για 2–3 δοκιμαστικούς λογαριασμούς στο όνομα του Μιχάλη, γραπτή ερώτηση σε κάθε πάροχο για τα 4 κριτήρια του C4, έναρξη καταχώρισης sender ID. SIM σε Cosmote, Vodafone και Nova (αρκούν καρτοκινητά). Δεν μπλοκάρουν τίποτα πριν το 1.10, αλλά το KYC και το sender ID θέλουν χρόνο: ό,τι αργεί μεταθέτει το 1.10. |
+| Πριν το 1.10 (μέρα ~34) | Επιβεβαίωση κατοχύρωσης του anaklo.gr. Λογαριασμός Cloudflare στο mailbox της Nous με 2FA, ζώνη `anaklo.gr` με nameservers στο Cloudflare, API token για το wrangler (Workers + DNS της ζώνης) στο password manager. |
+| Πριν το 1.10 | Resend (περιοχή EU): επαλήθευση του `mail.anaklo.gr` με SPF, DKIM και DMARC· API key στο password manager. |
+| Πριν το 1.10 | OneSignal (mailbox της Nous, 2FA): Web app για `https://dev.anaklo.gr`, custom service worker `/app/sw.js`, scope `/app/`, Identity Verification **κλειστό** (υποστηρίζει μόνο τα mobile SDKs· ADR-0010 §2)· app id και κλειδί REST στο password manager. |
+| Πριν το 1.10 | iPhone με iOS ≥ 16.4 (ιδανικά 17+) και ένα Android, με Instagram και Facebook συνδεδεμένα. Εφαρμογή κωδικών στο iPhone (Google Authenticator, Microsoft Authenticator ή οι ενσωματωμένοι «Κωδικοί») και σε δεύτερη συσκευή (π.χ. το Android). |
+| Πριν το 1.10 | Sentry (EU): projects `booking`, `pro`, `functions` και auth token για source maps. Λογαριασμός uptime monitor (δωρεάν). |
+| 1.10, μέρα 1 | Dashboard του `anaklo-dev` με τη λίστα του `SETUP.md` (παρακάτω), αφού επαληθευτεί το domain στο Resend. Μετά `db:push` (ή `db:reset:dev`) → `npm run secrets:dev` (Edge Functions, Worker, Vault) από το password manager (`PROXY_SECRET`, `OTP_HMAC_KEY` και `PHONE_HMAC_KEY` στο Vault ως `otp_hmac_key`/`phone_hmac_key`, με `supabase link` στο dev· OneSignal: app id και κλειδί REST· Resend· dispatch· αργότερα ο πάροχος SMS) → `npm run provision:dev` με το JSON από φάκελο **εκτός** repo (επιχείρηση demo, emails δοκιμαστικών λογαριασμών) → `db:test:dev` → `deploy:dev`. Εγκατάσταση της PWA στην αρχική οθόνη του iPhone: ξεκινούν ο έλεγχος 3 ημερών και η επανάληψη του push μετά από 24 ώρες. |
+| 1.10 | Επιλογή παρόχου SMS με τα κριτήρια C4 → σύμβαση, DPA, τελικό sender ID, προπληρωμή ή σκληρό όριο δαπάνης. |
+| Από το 1.10, τέλος κάθε βήματος | `npm run db:push` → `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`. Μετά από `db:reset:dev`: `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev`. |
 
-**Λίστα Auth στο dashboard του `anaklo-dev`** (γράφεται στο `docs/SETUP.md`· ποτέ `config push`):
+**Λίστα Auth στο dashboard του `anaklo-dev`** (στο 1.10· γράφεται στο `docs/SETUP.md`· ποτέ `config push`):
 
 - «Allow new users to sign up» = **off** (έγινε ήδη, μόνο επιβεβαίωση)
 - MFA: **TOTP** enroll και verify ενεργά
@@ -155,16 +181,16 @@
 
 ## 1.1 Υποδομή
 
-- **Στόχος:** Το `dev.anaklo.gr` σερβίρεται από έναν Cloudflare Worker (σελίδα κράτησης, `/app`, `/api` proxy που κρατά το cookie της έμπιστης συσκευής). Ο κουρέας εγκαθιστά το `/app` στο iPhone και συνδέεται μέσα στην εγκατεστημένη εφαρμογή με κωδικό email. Οι Edge Functions ελέγχονται στο CI, το provisioning στήνει την επιχείρηση demo, και οι δοκιμές σε συσκευές κλείνουν cookies, session και push πριν τα χρειαστεί άλλο βήμα.
-- **Μέρες:** 5
-- **Εξαρτάται από:** το βήμα 0 (remote dev ενημερωμένο).
+- **Στόχος:** Ο Cloudflare Worker (σελίδα κράτησης, `/app`, `/api` proxy που κρατά το cookie της έμπιστης συσκευής) υπάρχει και τα modules του τρέχουν ως middleware του Vite, ώστε το Playwright να περνά από τον ίδιο δρόμο. Ο κουρέας συνδέεται στο `/app` με κωδικό email (τοπικά μέσω Mailpit). Οι Edge Functions ελέγχονται στο CI και το provisioning στήνει την επιχείρηση demo στην τοπική βάση. Το deploy στο `dev.anaklo.gr`, τα μυστικά του remote και οι δοκιμές σε συσκευές πάνε στο 1.10 (C7).
+- **Μέρες:** 4 (τοπικό μέρος· **ολοκληρώθηκε**, `b315e6c`)
+- **Εξαρτάται από:** —
 
 **Βάση**
 
 - Κανένα migration. `supabase/seed.sql`: συνθετικοί χρήστες Auth (owner, manager, staff, και ένας χωρίς συμμετοχή για το «χωρίς πρόσβαση»), emails `*.test`, με σταθερά UUID, `email_confirmed_at`, `aud` = `role` = `authenticated`, **κενά strings** (όχι `NULL`) στα `confirmation_token`, `recovery_token`, `email_change_token_new`, `email_change` (αλλιώς το GoTrue απαντά 500), γραμμή στο `auth.identities` (provider `email`) και `on conflict do nothing`. Μετά `business_members` για το `demo-barber`. Δεν γράφουν ραντεβού, άρα δεν χρειάζονται actor.
 - `supabase/config.toml`, μόνο τοπικά: `otp_expiry = 600` (το `otp_length = 6` υπάρχει)· `site_url` και redirects· πρότυπο κωδικού στο `supabase/templates/`· τοπικό `[auth.rate_limit] email_sent` από 2 σε π.χ. 100· `[auth] jwt_expiry = 3600` και `enable_refresh_token_rotation = true` (επιβεβαίωση)· `[auth.sessions] inactivity_timeout = "720h"`· `[edge_runtime.secrets] PROXY_SECRET = "env(PROXY_SECRET)"`, γιατί το edge runtime δεν διαβάζει το `.env.local`.
 - `verify_jwt = false` σε κάθε function που δεν καλείται με JWT χρήστη: `health`, `spike-td`, `public-booking`, `manage` (publishable key μέσω του proxy· τα `sb_publishable_` δεν είναι JWT), `dispatch` (μυστικό από Vault, pg_net), `sms-dlr` (υπογραφή ή μυστικό του παρόχου). Ο έλεγχος γίνεται στον κώδικα. `verify_jwt = true` μόνο στο `spike-push`, στο `invite-member` και στο `manage-factors` (1.7), που τα καλεί η PWA απευθείας με το JWT του χρήστη.
-- `scripts/provision-business.mjs` (`npm run provision:dev`): JSON από φάκελο εκτός repo, με Zod (στο repo μόνο το συνθετικό `supabase/provision/demo-barber.example.json`). **Δημιουργεί** την επιχείρηση· για υπάρχον slug ενημερώνει μόνο στήλες που αλλάζει και η εφαρμογή. Τα `slug`, `timezone`, `currency` μπαίνουν μόνο στη δημιουργία (μετά μόνο με το `change_business_identity` του 1.7)· το `vertical` μόνο στη δημιουργία, και δεν αλλάζει στη Φάση 1.
+- `scripts/provision-business.mjs` (`npm run provision:local` στην τοπική βάση· `npm run provision:dev` στο 1.10): JSON από φάκελο εκτός repo, με Zod (στο repo μόνο το συνθετικό `supabase/provision/demo-barber.example.json`). **Δημιουργεί** την επιχείρηση· για υπάρχον slug ενημερώνει μόνο στήλες που αλλάζει και η εφαρμογή. Τα `slug`, `timezone`, `currency` μπαίνουν μόνο στη δημιουργία (μετά μόνο με το `change_business_identity` του 1.7)· το `vertical` μόνο στη δημιουργία, και δεν αλλάζει στη Φάση 1.
 - Το ίδιο script γράφει προσωπικό (και χωρίς login), κατηγορίες, υπηρεσίες, `staff_services`, ωράρια (Zod χωρίς επικαλύψεις, delete-then-insert), χρήστες Auth με admin API (`email_confirm`, χωρίς link) και μέλη. Αρνείται project άλλο από το `SUPABASE_DEV_PROJECT_REF` χωρίς `--prod` και δεν γράφει ποτέ ραντεβού. Ως `service_role` παρακάμπτει τις πολιτικές `aal2`: είναι εργαλείο της Nous, όχι της εφαρμογής.
 
 **Edge Functions**
@@ -172,9 +198,9 @@
 - Toolchain: `deno` ως pinned npm devDependency· scripts `fn:check` (deno check + lint), `fn:serve`, `fn:deploy:dev`. Το CI τρέχει `fn:check`.
 - CI (`.github/workflows/ci.yml`), job `database-e2e`: το `supabase start -x` γίνεται `-x studio,imgproxy,logflare,vector,supavisor`, δηλαδή **χωρίς** `edge-runtime` και `mailpit` (χωρίς Mailpit δεν φτάνει ο κωδικός email, χωρίς edge runtime αποτυγχάνει κάθε `/api/functions/v1/*`). Τα `PROXY_SECRET` και `APP_ENV=local` μπαίνουν ως env του job, για τον Vite και για το edge runtime (μέσω του `[edge_runtime.secrets]`). Ίδιες μεταβλητές στο `.env.example` και στο `docs/SETUP.md` §3 (το `e2e` τις θέλει στο `.env.local`).
 - `_shared/http.ts` (για τις functions πίσω από το `/api`: `health`, `spike-td`, `public-booking`, `manage`): `requireProxy(req, secret)` ελέγχει το `x-anaklo-proxy-secret` σε σταθερό χρόνο, και δίνει 500 χωρίς να δεχτεί ποτέ το αίτημα όταν το μυστικό που του περνά το `index.ts` (από το `PROXY_SECRET` του env) λείπει ή είναι κενό· IP μόνο από `x-anaklo-client-ip`· είσοδος με `zod/mini`· ενιαίο σχήμα σφάλματος· `Cache-Control: no-store`. Τα `dispatch`, `sms-dlr`, `invite-member` και `manage-factors` δεν περνούν από το `/api` και έχουν δικό τους έλεγχο.
-- `health` (χωρίς δεδομένα: αποδεικνύει deploy, μυστικό και περιοχή) και `spike-td` (προσωρινή: εκδίδει και διαβάζει token μέσω του Worker, σβήνεται στο τέλος του βήματος).
+- `health` (χωρίς δεδομένα: αποδεικνύει deploy, μυστικό και περιοχή) και `spike-td` (προσωρινή: εκδίδει και διαβάζει token μέσω του Worker· μένει για τη δοκιμή του cookie στο 1.10 και σβήνεται μετά από αυτήν).
 - Όριο σώματος 64 KB (`_shared/body-limit.ts`, ίδιο στον proxy και στο `parseJsonBody`): μετρά το stream και το κόβει μόλις περάσει το όριο, και χωρίς `Content-Length` (chunked, HTTP/2)· μη αριθμητικό `Content-Length` → 400.
-- `spike-push` (προσωρινή, `verify_jwt = true`, για τη δοκιμή C5 του ADR-0010 §3): μόνο για owner (ρόλος από το `business_members`)· σώμα `{ subscription_id }` (UUID, `zod/mini`), δηλαδή η συνδρομή που διάβασε η εφαρμογή από το SDK της **δικής της** συσκευής· στέλνει δοκιμαστικό push **μόνο** σε αυτή (`POST https://api.onesignal.com/notifications?c=push`, `target_channel: 'push'`, `include_subscription_ids`, κλειδί REST ως secret). Κανένα `external_id`, κανένας πίνακας και κανένα migration στο 1.1 (ADR-0010 §2). Το payload το χτίζει το καθαρό `buildPushPayload` του `_shared/onesignal.ts`, που το ξαναχρησιμοποιεί το `dispatch` στο 1.5a. Σε no-go, η ίδια function στέλνει Web Push (VAPID) για την επανάληψη της δοκιμής, και ο χρόνος χρεώνεται στο buffer. Σβήνεται όταν κλείσει η δοκιμή, το αργότερο στο 1.5a, όπου τη θέση του παίρνει το `dispatch`.
+- `spike-push` (προσωρινή, `verify_jwt = true`, για τη δοκιμή C5 του ADR-0010 §3): μόνο για owner (ρόλος από το `business_members`)· σώμα `{ subscription_id }` (UUID, `zod/mini`), δηλαδή η συνδρομή που διάβασε η εφαρμογή από το SDK της **δικής της** συσκευής· στέλνει δοκιμαστικό push **μόνο** σε αυτή (`POST https://api.onesignal.com/notifications?c=push`, `target_channel: 'push'`, `include_subscription_ids`, κλειδί REST ως secret). Κανένα `external_id`, κανένας πίνακας και κανένα migration στο 1.1 (ADR-0010 §2). Το payload το χτίζει το καθαρό `buildPushPayload` του `_shared/onesignal.ts`, που το ξαναχρησιμοποιεί το `dispatch` στο 1.5. Σε no-go, η ίδια function στέλνει Web Push (VAPID) για την επανάληψη της δοκιμής, και ο χρόνος χρεώνεται στο buffer. Μένει για τη δοκιμή C5 του 1.10 και σβήνεται μετά από αυτήν· από το 1.5 την κανονική αποστολή την κάνει το `dispatch`.
 
 **Frontend (και Worker)**
 
@@ -184,10 +210,10 @@
 - Τα ίδια modules και η έγχυση του `/<slug>` (`edge/inject.ts`, καθαρή συνάρτηση σε string) τρέχουν και ως middleware του Vite, ώστε το Playwright να περνά από τον ίδιο δρόμο. Η έγχυση παίρνει τα δεδομένα από το `public_business_profile` (Φάση 0) στο 1.1 και από το `public_booking_catalogue` από το 1.3. Το μυστικό τοπικά από μεταβλητή χωρίς `VITE_` στο `.env.local`.
 - PWA: `/app/login` (email → κωδικός 6 ψηφίων). **Το ίδιο ουδέτερο μήνυμα** για `otp_disabled` (άγνωστο email, με κλειστό signup) **και** για `over_email_send_rate_limit` (όριο ανά διεύθυνση)· διαφορετικό μήνυμα μόνο για σφάλμα δικτύου και για το όριο ανά IP (`over_request_rate_limit`). Το email σε αναμονή μένει στο `localStorage` με λήξη, για την περίπτωση που το iOS κλείσει την εφαρμογή όσο ο χρήστης διαβάζει το Mail. Loaders `requireSession`/`requireMembership` (ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT), οθόνη «χωρίς πρόσβαση».
 - Πολιτική session (ADR-0009): access token 1 ώρα και rotation των refresh tokens (ρυθμίσεις Auth). **30 μέρες αδράνειας** → τέλος session και πλήρης σύνδεση. Επειδή το Free του `anaklo-dev` δεν έχει «Inactivity timeout», την επιβάλλει και η εφαρμογή: timestamp τελευταίας δραστηριότητας στο `localStorage`, που ενημερώνεται σε κάθε άνοιγμα και focus. Ο έλεγχος τρέχει πριν από κάθε ενημέρωση (στο `requireSession` και στο focus): αν έχουν περάσει > 30 μέρες, καλείται η ίδια συνάρτηση αποσύνδεσης με την επόμενη γραμμή (`signOut({ scope: 'local' })` και `OneSignal.User.PushSubscription.optOut()`) → login. Το ίδιο γίνεται όταν το supabase-js στείλει `SIGNED_OUT` επειδή το session ανακλήθηκε (αλλαγή ρόλου, αφαίρεση, «από όλες τις συσκευές»· ADR-0010 §2). Καθαρή συνάρτηση `isSessionStale(lastActivityAt, now)` με Vitest. Κανένα απόλυτο όριο διάρκειας.
-- Αποσύνδεση: `signOut({ scope: 'local' })`, μόνο αυτή η συσκευή, γιατί τα κινητά του μαγαζιού είναι κοινά· και πριν από αυτό `OneSignal.User.PushSubscription.optOut()` (από το 1.5a και `unregister_push_subscription`), με ανώτατο χρόνο, ώστε το push να μη μπλοκάρει ποτέ την αποσύνδεση. Η ίδια συνάρτηση δέχεται `scope: 'global'` για την «Αποσύνδεση από όλες τις συσκευές» (Ρυθμίσεις → Ασφάλεια, 1.7). Μετά από αποσύνδεση, η επόμενη είσοδος είναι **νέα** σύνδεση (από το 1.7 και με κωδικό από την εφαρμογή κωδικών για owner/manager).
+- Αποσύνδεση: `signOut({ scope: 'local' })`, μόνο αυτή η συσκευή, γιατί τα κινητά του μαγαζιού είναι κοινά· και πριν από αυτό `OneSignal.User.PushSubscription.optOut()` (από το 1.5 και `unregister_push_subscription`), με ανώτατο χρόνο, ώστε το push να μη μπλοκάρει ποτέ την αποσύνδεση. Η ίδια συνάρτηση δέχεται `scope: 'global'` για την «Αποσύνδεση από όλες τις συσκευές» (Ρυθμίσεις → Ασφάλεια, 1.7). Μετά από αποσύνδεση, η επόμενη είσοδος είναι **νέα** σύνδεση (από το 1.7 και με κωδικό από την εφαρμογή κωδικών για owner/manager).
 - iOS Safari εκτός standalone: οθόνη «Πρόσθεσε πρώτα στην αρχική οθόνη». Την απόφαση την παίρνει καθαρή συνάρτηση `needsInstall({ isIOS, standalone })`, με Vitest. Στο Playwright, για το project `mobile-safari` (`devices['iPhone 14']`, χωρίς `navigator.standalone`), ένα `addInitScript` ορίζει `navigator.standalone = true`, και ένα spec χωρίς αυτό ελέγχει ότι η οθόνη εμφανίζεται. Εικονίδια PNG (apple-touch-icon 180 px, manifest 192/512 maskable). `/app/sw.js`: μόνο import του worker του OneSignal (scope `/app/`), χωρίς caching.
-- Προσωρινό κουμπί «Ενεργοποίηση ειδοποιήσεων» στην `/app`, για τη δοκιμή του ADR-0010 §3 (κείμενα μέσω i18n): lazy SDK του OneSignal με `serviceWorkerPath: 'app/sw.js'` και scope `/app/`, **χωρίς** `OneSignal.login` (καμία ταυτότητα στον client, ADR-0010 §2)· αίτημα άδειας **μόνο** μέσα στο handler του πατήματος, και στο iOS μόνο σε standalone, μετά `optIn()` και ανάγνωση του `PushSubscription.id` (αν είναι `null`, αναμονή για το event `change`, με όριο χρόνου)· `optOut()` στην αποσύνδεση· μια αποσύνδεση όσο φορτώνει το SDK ή όσο τρέχει η ενεργοποίηση την ακυρώνει και κάνει `optOut`. Δίπλα (μόνο για owner), κουμπί «Δοκιμαστικό push» που καλεί το `spike-push` με το `subscription_id` αυτής της συσκευής (μέσω του `api.ts`). Η κανονική οθόνη έρχεται στο 1.5a.
-- Scripts: `deploy-dev.mjs` (migration → functions → build → σβήσιμο `.map` → Worker· idempotent· **ποτέ** ρυθμίσεις Auth) και `secrets-dev.mjs`: idempotent, Vault με create ή update ανά όνομα (ένα `DO` μέσω `supabase db query --linked --file`, μόνο με `supabase link` στο dev, χωρίς τιμές στη γραμμή εντολών), `supabase secrets set` για τις functions και `wrangler secret put` για τον Worker (το `PROXY_SECRET` με την ίδια τιμή σε Worker και functions)· από env, ποτέ από το repo.
+- Προσωρινό κουμπί «Ενεργοποίηση ειδοποιήσεων» στην `/app`, για τη δοκιμή του ADR-0010 §3 (κείμενα μέσω i18n): lazy SDK του OneSignal με `serviceWorkerPath: 'app/sw.js'` και scope `/app/`, **χωρίς** `OneSignal.login` (καμία ταυτότητα στον client, ADR-0010 §2)· αίτημα άδειας **μόνο** μέσα στο handler του πατήματος, και στο iOS μόνο σε standalone, μετά `optIn()` και ανάγνωση του `PushSubscription.id` (αν είναι `null`, αναμονή για το event `change`, με όριο χρόνου)· `optOut()` στην αποσύνδεση· μια αποσύνδεση όσο φορτώνει το SDK ή όσο τρέχει η ενεργοποίηση την ακυρώνει και κάνει `optOut`. Δίπλα (μόνο για owner), κουμπί «Δοκιμαστικό push» που καλεί το `spike-push` με το `subscription_id` αυτής της συσκευής (μέσω του `api.ts`). Η κανονική οθόνη έρχεται στο 1.5.
+- Scripts (γράφτηκαν στο 1.1, τρέχουν στο 1.10): `deploy-dev.mjs` (migration → functions → build → σβήσιμο `.map` → Worker· idempotent· **ποτέ** ρυθμίσεις Auth) και `secrets-dev.mjs`: idempotent, Vault με create ή update ανά όνομα (ένα `DO` μέσω `supabase db query --linked --file`, μόνο με `supabase link` στο dev, χωρίς τιμές στη γραμμή εντολών), `supabase secrets set` για τις functions και `wrangler secret put` για τον Worker (το `PROXY_SECRET` με την ίδια τιμή σε Worker και functions)· από env, ποτέ από το repo.
 - Έγγραφα: ADR-0008 (hosting, proxy, cookie), ADR-0009 (κωδικός email, κλειστό signup, provisioning, εξαίρεση κανόνα 8 για το email, πολιτική session, σχέδιο TOTP του C3), ADR-0010 (push, προτεινόμενο)· λίστα dashboard στο `SETUP.md`· `edge/` στη «Δομή» του CLAUDE.md.
 
 **Tests**
@@ -196,28 +222,19 @@
 - Vitest: `needsInstall`, `isSessionStale` (29 και 31 μέρες), αντιστοίχιση σφαλμάτων του `signInWithOtp` σε μήνυμα (επιτυχία, `otp_disabled` και `over_email_send_rate_limit` → ίδιο ουδέτερο μήνυμα· διαφορετικό μόνο για δίκτυο και `over_request_rate_limit`), αποσύνδεση με `scope: 'local'` από προεπιλογή· αποτυχημένη επαναποστολή κωδικού κρατά το email σε αναμονή όπως ήταν· αποσύνδεση όσο φορτώνει το SDK ή όσο τρέχει η ενεργοποίηση του push → κανένα `optIn` μετά από αυτήν, ένα `optOut`, με ανώτατο χρόνο· ποτέ `login`/`logout` του OneSignal (`oneSignal.test.ts`)· payload του push μόνο με `include_subscription_ids` και `target_channel: 'push'`, el και en, κανένα `external_id`/`include_aliases` (`_shared/onesignal.test.ts`)· σώμα χωρίς `Content-Length` κόβεται στο όριο (`body-limit`, proxy, `parseJsonBody`)· provisioning: σειρά εγγραφών μελών (παράδοση ιδιοκτησίας, μετακίνηση προσωπικού σε νέο login) και έλεγχος συνδέσεων προσωπικού στην τελική κατάσταση· SQL του Vault (`vaultUpsertSql`).
 - Playwright `pro-login.spec`: ο owner συνδέεται με κωδικό email (από το Mailpit, αφού αφαιρεθεί το `mailpit` από το `-x` του CI)· μη μέλος → «χωρίς πρόσβαση»· άγνωστο email → ίδιο μήνυμα· `mobile-safari` χωρίς standalone → οθόνη εγκατάστασης. Στο 1.7 το spec ενημερώνεται (ο owner καταλήγει σε `enroll`/`challenge`).
 
-**Δοκιμές σε συσκευές** (go/no-go για καθεμία):
-
-| Δοκιμή                     | Πού                                                          | Περνά όταν                                                                                                                                           |
-| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cookie έμπιστης συσκευής   | Instagram και Facebook in-app (iOS, Android), Safari, Chrome | γράφεται, διαβάζεται και υπάρχει μετά από επανεκκίνηση της εφαρμογής                                                                                 |
-| Session εγκατεστημένης PWA | iPhone, εφαρμογή στην αρχική οθόνη                           | σύνδεση μέσα στην εφαρμογή· μένει συνδεδεμένη μετά από kill και μετά από 3 μέρες                                                                     |
-| Push (C5)                  | iPhone, iOS ≥ 16.4, PWA **εγκατεστημένη στην αρχική οθόνη**  | όλα τα βήματα του ADR-0010 §3: η άδεια ζητείται μέσα από την εγκατεστημένη εφαρμογή με πάτημα κουμπιού· το «Δοκιμαστικό push» (`spike-push`) φτάνει στη συσκευή· push στη συνδρομή της συσκευής (από το dashboard του OneSignal) φτάνει με την εφαρμογή κλειστή και την οθόνη κλειδωμένη· το πάτημα ανοίγει την εφαρμογή στη σωστή οθόνη· το ίδιο μετά από επανεκκίνηση του κινητού και μετά από 24 ώρες· μετά την αποσύνδεση (`optOut`) δεν φτάνει τίποτα· ο `/app/sw.js` δεν χαλά φόρτωση και ενημέρωση· κανείς δεν παίρνει τα push άλλου: το push του owner δεν φτάνει στον browser ενός `staff`, και δεν υπάρχει ταυτότητα στον client για να την υποδυθεί (βήμα 10) |
-| Push                       | Android Chrome, εγκατεστημένη PWA                            | όπως στο iPhone                                                                                                                                      |
-
-Το αποτέλεσμα του push γράφεται στο ADR-0010: go → OneSignal (αποδεκτό), no-go → VAPID. Ο έλεγχος των 3 ημερών κλείνει γύρω στη μέρα 8 και γράφεται στο ADR-0009, στην ενότητα «Αποτέλεσμα δοκιμής».
+**Δοκιμές σε συσκευές:** μεταφέρθηκαν στο 1.10 (C7): cookie στους in-app browsers, session της εγκατεστημένης PWA, push (C5).
 
 **Κριτήρια εξόδου**
 
-- `dev.anaklo.gr/demo-barber` και `/app` από τον Worker· το `/api/functions/v1/health` δίνει 200 μέσω proxy και 403 απευθείας.
-- Σε πραγματικό iPhone: εγκατάσταση, σύνδεση μέσα στην standalone εφαρμογή, kill, και παραμένει συνδεδεμένο. Go/no-go για το push στο ADR-0010 (C5).
-- `npm run deploy:dev` idempotent, χωρίς κανένα `.map`· CI πράσινο με `fn:check`. ADR-0008/0009/0010 γραμμένα· λίστα dashboard στο `SETUP.md` και εφαρμοσμένη στο `anaklo-dev`.
-- Οι αιτήσεις για λογαριασμούς SMS και sender ID τρέχουν (παρακολουθείται, δεν μπλοκάρει).
+- Τοπικά, μέσω των modules του Worker στο Vite: `/demo-barber` και `/app`· το `/api/functions/v1/health` δίνει 200 μέσω proxy και 403 απευθείας.
+- Ο owner συνδέεται με κωδικό email από το Mailpit (`pro-login.spec`)· `provision:local` περνά στην τοπική βάση.
+- CI πράσινο με `fn:check`. ADR-0008/0009/0010 γραμμένα· λίστα dashboard στο `SETUP.md` (εφαρμόζεται στο 1.10).
+- Μεταφέρθηκαν στο 1.10: `deploy:dev` idempotent χωρίς `.map`, `dev.anaklo.gr` από τον Worker, δοκιμές σε πραγματικό iPhone και go/no-go του push (C5).
 
 ## 1.2 Διαθεσιμότητα και κράτηση σε SQL
 
-- **Στόχος:** Σωστά slots και ατομικές κρατήσεις για τη δημόσια σελίδα και το προσωπικό, σε αλλαγές ώρας, τοπικά μεσάνυχτα, κλεισίματα και ταυτόχρονα αιτήματα. Η λογική ζει μόνο σε SQL, με pgTAP. Δεν θέλει εξωτερικό λογαριασμό, άρα προχωρά όσο εκκρεμούν αιτήσεις.
-- **Μέρες:** 4,5
+- **Στόχος:** Σωστά slots και ατομικές κρατήσεις για τη δημόσια σελίδα και το προσωπικό, σε αλλαγές ώρας, τοπικά μεσάνυχτα, κλεισίματα και ταυτόχρονα αιτήματα. Η λογική ζει μόνο σε SQL, με pgTAP. Δεν θέλει εξωτερικό λογαριασμό.
+- **Μέρες:** 4,5 (**ολοκληρώθηκε**, `cba7970`)
 - **Εξαρτάται από:** — (0001–0003).
 
 **Βάση: `0004_availability_booking.sql`**
@@ -257,27 +274,28 @@
 
 **Κριτήρια εξόδου**
 
-- pgTAP πράσινο τοπικά και με `db:test:dev`· `check:types` και race test πράσινα στο CI.
-- `EXPLAIN ANALYZE` στο dev: 14 μέρες × 3 επαγγελματίες πάνω σε 5.000 ραντεβού σε < 50 ms.
+- pgTAP πράσινο τοπικά (με `db:test:dev` όταν σταλούν τα migrations, το αργότερο στο 1.10)· `check:types` και race test πράσινα στο CI.
+- `EXPLAIN ANALYZE` τοπικά (`perf-fixture.sql`): 14 μέρες × 3 επαγγελματίες πάνω σε 5.000 ραντεβού σε < 50 ms (μετρήθηκαν ~11 ms).
 
 ## 1.3 Online κράτηση end-to-end
 
-- **Στόχος:** Στο `dev.anaklo.gr/demo-barber`, από Instagram και Facebook in-app: υπηρεσία → επαγγελματίας (μόνο με ≥ 2 και `allow_any_staff`) → ώρα → όνομα + κινητό, με κουτί άρνησης μάρκετινγκ → OTP μόνο σε νέα συσκευή → «Κλείνεις ως Γιώργος · άλλο άτομο» → επιβεβαίωση με link διαχείρισης, Google Calendar, .ics, χάρτη και πρόταση επόμενης επίσκεψης. Η ίδια συσκευή ξανακλείνει χωρίς OTP· το `/m/<token>` ακυρώνει ή μετακινεί. Τα SMS περνούν από τον ψεύτικο adapter ή τους δοκιμαστικούς αριθμούς του dev μέχρι το 1.5b.
-- **Μέρες:** 6,5
-- **Εξαρτάται από:** 1.1 (Worker, proxy, cookie, toolchain), 1.2 (0004).
+- **Στόχος:** Στο `localhost:5173/demo-barber` (μέσω των modules του Worker στο Vite), σε viewport κινητού: υπηρεσία → επαγγελματίας (μόνο με ≥ 2 και `allow_any_staff`) → ώρα → όνομα + κινητό, με κουτί άρνησης μάρκετινγκ → OTP μόνο σε νέα συσκευή → «Κλείνεις ως Γιώργος · άλλο άτομο» → επιβεβαίωση με link διαχείρισης, Google Calendar, .ics, χάρτη και πρόταση επόμενης επίσκεψης. Η ίδια συσκευή ξανακλείνει χωρίς OTP· το `/m/<token>` ακυρώνει ή μετακινεί. Τα SMS περνούν από τον ψεύτικο adapter με τους δοκιμαστικούς αριθμούς μέχρι το 1.10 (C7), όπου γίνονται και οι κρατήσεις από Instagram και Facebook in-app. Η σελίδα αποκτά την εμφάνιση της Δ (C8) με το μεσαίο επίπεδο κίνησης.
+- **Μέρες:** 7 (6,5 + 0,5 για τη βάση σχεδιασμού και κίνησης· **υλοποιήθηκε τοπικά**, εκκρεμεί commit)
+- **Εξαρτάται από:** 1.1 (modules του Worker, proxy, cookie, toolchain), 1.2 (0004).
+- **Συμβόλαιο υλοποίησης:** `docs/plans/contracts/1.3-public-booking.md` (υπογραφές RPC, HTTP, ρυθμίσεις)· όπου διαφέρει από τις παρακάτω γραμμές, ισχύει εκείνο.
 
 **Βάση: `0005_public_booking.sql`**
 
 - Νέοι πίνακες με RLS και χωρίς GRANT σε ρόλο του API (μόνο μέσω RPC):
-  - `otp_challenges`: κωδικός ως HMAC (κλειδί Vault `otp_hmac_key`, από το `secrets:dev` ήδη από το 1.1), λήξη 5′, έως 5 προσπάθειες, 60″ ανάμεσα σε αποστολές· και `grant_hash`, `grant_expires_at`, `grant_used_at`
+  - `otp_challenges`: κωδικός ως HMAC (κλειδί Vault `otp_hmac_key`: τοπικά και στο CI συνθετικό, από το `seed.sql`, μόνο αν λείπει (ποτέ δεν αντικαθιστά πραγματικό κλειδί)· στο remote από το `secrets:dev`, στο 1.10), λήξη 5′, έως 5 προσπάθειες, 60″ ανάμεσα σε αποστολές· και `grant_hash`, `grant_expires_at`, `grant_used_at`
   - `trusted_devices`: sha256 του token (≥ 128 bit), ανά επιχείρηση και τηλέφωνο, 6 μήνες, ανακλήσιμο· `booking_tokens`: hash, ραντεβού, λήξη, ανάκληση, **πολλά ζωντανά ανά ραντεβού**· `rate_limits`: κλειδιά IP και τηλεφώνου ως HMAC
   - `messages_log` (outbox): μοναδικό `dedupe_key` (ραντεβού/πρότυπο/ώρα ή `otp_challenge`)· `channel` (`sms`, `push`)· `to_e164` ή `recipient_user_id`· `locale`, `template`, `category`· status `queued|sending|sent|delivered|failed|cancelled|unknown`· `attempts`, `lease_until`, `scheduled_for`, `sent_at`· `booking_token_id` (ποτέ το link)· `segments`, `cost_cents`, `provider`, `provider_message_id`, `error`
-  - `suppression_list (business_id, phone_hmac, reason)` με `private.phone_hmac()` (HMAC-SHA256, κλειδί Vault `phone_hmac_key`, από το `secrets:dev` ήδη από το 1.1· στο 1.3 γίνονται υποχρεωτικά στο `secrets-plan.mjs`)· `private.platform_settings` (πλατφορμικός διακόπτης SMS, ημερήσιο όριο)
+  - `suppression_list (business_id, phone_hmac, reason)` με `private.phone_hmac()` (HMAC-SHA256, κλειδί Vault `phone_hmac_key`, με τον ίδιο τρόπο· στο 1.3 και τα δύο κλειδιά γίνονται υποχρεωτικά στο `secrets-plan.mjs`)· `private.platform_settings` (πλατφορμικός διακόπτης SMS, ημερήσιο όριο)
 - `businesses.short_code` για το `/r/<code>` (6 χαρακτήρες `a-z0-9`, unique, προεπιλογή από τη βάση, χωρίς GRANT update) και RPC του `anon` `public_slug_for_code(p_code)` για τον Worker.
 - `private.vertical_defaults` (barber: 28 μέρες), ίδιο με το νέο `packages/verticals/barber.json`. `private.next_visit_hint_impl(business)`: ο διάμεσος της επιχείρησης με ≥ 50 διαστήματα, αλλιώς η προεπιλογή του κλάδου· επιστρέφει κλειδί i18n και εβδομάδες· το ξαναχρησιμοποιεί η «μνήμη» (Φάση 2).
 - RPCs μόνο για `service_role` (`private.*_impl` + wrapper):
   - `otp_start`: όρια ανά αριθμό, IP, επιχείρηση, ημέρα, πλατφορμικό όριο και διακόπτης· μόνο +3069· ζητά ώρα **ακόμη ελεύθερη** πριν από κάθε SMS· ίδια απάντηση για κάθε αριθμό
-  - `otp_verify`: σωστός κωδικός της **ίδιας** επιχείρησης → grant (≥ 128 bit, hash στη βάση, ~10′, δεμένο σε επιχείρηση, τηλέφωνο και challenge)· `trusted_device_check`, `trusted_device_issue`
+  - `otp_verify`: σωστός κωδικός της **ίδιας** επιχείρησης → grant (≥ 128 bit, hash στη βάση, ~10′, δεμένο σε επιχείρηση, τηλέφωνο και challenge) και, στην ίδια συναλλαγή, token έμπιστης συσκευής· ποτέ σφάλμα για λάθος κωδικό (`invalid|expired|locked|verified`, ώστε η προσπάθεια να μετρά). Έλεγχος συσκευής = `clients_for_phone`· ανάκληση από τον πελάτη = `trusted_device_revoke` (χωρίς χωριστά `trusted_device_check`/`issue`)
   - `clients_for_phone`: μόνο μικρά ονόματα, μόνο με έγκυρο grant ή έμπιστη συσκευή, χωρίς να καταναλώνει το grant
   - `book_appointment` (το wrapper της online κράτησης, μόνο `service_role`· D10): **πρώτα** idempotency: ίδιο κλειδί και ίδιο payload, με το ίδιο (ήδη καταναλωμένο) grant ή την ίδια έμπιστη συσκευή → το υπάρχον ραντεβού και **νέο** token, χωρίς νέα κατανάλωση. Μετά καταναλώνει το grant (εφάπαξ) ή ελέγχει την έμπιστη συσκευή· `book_core` με `verified_via` `otp`/`trusted_device` και actor `client`· `soft_opt_in` μόνο αν το κουτί εμφανίστηκε και έμεινε ατσεκάριστο, με `policy_version`· planner· νέο manage token που επιστρέφεται **μία** φορά
   - `phone_verified_at` μόνο στον δρόμο του OTP: `now()` σε νέο και σε υπάρχοντα πελάτη, και αν αλλάζει ο αριθμός, στο ίδιο UPDATE (έτσι το `reset_phone_verification` τον κρατά). Η έμπιστη συσκευή δεν τον γράφει
@@ -288,10 +306,10 @@
 
 **Edge Functions**
 
-- `public-booking` (μόνο POST· `start`, `verify`, `clients`, `book`): έλεγχος μυστικού proxy, IP από τον Worker· schemas `zod/mini` από το `_shared/booking-schemas.ts`, κοινά με τη σελίδα· ίδια απάντηση για γνωστό και άγνωστο αριθμό· token έμπιστης συσκευής μόνο μέσω των headers του Worker, και μόνο αν το `x-anaklo-business` είναι η επιχείρηση του σώματος· grant στο σώμα της απάντησης· αν αποτύχει το OTP, επιστρέφει το τηλέφωνο της επιχείρησης.
-- `manage`: view, cancel, reschedule, όλα με POST· τίποτα δεν αλλάζει με GET.
-- `_shared/send.ts`: claim → `renderSms` στη γλώσσα του πελάτη → adapter → `record_send_result`, αμέσως μετά το commit (SPEC §12)· ο client της βάσης και ο adapter περνούν ως ορίσματα από το `index.ts`. Τον ίδιο κώδικα χρησιμοποιεί ο dispatcher του 1.5a.
-- `_shared/sms-provider.ts`: interface, ψεύτικος adapter (γράφει αποτέλεσμα, δεν στέλνει) και `createSmsProvider({ env, allowedRecipients, testNumbers })`, με τις τιμές από το `Deno.env` του `index.ts`. Εκτός prod: `SMS_ALLOWED_RECIPIENTS` και `OTP_TEST_NUMBERS` (σταθερός κωδικός για το `+306900000xxx` του seed και τα κινητά του developer), που απορρίπτονται στην εκκίνηση όταν `ANAKLO_ENV=prod`.
+- `public-booking` (μόνο POST· `start`, `verify`, `clients`, `book`, `forget`): έλεγχος μυστικού proxy, IP από τον Worker· schemas `zod/mini` από το `_shared/booking-schemas.ts`, κοινά με τη σελίδα· ίδια απάντηση για γνωστό και άγνωστο αριθμό· token έμπιστης συσκευής μόνο μέσω των headers του Worker, και μόνο αν το `x-anaklo-business` είναι η επιχείρηση του σώματος· με έγκυρη συσκευή το `start` απαντά `trusted` χωρίς SMS· grant στο σώμα της απάντησης· αν αποτύχει το OTP (AN012/AN017), η σελίδα δείχνει το τηλέφωνο της επιχείρησης από τον κατάλογο (η απάντηση σφάλματος μένει `{ error: { code, message } }`).
+- `manage`: view, slots, cancel, reschedule, όλα με POST· τίποτα δεν αλλάζει με GET.
+- `_shared/send.ts`: claim → `renderSms` στη γλώσσα του πελάτη → adapter → `record_send_result`, αμέσως μετά το commit (SPEC §12)· ο client της βάσης και ο adapter περνούν ως ορίσματα από το `index.ts`. Τον ίδιο κώδικα χρησιμοποιεί ο dispatcher του 1.5.
+- `_shared/sms-provider.ts`: interface, ψεύτικος adapter (γράφει αποτέλεσμα, δεν στέλνει· με `ANAKLO_ENV=local` τυπώνει το κείμενο με κρυμμένο αριθμό) και `createSmsProvider({ env, provider })`. `_shared/booking-config.ts` διαβάζει τις τιμές του `Deno.env` από το `index.ts`: εκτός prod `SMS_ALLOWED_RECIPIENTS` (φίλτρο στο `send.ts`) και `OTP_TEST_NUMBERS` + `OTP_TEST_CODE` (σταθερός κωδικός για το `+306900000xxx` του seed και τα κινητά του developer), που απορρίπτονται στην εκκίνηση όταν `ANAKLO_ENV=prod` (ή όταν λείπει).
 - Νέο πρότυπο SMS `rescheduled_by_client`, με test 1 SMS.
 
 **Frontend**
@@ -303,6 +321,21 @@
 - Worker `/<slug>`: το `injectBookingShell` βάζει τίτλο, Open Graph (από το `booking`), μεταβλητές θέματος (`src/shared/lib/theme.ts`) και το JSON του `public_booking_catalogue` με escape κατά `</script>`· άγνωστο ή κλειστό slug → κέλυφος SPA με 404· `/r/<code>` → 302 στο `/<slug>`.
 - `src/features/booking/calendar.ts`: URL Google Calendar και .ics (UTC, escape, CRLF), με κείμενα από το `booking`. Ώρα που μόλις κλείστηκε → κοντινές εναλλακτικές από το `available_slots`· αποτυχία OTP → το τηλέφωνο της επιχείρησης ως link κλήσης.
 - Η μετακίνηση από το link διαχείρισης (`manage_reschedule`, UI, πρότυπο `rescheduled_by_client`) γίνεται **τελευταία** μέσα στο 1.3, ώστε να κοπεί (C1 #2) χωρίς να αγγίξει την ακύρωση και το link νέας κράτησης.
+
+**Σχεδιασμός και κίνηση (Δ, μεσαίο επίπεδο· +0,5 μέρα, ADR-0011)**
+
+- Βάση, πρώτα, πριν από τις οθόνες:
+  - tokens στο `src/styles/tokens.css` από το MOTION.md §1: χρώματα (παλέτα `--lux-*` → σημασιολογικά `--color-*`), τυπογραφία, σχήματα, χρόνοι, easing. Το `PAGE_BACKGROUND` του `theme.ts` ακολουθεί το νέο `--color-bg`.
+  - γραμματοσειρές: GFS Didot για τίτλους (`@fontsource/gfs-didot`, μόνο τα woff2 των `greek` και `latin` 400) και Manrope (μόνο `greek` και `latin`), με δικά μας `@font-face` + `unicode-range` στο `src/styles/fonts.css`, `font-display: swap`.
+  - `src/shared/motion/`: `useReducedMotion`, `useInView`, `useCountUp`, `SplitWords`, `RollText`, `motion.css` (οι κλάσεις του MOTION.md §4, μαζί με το μπλοκ `prefers-reduced-motion`).
+  - restyle του `src/shared/ui/` με τα tokens: κουμπιά pill (G3) με E16 σε αφή και E1/E2 μόνο με ποντίκι, κάρτες, inputs 16px, skeleton σε άμμο (E17).
+- Στη σελίδα κράτησης:
+  - G1 ετικέτες με E3, G2 τίτλοι, G3 σε όλα τα CTA
+  - E5 στο όνομα της επιχείρησης· κάρτα εξωφύλλου με G5/E8· G6 όταν το `surface` του θέματος είναι `dark` (στη Φάση 1 χωρίς φωτογραφία: σκούρο φόντο με το overlay)
+  - εμφανίσεις E3/E4 (16px), E13 κεφαλίδα, E14 μετάβαση βημάτων (και προς τα πίσω), E19 μπάρα προόδου, E17 skeletons
+  - E15 στην επιβεβαίωση, μόνο μετά την απάντηση του `book`
+  - E12 carousel προσωπικού μόνο με > 4 επαγγελματίες, αλλιώς λίστα. Τα E9 και E10 θέλουν φωτογραφίες: v1.
+- Το LCP (όνομα επιχείρησης) δεν περιμένει ούτε τη γραμματοσειρά (`swap`) ούτε την κίνηση· το κόστος των hooks μετρά στο `npm run size`.
 
 **Tests**
 
@@ -316,25 +349,36 @@
   - `manage_view` δεν αλλάζει τίποτα· ακύρωση μέσα στο παράθυρο απορρίπτεται, **εκτός** αν η κράτηση έγινε μέσα στο παράθυρο ή πριν από < 60′· η μετακίνηση κρατά το id και γράφει `rescheduled` με actor `client`
   - planner v1: μία επιβεβαίωση ανά online κράτηση, τίποτα από inserts του seed· το `next_visit_hint` περνά από την προεπιλογή του κλάδου στον διάμεσο στα 50 διαστήματα
 - Vitest: reducer· Google Calendar και .ics· schemas· ίδια απάντηση για γνωστό και άγνωστο αριθμό· ο φρουρός των δοκιμαστικών αριθμών απορρίπτει prod· escape του ονόματος και του `</script>` στο `injectBookingShell`· **replay** του `book` → ίδιο ραντεβού και link που δουλεύει· κάθε πρότυπο SMS με τα μακρύτερα links (`dev.anaklo.gr/m/<22>`, `dev.anaklo.gr/r/<code>`) σε 1 SMS· κατάλογοι el = en **ανά namespace** και όριο μεγέθους του `booking`· `packages/verticals` = `private.vertical_defaults`.
-- Playwright (κινητό, Chromium + WebKit): νέα συσκευή (OTP → κράτηση → επιβεβαίωση, με δοκιμαστικό αριθμό)· έμπιστη συσκευή χωρίς OTP (Chromium και WebKit· στο iPhone και με το χέρι)· **cookies απενεργοποιημένα**, η ροή ολοκληρώνεται με το grant· κοινό κινητό με μικρά ονόματα· ώρα κλεισμένη → εναλλακτικές· αποτυχία OTP → τηλέφωνο επιχείρησης· ακύρωση από το link ελευθερώνει την ώρα· μετακίνηση από το link.
+- Playwright (κινητό, Chromium + WebKit): νέα συσκευή (OTP → κράτηση → επιβεβαίωση, με δοκιμαστικό αριθμό)· έμπιστη συσκευή χωρίς OTP (Chromium και WebKit· σε πραγματικό iPhone στο 1.10)· **cookies απενεργοποιημένα**, η ροή ολοκληρώνεται με το grant· κοινό κινητό με μικρά ονόματα· ώρα κλεισμένη → εναλλακτικές· αποτυχία OTP → τηλέφωνο επιχείρησης· ακύρωση από το link ελευθερώνει την ώρα· μετακίνηση από το link.
+- Κίνηση: Vitest για `useReducedMotion` (με `matchMedia`), `useCountUp` (με reduce δίνει αμέσως την τελική τιμή), `useInView` (χωρίς `IntersectionObserver` → ορατό), `SplitWords` (`aria-label` με ολόκληρο το κείμενο, `aria-hidden` στις λέξεις)· ζεύγη χρωμάτων των tokens και κείμενο πάνω στο G6 σε AA (`contrastRatio`). Playwright με `reducedMotion: 'reduce'`: όλα τα βήματα της κράτησης ορατά αμέσως, στην τελική θέση, και ο τίτλος του `SplitWords` ως ένα heading.
 
 **Κριτήρια εξόδου**
 
-- `npm run size` ≤ 120 KB gzip, σε κάθε PR.
-- Πραγματικές κρατήσεις στο `dev.anaklo.gr` από Instagram και Facebook in-app σε iOS και Android, με δεύτερη κράτηση χωρίς OTP στην ίδια συσκευή.
-- Το `otp_sent / online κρατήσεις` βγαίνει με ένα query στο `messages_log`.
+- `npm run size` ≤ 120 KB gzip, σε κάθε PR, με τα tokens, τις γραμματοσειρές και το `src/shared/motion/`.
+- Όλα τα Playwright του 1.3 πράσινα τοπικά (κινητό, Chromium + WebKit), με τον ψεύτικο adapter και δοκιμαστικό αριθμό, και στο CI.
+- Definition of Done της κίνησης (Κανόνες) για κάθε οθόνη της κράτησης.
+- Το `otp_sent / online κρατήσεις` βγαίνει με ένα query στο `messages_log` (κάθε online κράτηση έχει ακριβώς ένα `booking_confirmed`):
+  ```sql
+  select business_id,
+         count(*) filter (where template = 'otp' and status in ('sent', 'delivered')) as otp_sent,
+         count(*) filter (where template = 'booking_confirmed') as online_bookings
+  from public.messages_log
+  where created_at >= now() - interval '30 days'
+  group by business_id;
+  ```
+- Μεταφέρθηκαν στο 1.10: πραγματικές κρατήσεις στο `dev.anaklo.gr` από Instagram και Facebook in-app σε iOS και Android, με δεύτερη κράτηση χωρίς OTP στην ίδια συσκευή.
 
 ## 1.4 PWA επαγγελματία
 
-- **Στόχος:** Στην εγκατεστημένη εφαρμογή ο κουρέας βλέπει «Σήμερα» και ημερολόγιο ημέρας με στήλη ανά επαγγελματία (των συναδέλφων ως «κατειλημμένο»), καταχωρεί τηλεφωνικό ραντεβού σε < 10″ και walk-in χωρίς τηλέφωνο, μετακινεί από λίστα ελεύθερων ωρών, σημειώνει no-show ή ακυρώνει. Τα περασμένα ραντεβού ολοκληρώνονται αυτόματα.
-- **Μέρες:** 3,5
+- **Στόχος:** Στην εφαρμογή (τοπικά σε viewport κινητού· εγκατεστημένη σε iPhone στο 1.10) ο κουρέας βλέπει «Σήμερα» και ημερολόγιο ημέρας με στήλη ανά επαγγελματία (των συναδέλφων ως «κατειλημμένο»), καταχωρεί τηλεφωνικό ραντεβού σε < 10″ και walk-in χωρίς τηλέφωνο, μετακινεί από λίστα ελεύθερων ωρών, σημειώνει no-show ή ακυρώνει. Τα περασμένα ραντεβού ολοκληρώνονται αυτόματα. Η εφαρμογή αποκτά την εμφάνιση της Δ με το ελάχιστο επίπεδο κίνησης (C8).
+- **Μέρες:** 4 (3,5 + 0,5 για την κίνηση)
 - **Εξαρτάται από:** 1.1 (σύνδεση), 1.2, 1.3 (0005: `messages_log`, planner).
-- **Χωρίς Realtime (C2):** το ημερολόγιο κάνει refetch όταν η εφαρμογή ξαναπάρει focus και **κάθε 60″** όσο φαίνεται μια μέρα, μαζί με το push (1.5a). Τα query keys είναι ανά επιχείρηση, μέρα και επαγγελματία, ώστε το Realtime της Φάσης 3 να μπει με ένα hook, χωρίς refactor.
+- **Χωρίς Realtime (C2):** το ημερολόγιο κάνει refetch όταν η εφαρμογή ξαναπάρει focus και **κάθε 60″** όσο φαίνεται μια μέρα, μαζί με το push (1.5). Τα query keys είναι ανά επιχείρηση, μέρα και επαγγελματία, ώστε το Realtime της Φάσης 3 να μπει με ένα hook, χωρίς refactor.
 
 **Βάση: `0006_day_ops.sql`**
 
 - `busy_calendar(p_business_id, p_local_date)`: τα ραντεβού των συναδέλφων ως μπλοκ, χωρίς πελάτη και τιμή (τα δικά του το staff, και όλα ο owner, τα διαβάζει απευθείας με RLS). `today_summary(p_business_id)`: επόμενα, κενά, προς σημείωση, αναμενόμενα έσοδα, που γίνονται `NULL` για staff **μέσα στο `_impl`**.
-- Staff μόνο στα δικά του, owner/manager σε όλα: `set_appointment_status` (confirm, no-show, complete, διορθώσεις μέσα στο παράθυρο)· `cancel_appointment(p_business_id, …, reason code, p_notify)`· `staff_move_appointment` πάνω στο `move_core`, με idempotency key ανά προσπάθεια, τα flags του D8 και `p_notify` (SMS `rescheduled_by_business`). Και τα τρία καλούν τον planner· τα μηνύματα της επιχείρησης προγραμματίζονται από το 1.5a.
+- Staff μόνο στα δικά του, owner/manager σε όλα: `set_appointment_status` (confirm, no-show, complete, διορθώσεις μέσα στο παράθυρο)· `cancel_appointment(p_business_id, …, reason code, p_notify)`· `staff_move_appointment` πάνω στο `move_core`, με idempotency key ανά προσπάθεια, τα flags του D8 και `p_notify` (SMS `rescheduled_by_business`). Και τα τρία καλούν τον planner· τα μηνύματα της επιχείρησης προγραμματίζονται από το 1.5.
 - `search_clients(p_business_id, query)`: `normalize_greek` + greeklish στο query, trigram στο `search_text`, τελευταία ψηφία τηλεφώνου, χωρίς συγχωνευμένους και ανωνυμοποιημένους, έως 20. Το χρησιμοποιούν το γρήγορο ραντεβού και η καρτέλα (1.8).
 - `private.job_runs`, `private.record_job_run()` και `private.auto_complete_impl(p_now)`: δηλώνει `system` μέσα του, σέβεται το `auto_complete_after_min`, δεν αγγίζει ακυρωμένα· pg_cron ανά 10′, με job_run. `01_security`, `gen:types`.
 
@@ -348,25 +392,30 @@
 - Καμία «επιτυχία» πριν απαντήσει ο server. Χωρίς σύνδεση ή σε timeout: «Δεν αποθηκεύτηκε — χωρίς σύνδεση», με retry και το **ίδιο** idempotency key.
 - React Hook Form + `@hookform/resolvers` μόνο στην PWA (ADR-0001)· αν το `zodResolver` δεν δουλεύει με `zod/mini`, μικρός τοπικός resolver.
 
+**Σχεδιασμός και κίνηση (Δ, ελάχιστο επίπεδο· +0,5 μέρα, ADR-0011)**
+
+- Restyle με τα tokens των οθονών του 1.1: σύνδεση (πεδίο email με `TextField` ή περίγραμμα `--color-control-border`), «χωρίς πρόσβαση», «Πρόσθεσε πρώτα στην αρχική οθόνη». Χρώματα της PWA στη Δ: `theme-color` του `app/index.html` και `theme_color`/`background_color` του `public/app/manifest.webmanifest` (σήμερα ακόμη navy `#1f3a5f`/`#f6f5f2` → `#503011`/`#f3ebe1`, όπως το `index.html` της κράτησης) και νέα εικονίδια με το `npm run gen:icons`.
+- E6 στους αριθμούς του «Σήμερα» (ραντεβού και, για τον owner, αναμενόμενα έσοδα μέσω `money.ts`) **μόνο στην πρώτη φόρτωση της ημέρας**, ποτέ στα refetch των 60″ ή του focus. Η απόφαση σε καθαρή συνάρτηση με Vitest, με την τοπική μέρα της επιχείρησης από το `dates.ts` και την τελευταία εμφάνιση ανά συσκευή στο `localStorage` (με try/catch· αν λείπει, απλώς ξαναμετρά).
+- E2 (μόνο με ποντίκι), E14 στα βήματα του `QuickAddSheet`, E15 στην επιτυχία κράτησης ή μετακίνησης μόνο μετά την απάντηση του server, E16 σε όλα τα κουμπιά, E17 skeletons (ημερολόγιο, «Σήμερα», φύλλα).
+
 **Tests**
 
 - pgTAP `11_day_ops`: `busy_calendar` χωρίς στήλες πελάτη ή τιμής· `today_summary_impl` ως staff → έσοδα `NULL`· το staff δεν μετακινεί ούτε ακυρώνει ραντεβού συναδέλφου, ο owner ναι· οι μετακινήσεις γράφουν `rescheduled`/`reassigned`, και σε κλεισμένη ώρα αποτυγχάνουν· auto-complete με την καθυστέρηση, χωρίς ακυρωμένα, με job_run, και μετά το staff διορθώνει μέσα στο παράθυρο (με reset του actor)· αναζήτηση ΓΙΩΡΓΟΣ, Γιώργος, giorgos, Giorgos και 4 τελευταίων ψηφίων, χωρίς συγχωνευμένους ή ανωνυμοποιημένους.
 - `test:race`: μετακίνηση και κράτηση στην ίδια ώρα ταυτόχρονα → πετυχαίνει ακριβώς μία.
 - Vitest: `dayLayout` σε μέρες 23 και 25 ωρών· διάταξη επικαλύψεων· schema γρήγορου ραντεβού.
-- Playwright: τηλεφωνικό ραντεβού σε < 10″· walk-in χωρίς τηλέφωνο· μετακίνηση σε ελεύθερη ώρα· no-show.
+- Playwright: τηλεφωνικό ραντεβού σε < 10″· walk-in χωρίς τηλέφωνο· μετακίνηση σε ελεύθερη ώρα· no-show· με `reducedMotion: 'reduce'`, «Σήμερα» και γρήγορο ραντεβού χωρίς κίνηση, με τους τελικούς αριθμούς αμέσως.
 
 **Κριτήρια εξόδου**
 
-- Η ροή 3 του SPEC §5 δουλεύει σε πραγματικό iPhone, στην εγκατεστημένη εφαρμογή.
-- Ένα δεύτερο κινητό βλέπει την αλλαγή το πολύ σε 60″ ή στο επόμενο focus. Τα job_runs του auto-complete φαίνονται στο dev.
+- Η ροή 3 του SPEC §5 περνά στο Playwright (κινητό, Chromium + WebKit)· σε πραγματικό iPhone, στην εγκατεστημένη εφαρμογή, στο 1.10.
+- Ένα δεύτερο browser context βλέπει την αλλαγή το πολύ σε 60″ ή στο επόμενο focus. Τα job_runs του auto-complete φαίνονται στην τοπική βάση.
+- Definition of Done της κίνησης για «Σήμερα», ημερολόγιο, φύλλα και τις οθόνες του 1.1.
 
-## 1.5 Ειδοποιήσεις
+## 1.5 Ειδοποιήσεις: planner, dispatcher, push (ψεύτικος adapter SMS)
 
-- **Στόχος:** Η ροή 1 του SPEC §5 τρέχει πραγματικά: η επιβεβαίωση φτάνει ως 1 SMS GSM-7 σε Cosmote, Vodafone και Nova· η υπενθύμιση ακολουθεί τους κανόνες 24ω/26ω και τις ώρες ησυχίας· ακυρώσεις και αλλαγές, από τον πελάτη ή την επιχείρηση, στέλνουν SMS· ο επαγγελματίας παίρνει push για κάθε online κράτηση, ακύρωση ή αλλαγή.
-- **Μέρες:** 3,5 (≈ 2 το 1.5a, ≈ 1,5 το 1.5b, από τις οποίες ~0,5 για το `sms-probe`, που γίνεται τις μέρες ~7–12).
-- **Εξαρτάται από:** 1.5a: 1.3, 1.4, ADR-0010 (1.1). 1.5b: 1.5a και υπογεγραμμένος πάροχος. Το 1.5b δεν έχει migration, άρα μπορεί να πάει μετά τα 1.6–1.8 χωρίς πρόβλημα σειράς.
-
-### 1.5a Planner, dispatcher, push (ψεύτικος adapter SMS)
+- **Στόχος:** Η ροή 1 του SPEC §5 τρέχει τοπικά από άκρη σε άκρη: η υπενθύμιση ακολουθεί τους κανόνες 24ω/26ω και τις ώρες ησυχίας· επιβεβαιώσεις, ακυρώσεις και αλλαγές, από τον πελάτη ή την επιχείρηση, γράφονται στο `messages_log` και «στέλνονται» από τον ψεύτικο adapter SMS· ο επαγγελματίας παίρνει push για κάθε online κράτηση, ακύρωση ή αλλαγή, μέσω ψεύτικου αποστολέα που καταγράφει. Ο πραγματικός πάροχος SMS (το παλιό 1.5b, ADR-0012) και το πραγματικό push σε συσκευές πάνε στο 1.10 (C7).
+- **Μέρες:** 2
+- **Εξαρτάται από:** 1.3, 1.4, ADR-0010 (προτεινόμενο· go/no-go στο 1.10).
 
 **Βάση: `0007_messaging.sql`**
 
@@ -382,19 +431,19 @@
 - `record_delivery_report`: segments και κόστος όπως τα αναφέρει ο πάροχος. Μήνυμα με άγνωστη έκβαση δεν ξαναστέλνεται ποτέ αυτόματα.
 - pg_net + pg_cron, με URLs και μυστικό του dispatch από Vault, και job_run σε κάθε job: «σπρώξιμο» του dispatch μετά το commit για γραμμές από RPCs της PWA· sweep κάθε 5′· νυχτερινό purge (OTP και tokens 30 μέρες μετά τη λήξη, `rate_limits`, `messages_log` παλαιότερα από 12 μήνες). Τα jobs με `cron.schedule('<όνομα>', …)`, ώστε να ξαναφτιάχνονται σε κάθε reset.
 - Τοπικά και στο CI το `seed.sql` γράφει στο Vault (με upsert) URL του dispatch που φτάνει από το container της βάσης (όχι `127.0.0.1:54321`) και το μυστικό του. Στο remote το αντικαθιστά το `secrets:dev`.
-- `push_subscriptions`, **και για τους δύο παρόχους** (ADR-0010 §2): ανά χρήστη, όχι ανά επιχείρηση (`user_id`, `provider` `onesignal`|`vapid` με `CHECK` και λίστα στο `_shared/domain.ts`, `subscription_id` του OneSignal ή `endpoint` και κλειδιά σε VAPID, `created_at`)· **`UNIQUE` στο `subscription_id`** (σε VAPID στο `endpoint`), ώστε ένα κοινό κινητό να ανήκει σε έναν χρήστη τη φορά· RLS `user_id = auth.uid()` και ρητά GRANT μόνο όσα χρειάζονται (ο χρήστης διαβάζει τις δικές του γραμμές). RPCs `register_push_subscription` (upsert: η συσκευή μετακινείται στον καλούντα· το `user_id` από το `auth.uid()`, ποτέ από τον browser) και `unregister_push_subscription`, με `_impl` + wrapper. Οι γραμμές σβήνονται στην αποσύνδεση, στην αφαίρεση από την τελευταία επιχείρηση και στην αλλαγή ρόλου που ανακαλεί τις συνεδρίες (`remove_member`/`set_member_role`, στην ίδια συναλλαγή). Αν το ADR-0010 κατέληξε σε VAPID, η επιπλέον δουλειά (κρυπτογράφηση RFC 8291, καθαρισμός στα 404/410) εκτιμάται στο τέλος του 1.1 και χρεώνεται στο buffer.
+- `push_subscriptions`, **και για τους δύο παρόχους** (ADR-0010 §2): ανά χρήστη, όχι ανά επιχείρηση (`user_id`, `provider` `onesignal`|`vapid` με `CHECK` και λίστα στο `_shared/domain.ts`, `subscription_id` του OneSignal ή `endpoint` και κλειδιά σε VAPID, `created_at`)· **`UNIQUE` στο `subscription_id`** (σε VAPID στο `endpoint`), ώστε ένα κοινό κινητό να ανήκει σε έναν χρήστη τη φορά· RLS `user_id = auth.uid()` και ρητά GRANT μόνο όσα χρειάζονται (ο χρήστης διαβάζει τις δικές του γραμμές). RPCs `register_push_subscription` (upsert: η συσκευή μετακινείται στον καλούντα· το `user_id` από το `auth.uid()`, ποτέ από τον browser) και `unregister_push_subscription`, με `_impl` + wrapper. Οι γραμμές σβήνονται στην αποσύνδεση, στην αφαίρεση από την τελευταία επιχείρηση και στην αλλαγή ρόλου που ανακαλεί τις συνεδρίες (`remove_member`/`set_member_role`, στην ίδια συναλλαγή). Αν η δοκιμή του 1.10 καταλήξει σε VAPID, η επιπλέον δουλειά (κρυπτογράφηση RFC 8291, καθαρισμός στα 404/410, ~1 μέρα) χρεώνεται στο buffer.
 - `01_security`, `gen:types`.
 
 **Edge Functions**
 
-- `dispatch` (`verify_jwt = false`, όχι μέσω `/api`): εξουσιοδότηση με μυστικό header (από Vault)· claim → render στη γλώσσα του πελάτη → αποστολή → καταγραφή. SMS μέσω του ψεύτικου adapter, push μέσω OneSignal (ή VAPID, κατά το ADR-0010).
+- `dispatch` (`verify_jwt = false`, όχι μέσω `/api`): εξουσιοδότηση με μυστικό header (από Vault)· claim → render στη γλώσσα του πελάτη → αποστολή → καταγραφή. SMS μέσω του ψεύτικου adapter· push μέσω OneSignal (ή VAPID, κατά το ADR-0010) πίσω από ένα interface αποστολέα, όπως το `_shared/sms-provider.ts`, με ψεύτικο αποστολέα που καταγράφει τοπικά και στο CI (χωρίς κλειδί OneSignal μέχρι το 1.10).
 - `public-booking` και `manage` στέλνουν τα άμεσα (OTP, επιβεβαίωση, ακύρωση, αλλαγή, push) αμέσως μετά το commit, με το ίδιο `_shared/send.ts`· το sweep πιάνει ό,τι έμεινε.
 - Push: μόνο με `include_subscription_ids`, από τις γραμμές του `push_subscriptions` των παραληπτών που βγάζει ο server από το `business_members`· ποτέ `external_id` ή aliases· payload από το `buildPushPayload` του `_shared/onesignal.ts` (από το 1.1)· κείμενα από το `_shared/push-templates.ts` (el/en, εξαίρεση του κανόνα 8 στο ADR-0010 και στο CLAUDE.md)· χωρίς τηλέφωνο ή επώνυμο στο payload.
 - Dev: έως 30 SMS/ημέρα και `SMS_ALLOWED_RECIPIENTS`. Νέο πρότυπο SMS `rescheduled_by_business`, με test 1 SMS.
 
 **Frontend**
 
-- Ρυθμίσεις → «Ειδοποιήσεις»: το κουμπί του 1.1 μεταφέρεται εδώ, με δοκιμαστικό push μέσω `dispatch`· στο iOS μόνο μέσα στην εγκατεστημένη εφαρμογή, αλλιώς οδηγία εγκατάστασης. Με την ενεργοποίηση: άδεια· αν η συσκευή έχει ήδη `PushSubscription.id`, πρώτα `register_push_subscription` (η γραμμή μετακινείται στον καλούντα) και `optIn()` μόνο αν πέτυχε· αν δεν έχει id (νέα συνδρομή, άρα καμία γραμμή), `optIn()`, ανάγνωση του id (από το 1.1) και `register_push_subscription`, και αν αυτό αποτύχει `optOut()` και μήνυμα αποτυχίας. Μια συσκευή δεν γίνεται ποτέ ενεργή όσο η γραμμή της ανήκει σε άλλον χρήστη (ADR-0010 §7). Στην αποσύνδεση: `optOut()` (από το 1.1) και `unregister_push_subscription`, πριν από το `signOut`, όσο υπάρχει ακόμη session, με τις ίδιες εγγυήσεις σειράς και χρόνου.
+- Ρυθμίσεις → «Ειδοποιήσεις»: το κουμπί του 1.1 μεταφέρεται εδώ, με δοκιμαστικό push μέσω `dispatch`· στο iOS μόνο μέσα στην εγκατεστημένη εφαρμογή, αλλιώς οδηγία εγκατάστασης. Χωρίς `VITE_ONESIGNAL_APP_ID` (τοπικά, μέχρι το 1.10) η οθόνη λέει ότι οι ειδοποιήσεις δεν είναι διαθέσιμες· η λογική ελέγχεται με Vitest και ψεύτικο SDK. Με την ενεργοποίηση: άδεια· αν η συσκευή έχει ήδη `PushSubscription.id`, πρώτα `register_push_subscription` (η γραμμή μετακινείται στον καλούντα) και `optIn()` μόνο αν πέτυχε· αν δεν έχει id (νέα συνδρομή, άρα καμία γραμμή), `optIn()`, ανάγνωση του id (από το 1.1) και `register_push_subscription`, και αν αυτό αποτύχει `optOut()` και μήνυμα αποτυχίας. Μια συσκευή δεν γίνεται ποτέ ενεργή όσο η γραμμή της ανήκει σε άλλον χρήστη (ADR-0010 §7). Στην αποσύνδεση: `optOut()` (από το 1.1) και `unregister_push_subscription`, πριν από το `signOut`, όσο υπάρχει ακόμη session, με τις ίδιες εγγυήσεις σειράς και χρόνου.
 - Οι επιλογές «ενημέρωση με SMS» του 1.4 πλέον στέλνουν.
 
 **Tests**
@@ -405,46 +454,17 @@
 - `test:race`: δύο dispatchers ταυτόχρονα → κάθε μήνυμα στέλνεται το πολύ μία φορά.
 - Vitest: payload push χωρίς προσωπικά δεδομένα και μόνο με `include_subscription_ids` από το `push_subscriptions`· τα νέα πρότυπα push στο `push-templates` (el = en, από το 1.1)· `enablePush` με υπάρχον `PushSubscription.id`: πρώτα `register_push_subscription`, και αν αποτύχει κανένα `optIn()`· με νέα συνδρομή: αν αποτύχει το `register_push_subscription` μετά το `optIn()`, ακολουθεί `optOut()` (η συσκευή δεν μένει ενεργή με γραμμή άλλου χρήστη)· `rescheduled_by_business` σε 1 SMS. Playwright: ο πελάτης ακυρώνει με το link → γραμμή στο `messages_log` και καταγεγραμμένο (ψεύτικο) push.
 
-**Κριτήρια εξόδου 1.5a**
+**Κριτήρια εξόδου**
 
-- Αν σκοτωθεί το dispatch στη μέση μιας παρτίδας, κάθε μήνυμα στέλνεται το πολύ μία φορά.
-- Push φτάνει σε εγκατεστημένο iPhone με την εφαρμογή κλειστή, από πραγματική online κράτηση στο dev.
-- Οι υπενθυμίσεις γύρω από την αλλαγή ώρας της 2026-10-25 ελέγχονται ζωντανά στο dev.
-
-### 1.5b Πάροχος SMS
-
-**Βάση:** κανένα migration. **Frontend:** καμία αλλαγή.
-
-**Πίνακας επιλογής (C4, pass/fail).** Πάροχος που αποτυγχάνει σε ένα από τα τέσσερα απορρίπτεται:
-
-| #   | Κριτήριο                                | Περνά όταν                                                                                                                                                                                                                  |
-| --- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | GSM-7 χωρίς αυτόματη μετατροπή σε UCS-2 | ρητό `data_coding=0` ή αντίστοιχη ρύθμιση. Αν δεν γίνεται, ο πάροχος **απορρίπτει** το μήνυμα αντί να το στείλει σιωπηλά ως UCS-2. Κάθε πρότυπο με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω φτάνει ως 1 SMS σε Cosmote, Vodafone και Nova |
-| 2   | Delivery webhooks                       | κατάσταση **και** αριθμός SMS για κάθε μήνυμα                                                                                                                                                                               |
-| 3   | Sender ID                               | αλφαριθμητικό, ≤ 11 χαρακτήρες, με καταχώριση, και εμφανίζεται σωστά                                                                                                                                                        |
-| 4   | Όριο δαπάνης                            | προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης στον πάροχο, επιπλέον των δικών μας ορίων                                                                                                                                   |
-
-Βαθμολογούνται επίσης, χωρίς αποκλεισμό: τιμή ανά SMS, allow-list χωρών, link που πατιέται χωρίς `https://`, αυτόματη συμπλήρωση κωδικού στο iOS, DPA και επεξεργασία στην ΕΕ, Viber αργότερα. Αποτελέσματα και επιλογή στο ADR-0011.
-
-**Script `scripts/sms-probe.ts`** (Deno): γράφεται τις μέρες ~7–8, παράλληλα με το 1.2, και τρέχει μέχρι τη μέρα ~12. Καλεί απευθείας το HTTP API κάθε δοκιμαστικού παρόχου, όχι μέσω του `_shared/sms-provider.ts` που έρχεται στο 1.3. Στέλνει κάθε πρότυπο στα όριά του, με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω, μέσω κάθε δοκιμαστικού λογαριασμού μόλις ανοίξει. Τα delivery reports τα διαβάζει από το API ή το dashboard του παρόχου (το `sms-dlr` έρχεται στο 1.5b). Οι ~0,5 μέρες του χρεώνονται στο 1.5b.
-
-**Edge Functions**
-
-- Adapter του παρόχου στο `_shared/sms-provider.ts`: ρητό GSM-7, sender ID, callback URL για delivery reports. Ο ψεύτικος adapter μένει για τοπικά και CI.
-- `sms-dlr` (webhook, `verify_jwt = false`, καλείται απευθείας από τον πάροχο, όχι μέσω `/api`): έλεγχος υπογραφής ή μυστικού· `record_delivery_report`· segments > 1 → σφάλμα στο log (ειδοποίηση Sentry από το 1.9).
-
-**Tests:** Vitest για την αντιστοίχιση αιτήματος (σημαία GSM-7, sender, callback), το parsing του delivery report και την απόρριψη χωρίς σωστή υπογραφή.
-
-**Κριτήρια εξόδου 1.5b**
-
-- Πραγματικά SMS επιβεβαίωσης και υπενθύμισης σε Cosmote, Vodafone και Nova, **1 SMS** το καθένα κατά το delivery report. Στο ADR-0011 καταγράφεται αν το link (χωρίς `https://`) πατιέται και αν το iOS προτείνει τον κωδικό OTP· βαθμολογούνται, δεν μπλοκάρουν (C4).
-- Προπληρωμή ή σκληρό όριο ρυθμισμένο στον πάροχο. ADR-0011 γραμμένο.
+- Αν σκοτωθεί το dispatch στη μέση μιας παρτίδας, κάθε μήνυμα στέλνεται το πολύ μία φορά (`test:race`).
+- Οι υπενθυμίσεις γύρω από την αλλαγή ώρας της 2026-10-25 περνούν στο pgTAP με σταθερό `p_now`, και ζωντανά στο τοπικό stack (pg_cron, `dispatch`, ψεύτικος adapter) αν μείνει ανοιχτό εκείνο το Σαββατοκύριακο.
+- Μεταφέρθηκαν στο 1.10: push σε εγκατεστημένο iPhone με την εφαρμογή κλειστή, από πραγματική online κράτηση· πραγματικά SMS (πάροχος, delivery reports).
 
 ## 1.6 Οθόνες ρυθμίσεων και έκτακτη απουσία
 
 - **Στόχος:** Ο owner ρυθμίζει το μαγαζί από το `/app/settings`: υπηρεσίες (με διάρκεια και τιμή ανά επαγγελματία), προσωπικό (και χωρίς login), εβδομαδιαία ωράρια με σπαστά, **κλεισίματα** (μαγαζιού ή επαγγελματία, κλειστό ή έξτρα ώρες), άδειες και πολιτική κρατήσεων. Όταν ένας επαγγελματίας λείπει έκτακτα σήμερα (`time_off` με `leave`, χωρίς αιτία· GDPR άρ. 9), εμφανίζονται τα ραντεβού της ημέρας του, και καθένα ανατίθεται σε ελεύθερο συνάδελφο ή ακυρώνεται με SMS.
 - **Μέρες:** 4
-- **Εξαρτάται από:** 1.4 (μετακίνηση, ακύρωση), 1.5a (SMS της επιχείρησης).
+- **Εξαρτάται από:** 1.4 (μετακίνηση, ακύρωση), 1.5 (SMS της επιχείρησης).
 
 **Βάση: `0008_schedule_ops.sql`**
 
@@ -454,7 +474,7 @@
 - `mark_absence(p_business_id, p_staff_id, from, to)`: γράφει άδεια `leave`· αν υπάρχει ήδη άδεια που επικαλύπτεται, την κρατά ή την επεκτείνει αντί να γράψει δεύτερη· επιστρέφει τις συγκρούσεις.
 - Οι υπόλοιπες εγγραφές (υπηρεσίες, προσωπικό, εξαιρέσεις, άδειες) με τα υπάρχοντα RLS και GRANT, από το `api.ts` κάθε feature. `01_security`, `gen:types`.
 
-**Edge Functions:** καμία· η ακύρωση με SMS χρησιμοποιεί τις RPCs του 1.4 και την αποστολή του 1.5a.
+**Edge Functions:** καμία· η ακύρωση με SMS χρησιμοποιεί τις RPCs του 1.4 και την αποστολή του 1.5.
 
 **Frontend**
 
@@ -462,6 +482,7 @@
 - `features/settings`: `ClosuresList` (μαγαζί ή επαγγελματίας, κλειστό ή έξτρα ώρες)· `TimeOffSheet` (λόγοι από το `TIME_OFF_REASONS`)· `BookingPolicyForm` (βήμα slots, ελάχιστη προειδοποίηση, μέγιστη απόσταση, προειδοποίηση ακύρωσης, αυτόματη ολοκλήρωση, παράθυρο διόρθωσης, `allow_any_staff`, `booking_enabled`, ώρες ησυχίας, τρόπος υπενθύμισης). Το θέμα αλλάζει μόνο από script.
 - `AbsenceFlow` → `ConflictResolver`: για κάθε ραντεβού, ανάθεση (`staff_available_slots` των συναδέλφων και `staff_move_appointment` με notify) ή ακύρωση με SMS. Κανένα κείμενο ή κλειδί i18n δεν αναφέρει ασθένεια.
 - Το `BookingPolicyForm` γίνεται **τελευταίο** μέσα στο 1.6 (C1 #3)· το `ClosuresList` δεν κόβεται ποτέ.
+- Κίνηση (ελάχιστο επίπεδο, ADR-0011): κουμπιά G3 με E16, skeletons E17 σε λίστες και φόρμες· τίποτα άλλο.
 
 **Tests**
 
@@ -471,7 +492,8 @@
 
 **Κριτήρια εξόδου**
 
-- Το JSON του provisioning και οι οθόνες περιγράφουν το ίδιο μαγαζί. Η ροή 6 του SPEC §5 δουλεύει σε κινητό.
+- Το JSON του provisioning και οι οθόνες περιγράφουν το ίδιο μαγαζί. Η ροή 6 του SPEC §5 περνά στο Playwright (κινητό)· σε πραγματική συσκευή στο 1.10.
+- Definition of Done της κίνησης για τις οθόνες ρυθμίσεων.
 
 ## 1.7 Ασφάλεια και μέλη
 
@@ -483,15 +505,15 @@
 - **Εξαρτάται από:** 1.1 (σύνδεση, πολιτική session)· το migration μπαίνει μετά το 0008.
 - **Μέρα 1 του βήματος, πριν από τα υπόλοιπα:**
   1. Integration test: νέο verify ανανεώνει το timestamp του `totp` στο `amr` του JWT (βλ. Tests). Όλος ο C6 στηρίζεται σε αυτό· αν αποτύχει, σταματάμε και ρωτάμε.
-  2. Στο `anaklo-dev`: δέχεται το hosted Supabase trigger στο `auth.mfa_factors` από migration; Δοκιμή μέσα σε συναλλαγή με rollback, με το `db:test:dev`, ώστε να μη μείνει τίποτα. Το αποτέλεσμα γράφεται στο ADR-0009 και αποφασίζει αν η ανίχνευση του 1.9 τρέχει αμέσως από trigger ή από job ανά 5′.
-  3. Η ανάκληση sessions στο remote (`delete from auth.sessions`), με την εφεδρεία του ADR-0009 §19 αν δεν επιτρέπεται.
+  2. Στο `anaklo-dev` (**προαιρετικά**, αν ο Μιχάλης έχει στείλει τα migrations· αλλιώς στο 1.10, C7): δέχεται το hosted Supabase trigger στο `auth.mfa_factors` από migration; Δοκιμή μέσα σε συναλλαγή με rollback, με το `db:test:dev`, ώστε να μη μείνει τίποτα. Το αποτέλεσμα γράφεται στο ADR-0009. Μέχρι να υπάρξει, η ανίχνευση του 1.9 γίνεται με job ανά 5′, που δουλεύει παντού· το trigger είναι βελτίωση, όχι προϋπόθεση.
+  3. Η ανάκληση sessions (`delete from auth.sessions`): τοπικά με pgTAP· στο remote προαιρετικά τώρα, αλλιώς στο 1.10, με την εφεδρεία του ADR-0009 §19 αν δεν επιτρέπεται (χρεώνεται στο buffer).
 
 **Σχέδιο TOTP (C3 και προσθήκες της 2026-09-27)**
 
 - Supabase MFA με παράγοντα TOTP. **Υποχρεωτική εγγραφή για owner και manager** στην πρώτη σύνδεση μετά το deploy, με οθόνη που μπλοκάρει.
 - **Staff: μόνο κωδικός email, ποτέ TOTP.** Αν ο υψηλότερος ρόλος ενός owner ή manager πέσει σε staff ή σε κανέναν (υποβιβασμός ή αφαίρεση), οι παράγοντές του σβήνονται στον server (βλ. «Μέλη και ταυτότητα»).
 - Owner/manager με επαληθευμένο παράγοντα δίνουν κωδικό από την εφαρμογή κωδικών μετά τον κωδικό email σε κάθε **νέα** σύνδεση ή συσκευή (εγκρίθηκε 2026-09-27). Το session κρατά `aal2` στα refresh, άρα μέσα στην εφαρμογή owner και manager είναι ήδη σε `aal2`: οι καθημερινές ενέργειες δεν ζητούν τίποτα άλλο, οι κρίσιμες ζητούν φρέσκο κωδικό (παρακάτω).
-- Remote: TOTP ενεργό στο dashboard (λίστα του `SETUP.md`).
+- Remote (στο 1.10): TOTP ενεργό στο dashboard (λίστα του `SETUP.md`). Τοπικά το ενεργοποιεί το `config.toml`.
 
 **Φρέσκος κωδικός για κρίσιμες ενέργειες (C6, εγκρίθηκε 2026-09-28)**
 
@@ -546,7 +568,7 @@
 **Χαμένη συσκευή και reset από τη Nous**
 
 - Οθόνη «Χάσατε τη συσκευή σας;», με link από την οθόνη του κωδικού: αν ο χρήστης πρόσθεσε δεύτερη συσκευή, δίνει τον κωδικό από εκεί· αλλιώς επικοινωνεί με τη Nous (στοιχεία επικοινωνίας από ρύθμιση της εφαρμογής, κείμενα από i18n). Εξηγεί ότι η Nous θα επαληθεύσει την ταυτότητά του και ότι η εφαρμογή **δεν** έχει άλλο τρόπο παράκαμψης.
-- Διαδικασία της Nous στο runbook `docs/runbooks/mfa-reset.md`, με το `scripts/mfa-reset.mjs` (dev από προεπιλογή, `--prod` ρητά):
+- Διαδικασία της Nous στο runbook `docs/runbooks/mfa-reset.md`, με το `scripts/mfa-reset.mjs` (dev από προεπιλογή, `--prod` ρητά, `--local` για την τοπική βάση όπως το `provision-business.mjs`):
   1. Αίτημα μόνο από τον ίδιο τον χρήστη, από γνωστό κανάλι.
   2. Επαλήθευση ταυτότητας: κωδικός που στέλνει η Nous στο email του λογαριασμού **και** κλήση πίσω στο τηλέφωνο της επιχείρησης που υπάρχει ήδη (`businesses.phone_e164` ή ο αριθμός του provisioning), **ποτέ** σε αριθμό που δίνεται στο αίτημα. Για manager, και γραπτή επιβεβαίωση από τον owner. Αν δεν γίνεται τίποτα από αυτά: έλεγχος με βίντεο ή από κοντά.
   3. Το script σβήνει **όλους** τους παράγοντες του χρήστη (admin API `auth.admin.mfa.deleteFactor`· το id από το RPC `user_id_for_email`, μόνο `service_role`) και ανακαλεί όλα τα sessions του (RPC `revoke_user_sessions`, μόνο `service_role`). Πριν από τη διαγραφή, το `record_support_action` (βήμα 4) γράφει άδεια αφαίρεσης (πηγή `nous_support`) για κάθε παράγοντα, ώστε ο ανιχνευτής του 1.9 να μην τη σημειώσει. Χωρίς φρέσκο κωδικό: η συσκευή χάθηκε.
@@ -557,7 +579,7 @@
 
 **Πολιτική session (ADR-0009)**
 
-- Από το 1.1: access token 1 ώρα, rotation των refresh tokens, 30 μέρες αδράνειας → πλήρης σύνδεση (έλεγχος της εφαρμογής· στο prod και «Inactivity timeout» = 720h), αποσύνδεση μόνο της συσκευής (`scope: 'local'`) μαζί με `OneSignal.User.PushSubscription.optOut()` (από το 1.5a και `unregister_push_subscription`). Κανένα απόλυτο όριο διάρκειας.
+- Από το 1.1: access token 1 ώρα, rotation των refresh tokens, 30 μέρες αδράνειας → πλήρης σύνδεση (έλεγχος της εφαρμογής· στο prod και «Inactivity timeout» = 720h), αποσύνδεση μόνο της συσκευής (`scope: 'local'`) μαζί με `OneSignal.User.PushSubscription.optOut()` (από το 1.5 και `unregister_push_subscription`). Κανένα απόλυτο όριο διάρκειας.
 - Στο 1.7: «Αποσύνδεση από όλες τις συσκευές» (`signOut({ scope: 'global' })`) στις Ρυθμίσεις → Ασφάλεια, και ανάκληση όλων των sessions ενός χρήστη όταν αλλάζει ο ρόλος του ή αφαιρείται (βλ. «Μέλη και ταυτότητα»).
 - Μετά από κάθε αποσύνδεση η επόμενη είσοδος είναι **νέα** σύνδεση: κωδικός email και, για owner/manager, κωδικός από την εφαρμογή κωδικών.
 
@@ -583,7 +605,7 @@
   4. η εφαρμογή δείχνει κείμενο για κοινοποίηση: σύνδεση στο `/app` με το email του
 - Αφαίρεση μέλους και αλλαγή ρόλου: RPCs `remove_member(p_business_id, p_user_id)` και `set_member_role(p_business_id, p_user_id, p_role)` του `authenticated`, **όχι** απευθείας με RLS (ένα DELETE ή UPDATE που δεν περνά restrictive πολιτική επηρεάζει 0 γραμμές χωρίς σφάλμα: ούτε step-up ούτε σωστό μήνυμα). Από το 0009 ο `authenticated` δεν έχει καν `INSERT`/`UPDATE`/`DELETE` στο `business_members`.
   - Owner με φρέσκο κωδικό: `private.require_fresh_totp()` μέσα στο `_impl` (`42501` με hint `aal2_required` ή `fresh_totp_required`), και γραμμή στο `audit_log`. Ποτέ αφαίρεση ή υποβιβασμός του τελευταίου owner. Προσθήκη ή αφαίρεση owner (προαγωγή σε owner, υποβιβασμός ή αφαίρεση owner) περνά από τα ίδια RPCs, άρα με τον ίδιο έλεγχο. Οι restrictive πολιτικές της Φάσης 0 μένουν ως δεύτερη γραμμή άμυνας.
-  - Στην ίδια συναλλαγή το `_impl` ανακαλεί όλα τα sessions του χρήστη (`private.revoke_user_sessions_impl`: `delete from auth.sessions where user_id = …`, definer). Το pgTAP το αποδεικνύει και στο remote με `db:test:dev`· αν το remote δεν το επιτρέπει, εφεδρεία: Edge Function με το admin API, με τον μηχανισμό που γράφεται στο ADR-0009 §19 την 1η μέρα του 1.7. Το access token που έχει ήδη εκδοθεί ζει έως 1 ώρα, αλλά ο ρόλος διαβάζεται ζωντανά από το `business_members`, οπότε το RLS κόβει την πρόσβαση στο επόμενο αίτημα και το `decideAuthRoute` εφαρμόζει τον νέο ρόλο στην επόμενη επανεκτίμηση.
+  - Στην ίδια συναλλαγή το `_impl` ανακαλεί όλα τα sessions του χρήστη (`private.revoke_user_sessions_impl`: `delete from auth.sessions where user_id = …`, definer). Το pgTAP το αποδεικνύει τοπικά, και στο remote με `db:test:dev` (προαιρετικά την 1η μέρα του 1.7, αλλιώς στο 1.10)· αν το remote δεν το επιτρέπει, εφεδρεία: Edge Function με το admin API, με τον μηχανισμό του ADR-0009 §19. Το access token που έχει ήδη εκδοθεί ζει έως 1 ώρα, αλλά ο ρόλος διαβάζεται ζωντανά από το `business_members`, οπότε το RLS κόβει την πρόσβαση στο επόμενο αίτημα και το `decideAuthRoute` εφαρμόζει τον νέο ρόλο στην επόμενη επανεκτίμηση.
   - Προαγωγή σε owner ή manager → στην επόμενη σύνδεση το `decideAuthRoute` δίνει `enroll`. Υποβιβασμός σε staff ή αφαίρεση → το ίδιο `_impl` (`set_member_role` ή `remove_member`) σβήνει τους παράγοντες του χρήστη (`auth.mfa_factors`), αν ο χρήστης δεν μένει owner ή manager σε άλλη επιχείρηση, και γράφει άδεια αφαίρεσης (πηγή `demotion`) για καθέναν στο `private.factor_change_grants`· ίδιος έλεγχος στο remote και ίδια εφεδρεία.
 - `change_business_identity(p_business_id, p_slug, p_timezone, p_currency)`, owner με φρέσκο κωδικό (`private.require_fresh_totp()` στο `_impl`), με `audit_log` (όχι `vertical`: γράφεται μόνο στη δημιουργία, D6): ζώνη ώρας ή νόμισμα **απορρίπτονται** όσο υπάρχουν μελλοντικά ραντεβού `booked`/`confirmed`· το παλιό slug μένει στο `business_slug_aliases` ως redirect, ώστε να δουλεύουν τα links που έχουν ήδη σταλεί ή δημοσιευτεί· κανένα slug ή alias δεν περνά σε άλλη επιχείρηση· έλεγχος δεσμευμένων.
 - Worker και `public_booking_catalogue`: alias → 301 στο τρέχον slug. Τα `/m/` και `/r/` δεν εξαρτώνται από το slug. Από το 1.7 το provisioning αρνείται slug που υπάρχει ως alias, και κάθε αλλαγή του σε υπάρχουσα επιχείρηση γράφει `audit_log` μέσω του `record_support_action`, με υποχρεωτικά `--reason` και `--ticket` και στο `provision-business.mjs` (όπως στο `mfa-reset.mjs`).
@@ -617,6 +639,7 @@
   - «Μέλη»: λίστα, πρόσκληση, αφαίρεση, ρόλος, μέσω των RPCs και του `withStepUp`· επιτυχία μόνο μετά την απάντηση του server.
   - «Ταυτότητα»: slug, ζώνη ώρας, νόμισμα, με τις συνέπειες γραμμένες πριν την επιβεβαίωση, μέσω του `withStepUp`.
 - Στοιχεία επικοινωνίας της Nous για τη `LostDeviceScreen` από το `src/shared/lib/env.ts` (νέες μεταβλητές στο `.env.example`)· τα κείμενα από i18n.
+- Κίνηση (ελάχιστο επίπεδο, ADR-0011): E14 ανάμεσα στα τρία βήματα του οδηγού εγγραφής και προς τη «Πρόσθεσε δεύτερη συσκευή»· E16 και E17 όπως στο 1.4.
 - Έγγραφα: ADR-0009 (δεύτερη συσκευή, reset της Nous, πολιτική session, φρέσκος κωδικός C6, όριο του Pro χωρίς hook άρνησης και υπολειπόμενος κίνδυνος, αποτελέσματα των ελέγχων της μέρας 1), ADR-0005, runbook `docs/runbooks/mfa-reset.md` (άδεια αφαίρεσης), SPEC §7 και §11, κανόνας φρέσκου κωδικού στο CLAUDE.md.
 
 **Tests**
@@ -630,11 +653,11 @@
 - pgTAP `14_members_identity`, μέλη:
   - `can_manage_members`: staff, manager και owner άλλης επιχείρησης → `42501`· owner χωρίς φρέσκο κωδικό → `42501` με το αντίστοιχο hint· owner με φρέσκο κωδικό → true
   - `set_member_role` και `remove_member`: staff και manager → `42501`· owner χωρίς φρέσκο κωδικό → `42501` με hint· owner με φρέσκο κωδικό → η αλλαγή και μία γραμμή audit· ποτέ ο τελευταίος owner· προαγωγή σε owner και αφαίρεση owner με τον ίδιο έλεγχο
-  - τα sessions του χρήστη σβήνονται (γραμμή στο `auth.sessions` πριν, καμία μετά), και με `db:test:dev` στο remote· υποβιβασμός σε staff σβήνει τους παράγοντες και γράφει άδεια αφαίρεσης για καθέναν, εκτός αν ο χρήστης μένει owner ή manager αλλού, και το ίδιο για `remove_member` (και όταν ο χρήστης δεν μένει μέλος πουθενά)
+  - τα sessions του χρήστη σβήνονται (γραμμή στο `auth.sessions` πριν, καμία μετά)· στο remote με `db:test:dev` στο 1.10 (ή νωρίτερα)· υποβιβασμός σε staff σβήνει τους παράγοντες και γράφει άδεια αφαίρεσης για καθέναν, εκτός αν ο χρήστης μένει owner ή manager αλλού, και το ίδιο για `remove_member` (και όταν ο χρήστης δεν μένει μέλος πουθενά)
   - `record_support_action`, `user_id_for_email` και `revoke_user_sessions` μόνο για `service_role`· το `record_support_action` θέλει λόγο και ticket, γράφει `nous_support` και, στο `mfa_reset`, τις άδειες αφαίρεσης
 - pgTAP `14_members_identity`, συσκευές κωδικών: `authorize_factor_change` αρνείται παλιό κωδικό· αρνείται την αφαίρεση του τελευταίου επαληθευμένου παράγοντα owner/manager και παράγοντα άλλου χρήστη· `add` χωρίς επαληθευμένο παράγοντα, σε `aal1` → άδεια· χρήστης μόνο staff → `42501` χωρίς hint· κάθε άδεια λήγει στα 10′ και γράφει `audit_log` σε κάθε επιχείρηση όπου ο χρήστης είναι owner ή manager.
 - pgTAP `01_security`: `business_members` μόνο `SELECT` για τον `authenticated`, και απευθείας `INSERT`/`UPDATE`/`DELETE` ως `authenticated` (και σε `aal2` με φρέσκο κωδικό) → `42501`· κανένα GRANT στο `private.factor_change_grants`· οι νέες functions στις allow-lists.
-- Integration (μέρα 1, `tests/db/` στο `test:race`, supabase-js στο τοπικό Supabase): enroll + verify → timestamp `totp` στο αποκωδικοποιημένο access token → αναμονή ≥ 2″ → νέο `challenge` + `verify` → `refreshSession` → νεότερο timestamp, κοντά στο τώρα. Μία φορά και με το χέρι στο `anaklo-dev`.
+- Integration (μέρα 1, `tests/db/` στο `test:race`, supabase-js στο τοπικό Supabase): enroll + verify → timestamp `totp` στο αποκωδικοποιημένο access token → αναμονή ≥ 2″ → νέο `challenge` + `verify` → `refreshSession` → νεότερο timestamp, κοντά στο τώρα. Μία φορά και με το χέρι στο `anaklo-dev`, στο 1.10.
 - Vitest:
   - `decideAuthRoute` σε όλους τους συνδυασμούς· `needsSecondDevice`· το «Αργότερα» μένει ανενεργό χωρίς την επιβεβαίωση
   - `withStepUp`: `aal2_required` και `fresh_totp_required` → `StepUpSheet` → μία επανάληψη της κλήσης· δεύτερη αποτυχία → σφάλμα, καμία τρίτη κλήση· `42501` χωρίς hint ή `401` → όχι φύλλο, νέο `decideAuthRoute`· καμία κλήση δεν ανοίγει το φύλλο χωρίς hint του server
@@ -650,12 +673,13 @@
 
 **Κριτήρια εξόδου**
 
-- Έλεγχοι της μέρας 1: το integration test αποδεικνύει ότι νέο verify ανανεώνει το timestamp του `totp` στο `amr` (τοπικά, και με το χέρι στο `anaklo-dev`)· η δυνατότητα trigger στο `auth.mfa_factors` του `anaklo-dev` είναι ελεγμένη και γραμμένη στο ADR-0009 (trigger ή job ανά 5′ στο 1.9).
-- Εγγραφή σε πραγματικό iPhone, μέσα στην εγκατεστημένη PWA, με τους «Κωδικούς» του iOS (με εναλλαγή εφαρμογής και reload), και δεύτερη συσκευή με το QR.
-- Κάθε κρίσιμη ενέργεια του 1.7 αποτυγχάνει στον server χωρίς φρέσκο κωδικό, και με απευθείας κλήση στο PostgREST ή στην Edge Function, όχι μόνο από το UI. Στο iPhone του dev το φύλλο εμφανίζεται μετά από 5′ και η ενέργεια περνά με τον κωδικό· οι καθημερινές ενέργειες δεν το ανοίγουν ποτέ.
-- Αφαίρεση και προσθήκη συσκευής στο dev μέσω της εφαρμογής, με άδεια στο `private.factor_change_grants` και γραμμή στο `audit_log`.
-- Το `mfa-reset.mjs` δοκιμασμένο στο dev κατά το runbook: παράγοντες και sessions σβησμένα, άδειες αφαίρεσης και γραμμή στο `audit_log` ανά επιχείρηση, και στην επόμενη σύνδεση εγγραφή → δεύτερη συσκευή.
-- Η ανάκληση sessions στην αλλαγή ρόλου περνά με `db:test:dev`, ή ο μηχανισμός της εφεδρείας είναι γραμμένος στο ADR-0009 §19 και δοκιμασμένος στο dev. TOTP ενεργό στο remote dashboard.
+- Έλεγχος της μέρας 1: το integration test αποδεικνύει τοπικά ότι νέο verify ανανεώνει το timestamp του `totp` στο `amr`.
+- Κάθε κρίσιμη ενέργεια του 1.7 αποτυγχάνει στον server χωρίς φρέσκο κωδικό, και με απευθείας κλήση στο PostgREST ή στην Edge Function, όχι μόνο από το UI. Στο Playwright (Chromium + WebKit) το φύλλο εμφανίζεται μετά το παράθυρο του seed και η ενέργεια περνά με τον κωδικό· οι καθημερινές ενέργειες δεν το ανοίγουν ποτέ.
+- Αφαίρεση και προσθήκη συσκευής τοπικά μέσω της εφαρμογής, με άδεια στο `private.factor_change_grants` και γραμμή στο `audit_log`.
+- Το `mfa-reset.mjs --local` δοκιμασμένο κατά το runbook: παράγοντες και sessions σβησμένα, άδειες αφαίρεσης και γραμμή στο `audit_log` ανά επιχείρηση, και στην επόμενη σύνδεση εγγραφή → δεύτερη συσκευή.
+- Η ανάκληση sessions στην αλλαγή ρόλου περνά στο pgTAP τοπικά.
+- Definition of Done της κίνησης για τον οδηγό εγγραφής και τις οθόνες ασφάλειας.
+- Μεταφέρθηκαν στο 1.10 (αν δεν έγιναν νωρίτερα, προαιρετικά): trigger στο `auth.mfa_factors` και ανάκληση sessions στο `anaklo-dev` (ή εφεδρεία ADR-0009 §19), έλεγχος του `amr` με το χέρι, `mfa-reset.mjs` στο dev, TOTP ενεργό στο remote dashboard· εγγραφή σε πραγματικό iPhone μέσα στην εγκατεστημένη PWA με τους «Κωδικούς» του iOS (εναλλαγή εφαρμογής και reload) και δεύτερη συσκευή με το QR· το φύλλο μετά από 5′ στο iPhone.
 - Ο C6 είναι γραμμένος ως απόφαση στα ADR-0005, ADR-0009, στο SPEC §11 και στο CLAUDE.md.
 
 ## 1.8 Καρτέλα πελάτη, συγχώνευση, ανωνυμοποίηση
@@ -666,7 +690,7 @@
 
 **Βάση: `0010_client_ops.sql`**
 
-- `client_card(p_business_id, client)`: στοιχεία, ιστορικό, απλοί μετρητές (επισκέψεις, τελευταία επίσκεψη, no-shows). Ποσά σε owner/manager, και σε staff μόνο για τα δικά του ραντεβού, **μηδενισμένα μέσα στο `_impl`**. Οι κανόνες της «μνήμης» μένουν για το `client_memory` (Φάση 2).
+- `client_card(p_business_id, client)`: στοιχεία, ιστορικό, απλοί μετρητές (επισκέψεις, τελευταία επίσκεψη, no-shows) και η τιμή του δαχτυλιδιού E18 (π.χ. μέρες από την τελευταία επίσκεψη ως προς το διάστημα του `next_visit_hint` του 1.3), έτοιμη από τον server, ώστε ο browser μόνο να τη ζωγραφίζει (κανόνας 13). Ποσά σε owner/manager, και σε staff μόνο για τα δικά του ραντεβού, **μηδενισμένα μέσα στο `_impl`**. Οι κανόνες της «μνήμης» μένουν για το `client_memory` (Φάση 2).
 - `merge_clients(p_business_id, source, target)`, owner/manager: μεταφέρει ραντεβού και σημειώσεις, βάζει `merged_into_id`, γράφει `audit_log`. **Οι συναινέσεις μένουν στον source**, γιατί το `guard_consent_update` απορρίπτει κάθε αλλαγή πλην του `withdrawn_at` για κάθε ρόλο· οι αναζητήσεις συναίνεσης και «μνήμης» ακολουθούν το `merged_into_id`. Συγχώνευση ανάμεσα σε επιχειρήσεις αδύνατη. Για τον importer της Φάσης 3: `private.merge_clients_core`, χωρίς GRANT, με actor `import`.
 - `erase_client(p_business_id, client)`, μόνο owner, με φρέσκο κωδικό: το `_impl` καλεί το `private.require_fresh_totp()` μετά τον έλεγχο συμμετοχής και ρόλου (C6· `42501` με hint `aal2_required` ή `fresh_totp_required`):
   - σβήνει όνομα, τηλέφωνο, email, γενέθλια και `search_text` (το `phone_verified_at` μηδενίζεται από τον trigger), σημειώσεις και συναινέσεις
@@ -680,10 +704,11 @@
 
 - `features/clients`: `ClientSearch` (με το `search_clients`) και `ClientCard` (στοιχεία, ιστορικό, σημειώσεις, συναινέσεις). `EraseDialog` με επιβεβαίωση, μέσω του `withStepUp` του 1.7: σε `aal2_required` ή `fresh_totp_required` ανοίγει το `StepUpSheet`.
 - Διακόπτης συναίνεσης: off = `withdrawn_at` στην ενεργή εγγραφή· on = **νέα** εγγραφή με `source = staff_ui` («στην καρέκλα»)· ποτέ αλλαγή σε `purpose` ή `granted`. Το ίδιο ισχύει για το κουτί της φόρμας κράτησης (1.3).
+- Κίνηση (ελάχιστο επίπεδο, ADR-0011): E18 δαχτυλίδι στην `ClientCard` (`stroke-dashoffset`, με reduced-motion γεμάτο αμέσως)· E17 skeleton στην καρτέλα και στην αναζήτηση· E16.
 
 **Tests**
 
-- pgTAP `15_client_ops`: η συγχώνευση μεταφέρει ραντεβού και σημειώσεις και γράφει μία γραμμή audit· οι συναινέσεις μένουν αμετάβλητες και φαίνονται μέσω του target· ανάμεσα σε επιχειρήσεις αδύνατο· το staff δεν συγχωνεύει ούτε ανωνυμοποιεί· `client_card_impl` ως staff δίνει ποσά μόνο για τα δικά του· το suppression κρατά HMAC, όχι απλό hash.
+- pgTAP `15_client_ops`: η συγχώνευση μεταφέρει ραντεβού και σημειώσεις και γράφει μία γραμμή audit· οι συναινέσεις μένουν αμετάβλητες και φαίνονται μέσω του target· ανάμεσα σε επιχειρήσεις αδύνατο· το staff δεν συγχωνεύει ούτε ανωνυμοποιεί· `client_card_impl` ως staff δίνει ποσά μόνο για τα δικά του· η τιμή του δαχτυλιδιού (πελάτης χωρίς επισκέψεις, μέσα στο διάστημα, πέρα από αυτό)· το suppression κρατά HMAC, όχι απλό hash.
 - pgTAP `15_client_ops`, φρέσκος κωδικός στο `erase_client_impl` (όπως στο 1.7): `aal1` → `42501` με hint `aal2_required`· `aal2` με `totp` πριν από 6′ ή με `amr` μόνο `otp` → `fresh_totp_required`, και ο πελάτης μένει ανέγγιχτος· `totp` πριν από 1′ → ανωνυμοποίηση· παράθυρο 0 → πάντα `fresh_totp_required`.
 - pgTAP `15_client_ops`, ανωνυμοποίηση: σάρωση του καταλόγου δεν βρίσκει το όνομα ή το τηλέφωνο σε καμία στήλη κειμένου κανενός πίνακα της επιχείρησης (και στα `messages_log`, `otp_challenges`)· `phone_verified_at` = `NULL`· τα ραντεβού μένουν.
 - Playwright: αναζήτηση με greeklish· ο owner (session `aal2` από το setup του 1.7, με το παράθυρο του seed και τον helper `e2e/lib/step-up.ts`) ανωνυμοποιεί πελάτη: επιβεβαίωση → εμφανίζεται το φύλλο κωδικού → κωδικός από το `e2e/lib/totp.ts` (`node:crypto`) → επιτυχία. Vitest: το `EraseDialog` περνά από το `withStepUp` (και τα δύο hints → φύλλο → μία επανάληψη· δεύτερη αποτυχία → σφάλμα). Οι περιπτώσεις του server τις ελέγχει το pgTAP παραπάνω.
@@ -693,12 +718,13 @@
 - Περνά ο έλεγχος του SPEC §13: ο ανωνυμοποιημένος πελάτης δεν εμφανίζεται πουθενά με όνομα ή τηλέφωνο.
 - Το `erase_client` αποτυγχάνει στον server χωρίς φρέσκο κωδικό, και με απευθείας κλήση στο PostgREST· από την εφαρμογή, το φύλλο κωδικού οδηγεί σε επιτυχία με μία επανάληψη.
 - Owner και manager καλούν το `merge_clients` μέσω του wrapper· το `merge_clients_core` είναι έτοιμο για την εισαγωγή της Φάσης 3.
+- Definition of Done της κίνησης για την καρτέλα και την αναζήτηση.
 
-## 1.9 Παρακολούθηση και τελική πρόβα
+## 1.9 Παρακολούθηση και ανίχνευση αλλαγών στις συσκευές κωδικών
 
-- **Στόχος:** Σφάλματα, νεκρά cron jobs και πεσμένη σελίδα κράτησης γίνονται αντιληπτά μέσα σε 15′, χωρίς προσωπικά δεδομένα στις αναφορές και με όλα στην ΕΕ. Κάθε αλλαγή στις συσκευές κωδικών owner/manager που δεν ταιριάζει με άδεια (π.χ. απευθείας στο GoTrue, με κλεμμένο session `aal2`) ανιχνεύεται μέσα σε 5′: ο παράγοντας που προστέθηκε σβήνεται, μια αφαίρεση δεν αναστρέφεται (το secret χάθηκε), και στις δύο περιπτώσεις ανακαλούνται τα sessions και φεύγουν email και push (C6). Όλη η Φάση 1 περνά σε πραγματικές συσκευές.
-- **Μέρες:** 2,5 (≈ 1,5 παρακολούθηση και πρόβα· ≈ 1 ανίχνευση, διαγραφή ξένου παράγοντα, ανάκληση sessions και email ασφαλείας, C6)
-- **Εξαρτάται από:** 1.5a (jobs, `dispatch`), 1.5b (πραγματικά SMS στην πρόβα), 1.7 (`private.factor_change_grants`, `revoke_user_sessions`, αποτέλεσμα του ελέγχου trigger της μέρας 1), 1.8. Όλα προηγούνται.
+- **Στόχος:** Νεκρά cron jobs φαίνονται στο `health` (503) μέσα σε 15′. Κάθε αλλαγή στις συσκευές κωδικών owner/manager που δεν ταιριάζει με άδεια (π.χ. απευθείας στο GoTrue, με κλεμμένο session `aal2`) ανιχνεύεται μέσα σε 5′: ο παράγοντας που προστέθηκε σβήνεται, μια αφαίρεση δεν αναστρέφεται (το secret χάθηκε), και στις δύο περιπτώσεις ανακαλούνται τα sessions και φεύγουν email και push (C6). Όλα τοπικά (C7)· Sentry, uptime, πραγματικά email και οι δοκιμές σε πραγματικές συσκευές πάνε στο 1.10.
+- **Μέρες:** 1,5 (≈ 0,5 heartbeats, `health` και runbooks· ≈ 1 ανίχνευση, διαγραφή ξένου παράγοντα, ανάκληση sessions και email ασφαλείας, C6)
+- **Εξαρτάται από:** 1.5 (jobs, `dispatch`), 1.7 (`private.factor_change_grants`, `revoke_user_sessions`), 1.8. Όλα προηγούνται.
 
 **Βάση: `0011_health.sql`**
 
@@ -710,22 +736,19 @@
   - κάθε παράγοντας που προστέθηκε ή αφαιρέθηκε πρέπει να ταιριάζει με άδεια στο `private.factor_change_grants` (από το `authorize_factor_change`, το `mfa-reset` της Nous, το `_impl` υποβιβασμού ή τον `dispatch`): αφαίρεση με το ίδιο `factor_id`· προσθήκη όταν το `created_at` του παράγοντα πέφτει μέσα στην ισχύ της άδειας. Η άδεια καταναλώνεται (`matched_at`)
   - αλλαγή χωρίς άδεια → γραμμή στο `private.security_events` και στο `audit_log` (actor `system`) σε κάθε επιχείρηση όπου ο χρήστης είναι owner ή manager, και «σπρώξιμο» του `dispatch` μετά το commit
   - στο τέλος ενημερώνει το snapshot· δεύτερο τρέξιμο χωρίς νέες αλλαγές δεν γράφει τίποτα
-- pg_cron ανά 5′ με job_run (`cron.schedule('detect-factor-changes', …)`). Αν ο έλεγχος της μέρας 1 του 1.7 έδειξε ότι το hosted Supabase δέχεται trigger στο `auth.mfa_factors`, η ίδια λογική τρέχει αμέσως από trigger αντί για το job.
+- pg_cron ανά 5′ με job_run (`cron.schedule('detect-factor-changes', …)`), που δουλεύει παντού. Αν ο έλεγχος στο `anaklo-dev` (προαιρετικά στο 1.7, αλλιώς στο 1.10) δείξει ότι το hosted Supabase δέχεται trigger στο `auth.mfa_factors`, η ίδια λογική μπορεί να τρέξει αμέσως από trigger αντί για το job.
 - RPCs μόνο για `service_role`: `claim_security_events` (lease, όπως στα μηνύματα) και `record_security_event_result`. Η διαγραφή ενός μη εγκεκριμένου παράγοντα από τον `dispatch` γράφει πρώτα άδεια (πηγή `system`), ώστε να μη σημειωθεί ξανά.
 
 **Edge Functions**
 
-- `health` → 503 όταν κάποιο job έχει λήξει. Sentry EU (Deno) σε κάθε function, με το SDK στο `index.ts`· ο scrubber στο `_shared/observability.ts` σβήνει αριθμούς `+30…`, emails και tokens πριν την αποστολή· ειδοποίηση για delivery reports με segments > 1.
-- `dispatch` (1.5a): χειρίζεται και τα `security_events`, με claim και lease:
-  - παράγοντας που **προστέθηκε** χωρίς άδεια → διαγραφή με `auth.admin.mfa.deleteFactor`, ανάκληση όλων των sessions του χρήστη (`revoke_user_sessions`), email μέσω Resend στον χρήστη και στους owners της επιχείρησης, push στους owners
+- `health` → 503 όταν κάποιο job έχει λήξει.
+- `dispatch` (1.5): χειρίζεται και τα `security_events`, με claim και lease:
+  - παράγοντας που **προστέθηκε** χωρίς άδεια → διαγραφή με `auth.admin.mfa.deleteFactor`, ανάκληση όλων των sessions του χρήστη (`revoke_user_sessions`), email στον χρήστη και στους owners της επιχείρησης, push στους owners
   - παράγοντας που **αφαιρέθηκε** χωρίς άδεια → δεν αναστρέφεται (το secret χάθηκε)· ανάκληση sessions και οι ίδιες ειδοποιήσεις. Στην επόμενη σύνδεση, αν δεν μένει κανένας παράγοντας, το `decideAuthRoute` δίνει `enroll`
-  - κείμενα email στο `supabase/functions/_shared/security-email-templates.ts` (el/en, με test el = en· εξαίρεση του κανόνα 8, όπως τα `sms-templates` και `push-templates`), στη γλώσσα του παραλήπτη, χωρίς secrets ή κωδικούς· αποστολή από το `mail.anaklo.gr`, με το κλειδί Resend ως secret της function. Push από το `_shared/push-templates.ts`.
+  - κείμενα email στο `supabase/functions/_shared/security-email-templates.ts` (el/en, με test el = en· εξαίρεση του κανόνα 8, όπως τα `sms-templates` και `push-templates`), στη γλώσσα του παραλήπτη, χωρίς secrets ή κωδικούς. Αποστολή πίσω από ένα interface αποστολέα email, όπως στα SMS: τοπικά και στο CI ψεύτικος αποστολέας που καταγράφει· Resend (από το `mail.anaklo.gr`, κλειδί ως secret της function) στο 1.10. Push από το `_shared/push-templates.ts`.
 
-**Frontend**
+**Frontend:** καμία αλλαγή (Sentry, source maps και uptime στο 1.10).
 
-- Sentry EU: στην PWA από την αρχή· στη σελίδα κράτησης lazy μετά την πρώτη απόδοση (πρώτο στη σειρά περικοπών). Το `beforeSend` σβήνει `+30…`, emails, tokens του `/m/` και tokens έμπιστης συσκευής.
-- Source maps: ανεβαίνουν στο Sentry κατά το build και **σβήνονται από το `dist` πριν το deploy**· το `build.sourcemap` μένει `hidden` και το `check-secrets` αποτυγχάνει σε κάθε `sourceMappingURL`.
-- Uptime ανά 5′ στο `/demo-barber` και στο `/api/functions/v1/health` (κρατά και το Free project ξύπνιο)· κανόνες ειδοποίησης στο Sentry.
 - `docs/runbooks/`: πεσμένη σελίδα κράτησης· SMS που δεν φεύγουν· μέλος κλειδωμένο ή με χαμένο κινητό (ο owner αφαιρεί το μέλος ή αλλάζει τον ρόλο του, που ανακαλεί τα sessions του· για χαμένη συσκευή κωδικών το `mfa-reset.md` του 1.7)· μη εγκεκριμένη αλλαγή συσκευής κωδικών (`security-event.md`: επικοινωνία με τον χρήστη από γνωστό κανάλι, νέα σύνδεση, `mfa-reset` αν χρειάζεται).
 
 **Tests**
@@ -736,27 +759,110 @@
   - αφαίρεση χωρίς άδεια → ένα event· ληγμένη άδεια → event· δεύτερο τρέξιμο → κανένα νέο event
   - οι άδειες του `mfa-reset`, του υποβιβασμού και του `dispatch` δεν δίνουν event· παράγοντες μη επαληθευμένοι ή χρηστών που δεν είναι owner/manager αγνοούνται· job_run
   - κανένα GRANT στους νέους πίνακες· οι νέες RPCs μόνο για `service_role`
-- Vitest: `observability.test` σβήνει ελληνικά κινητά, emails και tokens· `security-email-templates` el = en· χειρισμός των `security_events` στον `dispatch`, με ψεύτικους clients: προσθήκη → διαγραφή, ανάκληση, email σε χρήστη και owners, push· αφαίρεση → ανάκληση και ειδοποιήσεις, καμία διαγραφή· κάθε event μία φορά.
+- Vitest: `security-email-templates` el = en· χειρισμός των `security_events` στον `dispatch`, με ψεύτικους clients: προσθήκη → διαγραφή, ανάκληση, email σε χρήστη και owners, push· αφαίρεση → ανάκληση και ειδοποιήσεις, καμία διαγραφή· κάθε event μία φορά.
+- Χειροκίνητα τοπικά: προσθήκη παράγοντα **απευθείας** στο GoTrue του τοπικού Supabase (με session `aal2`, χωρίς την εφαρμογή) → μέσα σε 5′ ο παράγοντας σβήνεται, το session ανακαλείται, και email και push καταγράφονται από τους ψεύτικους αποστολείς.
+
+**Κριτήρια εξόδου**
+
+- Αν σταματήσει το cron του dispatch, το `health` δίνει 503 μέσα σε 15′ (τοπικά).
+- Μη εγκεκριμένη προσθήκη συσκευής κωδικών σβήνεται τοπικά, και κάθε μη εγκεκριμένη αλλαγή ανακαλεί τα sessions και ειδοποιεί χρήστη και owner μέσα σε 5′ (καταγραφή στους ψεύτικους αποστολείς). Ο υπολειπόμενος κίνδυνος είναι γραμμένος στο ADR-0009.
+- CI πράσινο, με `fn:check`, `test:race` και έλεγχο μεγέθους. Οι ροές 1, 2, 3 και 6 του SPEC §5 περνούν στο Playwright.
+- Μεταφέρθηκαν στο 1.10: Sentry, uptime και ειδοποιήσεις, soak 48 ωρών, ο ίδιος χειροκίνητος έλεγχος στο dev με πραγματικό email και push, οι ροές σε πραγματικές συσκευές.
+
+## 1.10 Ανάπτυξη, λογαριασμοί και συσκευές
+
+- **Στόχος:** Ό,τι έτρεξε ως εδώ τοπικά ανεβαίνει στο `dev.anaklo.gr` και περνά σε πραγματικές συσκευές και δίκτυα (C7): remote Supabase, Worker και domain, email σύνδεσης μέσω Resend, push με go/no-go (ADR-0010), πραγματικός πάροχος SMS (ADR-0012), Sentry και uptime. Τελειώνει με τελική πρόβα της Φάσης 1 σε πραγματικές συσκευές.
+- **Μέρες:** 3,5 (≈ 1 remote, deploy, λογαριασμοί και δοκιμές συσκευών, από το 1.1· ≈ 1,5 πάροχος SMS, το παλιό 1.5b, από τις οποίες ~0,5 για το `sms-probe`· ≈ 1 Sentry, uptime και τελική πρόβα, από το 1.9)
+- **Εξαρτάται από:** 1.1–1.9 και τα «Πριν το 1.10» των Προαπαιτούμενων (domain, λογαριασμοί, συσκευές, SIM, δοκιμαστικοί λογαριασμοί SMS). Κανένα migration.
+- **Σειρά:** πρώτα remote και deploy· αμέσως μετά εγκατάσταση στο iPhone, γιατί ο έλεγχος 3 ημερών και η επανάληψη του push μετά από 24 ώρες θέλουν χρόνο, και δοκιμή push, γιατί ένα no-go σημαίνει VAPID· παράλληλα το `sms-probe`· μετά πάροχος SMS, Sentry και uptime· στο τέλος τελική πρόβα και καθαρισμός.
+
+**Remote dev και deploy**
+
+- Ο Μιχάλης (Προαπαιτούμενα): dashboard του `anaklo-dev` με τη λίστα Auth, `db:push` (ή `db:reset:dev`) → `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev`. Η εκκρεμότητα της Φάσης 0 (guard συναινέσεων) κλείνει εδώ, αν δεν έκλεισε νωρίτερα.
+- Ζώνη `anaklo.gr` στο Cloudflare και `routes` του Worker για το `dev.anaklo.gr` (`SETUP.md`). Smoke: το `/demo-barber` δίνει 200 HTML, όχι 307· το `/api/functions/v1/health` 200 μέσω proxy και 403 απευθείας· το `deploy:dev` idempotent, χωρίς κανένα `.map`.
+- Resend: `mail.anaklo.gr` επαληθευμένο, Custom SMTP του Auth (ο κωδικός σύνδεσης φτάνει σε πραγματικό inbox), κλειδί του `dispatch` για τα email ασφαλείας με το `secrets:dev`.
+- Όσοι έλεγχοι του remote δεν έγιναν νωρίτερα (1.7): trigger στο `auth.mfa_factors` (αν επιτρέπεται, η ανίχνευση του 1.9 μπορεί να γίνει trigger), ανάκληση sessions με `db:test:dev` (αλλιώς η εφεδρεία του ADR-0009 §19, στο buffer), `amr` με το χέρι, `mfa-reset.mjs` στο dev κατά το runbook, TOTP ενεργό στο dashboard. Τα αποτελέσματα στο ADR-0009.
+
+**Push (C5, ADR-0010)**
+
+- App του OneSignal για το dev (Προαπαιτούμενα, `SETUP.md`)· app id και κλειδί REST με το `secrets:dev`, `VITE_ONESIGNAL_APP_ID` στο build του dev. Ο πραγματικός αποστολέας push αντικαθιστά τον ψεύτικο του 1.5.
+- Τα βήματα του ADR-0010 §3 στο iPhone και στο Android (πίνακας παρακάτω), με το «Δοκιμαστικό push» (`spike-push`, ή το δοκιμαστικό του `dispatch` από το 1.5). Go → ADR-0010 αποδεκτό· no-go → VAPID στον ίδιο πίνακα `push_subscriptions` (~1 μέρα, στο buffer) και ενημέρωση SPEC §6 και §12, CLAUDE.md και λίστας υποεκτελούντων.
+
+**Δοκιμές σε συσκευές** (go/no-go για καθεμία):
+
+| Δοκιμή                      | Πού                                                          | Περνά όταν                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cookie έμπιστης συσκευής    | Instagram και Facebook in-app (iOS, Android), Safari, Chrome | γράφεται, διαβάζεται και υπάρχει μετά από επανεκκίνηση της εφαρμογής                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Session εγκατεστημένης PWA  | iPhone, εφαρμογή στην αρχική οθόνη                           | σύνδεση μέσα στην εφαρμογή· μένει συνδεδεμένη μετά από kill και μετά από 3 μέρες                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Push (C5)                   | iPhone, iOS ≥ 16.4, PWA **εγκατεστημένη στην αρχική οθόνη**  | όλα τα βήματα του ADR-0010 §3: η άδεια ζητείται μέσα από την εγκατεστημένη εφαρμογή με πάτημα κουμπιού· το «Δοκιμαστικό push» φτάνει στη συσκευή· push στη συνδρομή της συσκευής (από το dashboard του OneSignal) φτάνει με την εφαρμογή κλειστή και την οθόνη κλειδωμένη· το πάτημα ανοίγει την εφαρμογή στη σωστή οθόνη· το ίδιο μετά από επανεκκίνηση του κινητού και μετά από 24 ώρες· μετά την αποσύνδεση (`optOut`) δεν φτάνει τίποτα· ο `/app/sw.js` δεν χαλά φόρτωση και ενημέρωση· κανείς δεν παίρνει τα push άλλου: το push του owner δεν φτάνει στον browser ενός `staff`, και δεν υπάρχει ταυτότητα στον client για να την υποδυθεί (βήμα 10)· push από πραγματική online κράτηση με την εφαρμογή κλειστή |
+| Push                        | Android Chrome, εγκατεστημένη PWA                            | όπως στο iPhone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Online κράτηση (1.3)        | Instagram και Facebook in-app σε iOS και Android             | πραγματική κράτηση στο `dev.anaklo.gr/demo-barber` και δεύτερη χωρίς OTP στην ίδια συσκευή· η έμπιστη συσκευή δουλεύει και στο Safari του iPhone                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Εφαρμογή επαγγελματία (1.4) | iPhone, εγκατεστημένη PWA· δεύτερο κινητό                    | η ροή 3 του SPEC §5· το δεύτερο κινητό βλέπει την αλλαγή σε ≤ 60″ ή στο επόμενο focus                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Συσκευές κωδικών (1.7)      | iPhone, εγκατεστημένη PWA· δεύτερη συσκευή                   | εγγραφή με τους «Κωδικούς» του iOS (με εναλλαγή εφαρμογής και reload) και δεύτερη συσκευή με το QR· το φύλλο κωδικού εμφανίζεται μετά από 5′ και η ενέργεια περνά                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Κίνηση (ADR-0011)           | iPhone, φτηνό Android                                        | κανένα hover σε αφή· με τη «Μείωση κίνησης» του συστήματος καμία κίνηση· ομαλές μεταβάσεις στο Android                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+Το αποτέλεσμα του push γράφεται στο ADR-0010 (go → OneSignal αποδεκτό, no-go → VAPID) και ο έλεγχος των 3 ημερών στο ADR-0009, στην ενότητα «Αποτέλεσμα δοκιμής».
+
+**Πάροχος SMS (ADR-0012, το παλιό 1.5b)**
+
+Βάση: κανένα migration. Frontend: καμία αλλαγή.
+
+**Πίνακας επιλογής (C4, pass/fail).** Πάροχος που αποτυγχάνει σε ένα από τα τέσσερα απορρίπτεται:
+
+| #   | Κριτήριο                                | Περνά όταν                                                                                                                                                                                                                  |
+| --- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | GSM-7 χωρίς αυτόματη μετατροπή σε UCS-2 | ρητό `data_coding=0` ή αντίστοιχη ρύθμιση. Αν δεν γίνεται, ο πάροχος **απορρίπτει** το μήνυμα αντί να το στείλει σιωπηλά ως UCS-2. Κάθε πρότυπο με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω φτάνει ως 1 SMS σε Cosmote, Vodafone και Nova |
+| 2   | Delivery webhooks                       | κατάσταση **και** αριθμός SMS για κάθε μήνυμα                                                                                                                                                                               |
+| 3   | Sender ID                               | αλφαριθμητικό, ≤ 11 χαρακτήρες, με καταχώριση, και εμφανίζεται σωστά                                                                                                                                                        |
+| 4   | Όριο δαπάνης                            | προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης στον πάροχο, επιπλέον των δικών μας ορίων                                                                                                                                   |
+
+Βαθμολογούνται επίσης, χωρίς αποκλεισμό: τιμή ανά SMS, allow-list χωρών, link που πατιέται χωρίς `https://`, αυτόματη συμπλήρωση κωδικού στο iOS, DPA και επεξεργασία στην ΕΕ, Viber αργότερα. Αποτελέσματα και επιλογή στο **ADR-0012**.
+
+- **Script `scripts/sms-probe.ts`** (Deno, ~0,5 μέρα): γράφεται και τρέχει μόλις ανοίξουν οι δοκιμαστικοί λογαριασμοί (ιδανικά λίγο πριν από το 1.10, το αργότερο στην αρχή του). Καλεί απευθείας το HTTP API κάθε δοκιμαστικού παρόχου, όχι μέσω του `_shared/sms-provider.ts`. Στέλνει κάθε πρότυπο στα όριά του, με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω, μέσω κάθε δοκιμαστικού λογαριασμού, στις SIM Cosmote, Vodafone και Nova. Τα delivery reports τα διαβάζει από το API ή το dashboard του παρόχου.
+- Adapter του παρόχου στο `_shared/sms-provider.ts`: ρητό GSM-7, sender ID, callback URL για delivery reports. Ο ψεύτικος adapter μένει για τοπικά και CI.
+- `sms-dlr` (webhook, `verify_jwt = false`, καλείται απευθείας από τον πάροχο, όχι μέσω `/api`): έλεγχος υπογραφής ή μυστικού· `record_delivery_report`· segments > 1 → σφάλμα στο log και ειδοποίηση Sentry.
+
+**Παρακολούθηση (από το 1.9)**
+
+- Sentry EU (Deno) σε κάθε function, με το SDK στο `index.ts`· ο scrubber στο `_shared/observability.ts` σβήνει αριθμούς `+30…`, emails και tokens πριν την αποστολή· ειδοποίηση για delivery reports με segments > 1.
+- Sentry EU στην PWA· στη σελίδα κράτησης lazy μετά την πρώτη απόδοση (πρώτο στη σειρά περικοπών). Το `beforeSend` σβήνει `+30…`, emails, tokens του `/m/` και tokens έμπιστης συσκευής.
+- Source maps: ανεβαίνουν στο Sentry κατά το build και **σβήνονται από το `dist` πριν το deploy**· το `build.sourcemap` μένει `hidden` και το `check-secrets` αποτυγχάνει σε κάθε `sourceMappingURL`.
+- Uptime ανά 5′ στο `/demo-barber` και στο `/api/functions/v1/health` (κρατά και το Free project ξύπνιο)· κανόνες ειδοποίησης στο Sentry.
+- Soak 48 ωρών στο dev, από τη μέρα 1 του βήματος.
+
+**Καθαρισμός**
+
+- Σβήνονται από το repo τα `spike-td` και `spike-push` (και οι ενότητές τους στο `config.toml`) και το προσωρινό κουμπί «Δοκιμαστικό push» του 1.1, αν έμεινε· από το `anaklo-dev` με το χέρι, γιατί το `fn:deploy:dev` δεν σβήνει functions (`SETUP.md`), μαζί με όσα secrets δεν χρησιμοποιούνται πια.
+
+**Tests**
+
+- Vitest: αντιστοίχιση αιτήματος του παρόχου (σημαία GSM-7, sender, callback), parsing του delivery report, απόρριψη χωρίς σωστή υπογραφή· `observability.test` σβήνει ελληνικά κινητά, emails και tokens.
+- Όλο το pgTAP με `db:test:dev` στο `anaklo-dev`.
 - Χειροκίνητα στο dev: προσθήκη παράγοντα **απευθείας** στο GoTrue (με session `aal2`, χωρίς την εφαρμογή) → μέσα σε 5′ ο παράγοντας σβήνεται, το session ανακαλείται και φτάνουν email και push.
 - Χειροκίνητος πίνακας συσκευών (SPEC §13): Instagram και Facebook in-app σε iOS και Android, Safari, Chrome, εγκατεστημένη PWA με push.
 
 **Κριτήρια εξόδου**
 
-- Αν σταματήσει το cron του dispatch, έρχεται ειδοποίηση μέσα σε 15′. Soak 48 ωρών στο dev, από την αρχή του βήματος: καμία διπλή αποστολή, κανένα ληγμένο job.
-- Μη εγκεκριμένη προσθήκη συσκευής κωδικών στο dev σβήνεται, και κάθε μη εγκεκριμένη αλλαγή ανακαλεί τα sessions και ειδοποιεί χρήστη και owner μέσα σε 5′ (ή αμέσως, με trigger). Ο υπολειπόμενος κίνδυνος είναι γραμμένος στο ADR-0009.
-- CI πράσινο, με `fn:check`, `test:race` και έλεγχο μεγέθους. Οι ροές 1, 2, 3 και 6 του SPEC §5 περνούν σε πραγματικές συσκευές.
+- `dev.anaklo.gr/demo-barber` και `/app` από τον Worker· `deploy:dev` idempotent, χωρίς `.map`· λίστα dashboard εφαρμοσμένη στο `anaklo-dev`· `db:test:dev` πράσινο.
+- Όλες οι δοκιμές του πίνακα συσκευών περνούν· go/no-go του push γραμμένο στο ADR-0010 (C5) και ο έλεγχος 3 ημερών στο ADR-0009.
+- Πραγματικά SMS επιβεβαίωσης και υπενθύμισης σε Cosmote, Vodafone και Nova, **1 SMS** το καθένα κατά το delivery report. Στο ADR-0012 καταγράφεται αν το link (χωρίς `https://`) πατιέται και αν το iOS προτείνει τον κωδικό OTP· βαθμολογούνται, δεν μπλοκάρουν (C4). Προπληρωμή ή σκληρό όριο ρυθμισμένο στον πάροχο. ADR-0012 γραμμένο.
+- Αν σταματήσει το cron του dispatch, έρχεται ειδοποίηση μέσα σε 15′· soak 48 ωρών χωρίς διπλή αποστολή και χωρίς ληγμένο job.
+- Μη εγκεκριμένη προσθήκη συσκευής κωδικών στο dev σβήνεται, και κάθε μη εγκεκριμένη αλλαγή ανακαλεί τα sessions και ειδοποιεί χρήστη και owner (email, push) μέσα σε 5′ (ή αμέσως, με trigger).
+- Spikes σβησμένα· CI πράσινο. Οι ροές 1, 2, 3 και 6 του SPEC §5 περνούν σε πραγματικές συσκευές.
 
 ## Κίνδυνοι
 
 | Κίνδυνος                                                                                                                        | Αντιμετώπιση                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Το KYC ή το sender ID αργούν, και δεν υπάρχει ακόμη νομικό πρόσωπο                                                              | 2–3 πάροχοι από τη μέρα 1, υπογράφει ο Μιχάλης (D3). Ο ψεύτικος adapter και οι δοκιμαστικοί αριθμοί κρατούν τα 1.3–1.5a σε κίνηση. Αν ως τη μέρα ~20 δεν υπάρχει πάροχος, τα 1.6–1.8 πάνε πριν το 1.5b (που δεν έχει migration). |
-| Σφάλματα ζώνης ώρας, DST και τοπικών μεσανύχτων                                                                                 | Λογική μόνο σε SQL, χωρίς αντίγραφο σε TypeScript. `p_now` ως όρισμα, τοπικό → UTC μία φορά ανά ημερομηνία, fixtures νυχτερινής βάρδιας και `America/New_York`. Η αλλαγή ώρας της 2026-10-25 παρακολουθείται ζωντανά στο dev.    |
+| Το KYC ή το sender ID αργούν, και δεν υπάρχει ακόμη νομικό πρόσωπο                                                              | 2–3 πάροχοι, υπογράφει ο Μιχάλης (D3)· οι αιτήσεις μπορούν να ξεκινήσουν πριν το 1.10, χωρίς να μπλοκάρουν τίποτα. Ο ψεύτικος adapter και οι δοκιμαστικοί αριθμοί κρατούν τα 1.3–1.9 σε κίνηση. Αν στο 1.10 δεν υπάρχει υπογεγραμμένος πάροχος, το υπόλοιπο 1.10 προχωρά και ο adapter του παρόχου (χωρίς migration) κλείνει μόλις υπογραφεί, πριν τον πιλότο. |
+| Σφάλματα ζώνης ώρας, DST και τοπικών μεσανύχτων                                                                                 | Λογική μόνο σε SQL, χωρίς αντίγραφο σε TypeScript. `p_now` ως όρισμα, τοπικό → UTC μία φορά ανά ημερομηνία, fixtures νυχτερινής βάρδιας και `America/New_York`. Η αλλαγή ώρας της 2026-10-25 πέφτει μέσα στο 1.5 και παρακολουθείται ζωντανά στο τοπικό stack.    |
 | Διπλοκρατήσεις από ταυτόχρονα αιτήματα ή επαναλήψεις                                                                            | Exclusion constraint, advisory lock ανά επιχείρηση και τοπική μέρα, idempotency (άλλο payload με ίδιο κλειδί = σφάλμα). Races στο CI: 20 κρατήσεις, ίδιο κλειδί, μετακίνηση και κράτηση.                                         |
-| Χαμένο cookie έμπιστης συσκευής στους in-app browsers                                                                           | Δοκιμή στο 1.1. Με το verification grant η ροή δεν κολλά ποτέ· το κόστος είναι μόνο περισσότερα OTP, που μετριούνται από το `messages_log`.                                                                                      |
-| iOS PWA: χωριστή αποθήκευση, push μόνο σε εγκατεστημένη εφαρμογή, ένας service worker ανά scope, reload στην εναλλαγή εφαρμογών | Κωδικός email αντί για magic link, οθόνη «πρόσθεσε πρώτα», δοκιμές του 1.1 (C5), `factorId` στο `sessionStorage`, VAPID ως εφεδρεία. Χωρίς push η δουλειά συνεχίζεται: refetch κάθε 60″.                                         |
-| Ένα μέλος δηλώνει στον browser την ταυτότητα άλλου (π.χ. `OneSignal.login('<id του owner>')`) και παίρνει τα push του· το Identity Verification του OneSignal δεν υποστηρίζει το Web SDK | Καμία ταυτότητα στον client: ποτέ `OneSignal.login`/`external_id`, ποτέ Identity Verification στο web app. Αποστολή μόνο με `include_subscription_ids` (Vitest στο `buildPushPayload`)· το δέσιμο συνδρομής ↔ χρήστη στον server (1.1: η συσκευή που καλεί· 1.5a: `push_subscriptions` με `UNIQUE`, RLS, RPCs και pgTAP)· `optOut` και `unregister` σε κάθε αποσύνδεση. Βήμα 10 της δοκιμής C5. |
+| Χαμένο cookie έμπιστης συσκευής στους in-app browsers                                                                           | Δοκιμή στο 1.10 (C7). Με το verification grant η ροή δεν κολλά ποτέ (Playwright με cookies απενεργοποιημένα από το 1.3)· το κόστος είναι μόνο περισσότερα OTP, που μετριούνται από το `messages_log`.                                                                                      |
+| iOS PWA: χωριστή αποθήκευση, push μόνο σε εγκατεστημένη εφαρμογή, ένας service worker ανά scope, reload στην εναλλαγή εφαρμογών | Κωδικός email αντί για magic link, οθόνη «πρόσθεσε πρώτα», δοκιμές του 1.10 (C5), `factorId` στο `sessionStorage`, VAPID ως εφεδρεία. Χωρίς push η δουλειά συνεχίζεται: refetch κάθε 60″.                                         |
+| Ένα μέλος δηλώνει στον browser την ταυτότητα άλλου (π.χ. `OneSignal.login('<id του owner>')`) και παίρνει τα push του· το Identity Verification του OneSignal δεν υποστηρίζει το Web SDK | Καμία ταυτότητα στον client: ποτέ `OneSignal.login`/`external_id`, ποτέ Identity Verification στο web app. Αποστολή μόνο με `include_subscription_ids` (Vitest στο `buildPushPayload`)· το δέσιμο συνδρομής ↔ χρήστη στον server (`spike-push`: η συσκευή που καλεί· 1.5: `push_subscriptions` με `UNIQUE`, RLS, RPCs και pgTAP)· `optOut` και `unregister` σε κάθε αποσύνδεση. Βήμα 10 της δοκιμής C5. |
 | Μένουν ~19 KB στον προϋπολογισμό της σελίδας κράτησης                                                                           | Namespaces i18n, lazy chunks, ημερομηνίες μόνο με `Intl`, κατάλογος από τον Worker, χωρίς TanStack Query στη σελίδα, Preact ως τελευταία λύση. Έλεγχος μεγέθους σε κάθε PR.                                                      |
+| Η κίνηση και οι γραμματοσειρές της Δ βαραίνουν τη σελίδα κράτησης, το LCP ή τα φτηνά Android (C8)                              | Καμία βιβλιοθήκη κίνησης, μόνο CSS και μικρά hooks· μόνο `transform`/`opacity`· χωρίς splash και scroll-linked στη σελίδα κράτησης· GFS Didot μόνο 400 με `greek` + `latin` και `font-display: swap`· `npm run size` σε κάθε PR· reduced-motion με test· δοκιμή σε φτηνό Android στο 1.10 (ADR-0011). |
+| Τοπικά πρώτα (C7): ό,τι εξαρτάται από εξωτερικά (cookie στους in-app browsers, push στο iPhone, περιορισμοί του hosted Supabase, πάροχος SMS) φαίνεται μόλις στο 1.10 | Τα modules του Worker τρέχουν στο Vite από το 1.1, άρα το Playwright περνά από τον ίδιο δρόμο· `push_subscriptions` για OneSignal και VAPID από το 1.5· γραμμένες εφεδρείες (grant χωρίς cookie, VAPID, ADR-0009 §19, job ανά 5′ αντί για trigger)· στο 1.10 πρώτα η δοκιμή push· προαιρετικά `db:push` + `db:test:dev` νωρίτερα· 3 μέρες buffer μετά το 1.10. |
 | Ο πάροχος στέλνει σιωπηλά UCS-2, το link δεν πατιέται ή το iOS δεν προτείνει τον κωδικό                                         | Κριτήρια C4 με `sms-probe` σε πραγματικά δίκτυα πριν την επιλογή. Ρητό GSM-7 στο αίτημα. Segments από τα delivery reports, με ειδοποίηση όταν ξεπερνούν το 1.                                                                    |
 | SMS pumping (ψεύτικα OTP που φουσκώνουν το κόστος)                                                                              | Μόνο +3069, OTP μόνο με ελεύθερη ώρα, όρια ανά αριθμό, IP, επιχείρηση και ημέρα, πλατφορμικό όριο και διακόπτης, μυστικό proxy, σκληρό όριο στον πάροχο (C4).                                                                    |
 | Διπλές αποστολές, cron ή pg_net που αποτυγχάνουν σιωπηλά, παύση του Free project                                                | Dedupe keys και leases· άγνωστη έκβαση δεν ξαναστέλνεται. `job_runs` → `health` 503 → uptime ανά 5′, που κρατά και το project ξύπνιο. Supabase Pro πριν τον πιλότο (Φάση 3).                                                     |
@@ -765,9 +871,9 @@
 | Edge Function με `service_role` που παρακάμπτει ελέγχους (`invite-member`, `manage-factors`)                                    | Έλεγχος ρόλου και φρέσκου κωδικού με RPC ως ο χρήστης **πριν** από το `service_role`, με Vitest (`invite-member`, `manage-factors`) και pgTAP (`can_manage_members`, `authorize_factor_change`). Γενικά: `service_role` μόνο μέσω RPC, χωρίς GRANT πινάκων στα νέα δεδομένα.                                                                     |
 | Κλεμμένο ή ξεχασμένο ανοιχτό session owner κάνει κρίσιμη ενέργεια (ανωνυμοποίηση, μέλη, ταυτότητα)                             | Φρέσκος κωδικός (C6) μέσα σε κάθε κρίσιμο `_impl`, όχι μόνο στο UI· `business_members` μόνο μέσω RPC, ώστε να μην παρακάμπτεται από τον πίνακα. pgTAP για κάθε `_impl` (`aal1`, κωδικός 6′, μόνο `otp`, παράθυρο 0).                                                     |
 | Το timestamp του `totp` στο `amr` δεν ανανεώνεται σε νέο verify, άρα ο φρέσκος κωδικός δεν μπορεί να ελεγχθεί                   | Ελεγμένο στον κώδικα του Supabase Auth (`models/amr.go`, `AddClaimToSession`: upsert του `mfa_amr_claims.updated_at` σε κάθε verify). Integration test τη μέρα 1 του 1.7 στο αποκωδικοποιημένο JWT· αν αποτύχει, σταματάμε και ρωτάμε πριν από οτιδήποτε άλλο. |
-| Κλεμμένο session `aal2` αλλάζει συσκευές κωδικών απευθείας στο GoTrue. Το Supabase Pro δεν ελέγχει φρεσκάδα εκεί και δεν έχει hook άρνησης (το MFA Verification Attempt υπάρχει μόνο σε Teams/Enterprise) | Η εφαρμογή περνά μόνο από `authorize_factor_change`/`manage-factors` με φρέσκο κωδικό. Ανίχνευση ανά 5′ (ή αμέσως με trigger στο `auth.mfa_factors`, αν το επιτρέπει το hosted Supabase: έλεγχος τη μέρα 1 του 1.7) και αντίδραση στο 1.9: διαγραφή του νέου παράγοντα, ανάκληση όλων των sessions, email σε χρήστη και owner, push στον owner. **Υπολειπόμενος κίνδυνος**, γραμμένος στο ADR-0009: έως 5′ με παράγοντα του επιτιθέμενου πριν σβηστεί· μια αφαίρεση χωρίς άδεια δεν αναστρέφεται (μόνο ανάκληση και ειδοποίηση). |
-| Το remote dev αποκλίνει από το repo· το `db:reset:dev` σβήνει provisioning και ίσως Vault                                       | Σταθερή σειρά στο τέλος κάθε βήματος (`db:push` → `secrets:dev` → `db:test:dev` → `deploy:dev`· μετά από `db:reset:dev` μπαίνει και `provision:dev` αμέσως μετά το `secrets:dev`). Το `secrets:dev` κάνει upsert, τα cron jobs τα ξαναφτιάχνουν τα migrations. Το `deploy-dev` ελέγχει το project ref. Ποτέ `config push`· λίστα dashboard στο `SETUP.md`. |
-| Υπέρβαση χρόνου                                                                                                                 | 37 + 3 μέρες (μαζί τα +2 του C6), με την αργία της 28/10 μέσα. Σύγκριση πραγματικού και πλάνου στο τέλος κάθε βήματος. Σειρά περικοπών C1, σε ό,τι δεν έχει ακόμη υλοποιηθεί· τα κλεισίματα δεν κόβονται.                                            |
+| Κλεμμένο session `aal2` αλλάζει συσκευές κωδικών απευθείας στο GoTrue. Το Supabase Pro δεν ελέγχει φρεσκάδα εκεί και δεν έχει hook άρνησης (το MFA Verification Attempt υπάρχει μόνο σε Teams/Enterprise) | Η εφαρμογή περνά μόνο από `authorize_factor_change`/`manage-factors` με φρέσκο κωδικό. Ανίχνευση ανά 5′ (ή αμέσως με trigger στο `auth.mfa_factors`, αν το επιτρέπει το hosted Supabase: έλεγχος στο `anaklo-dev`, προαιρετικά τη μέρα 1 του 1.7, αλλιώς στο 1.10) και αντίδραση στο 1.9: διαγραφή του νέου παράγοντα, ανάκληση όλων των sessions, email σε χρήστη και owner, push στον owner. **Υπολειπόμενος κίνδυνος**, γραμμένος στο ADR-0009: έως 5′ με παράγοντα του επιτιθέμενου πριν σβηστεί· μια αφαίρεση χωρίς άδεια δεν αναστρέφεται (μόνο ανάκληση και ειδοποίηση). |
+| Το remote dev αποκλίνει από το repo· το `db:reset:dev` σβήνει provisioning και ίσως Vault                                       | Μέχρι το 1.10 το remote είναι προαιρετικό (C7)· από εκεί σταθερή σειρά στο τέλος κάθε βήματος (`db:push` → `secrets:dev` → `db:test:dev` → `deploy:dev`· μετά από `db:reset:dev` μπαίνει και `provision:dev` αμέσως μετά το `secrets:dev`). Το `secrets:dev` κάνει upsert, τα cron jobs τα ξαναφτιάχνουν τα migrations. Το `deploy-dev` ελέγχει το project ref. Ποτέ `config push`· λίστα dashboard στο `SETUP.md`. |
+| Υπέρβαση χρόνου                                                                                                                 | 38 + 3 μέρες (μαζί τα +2 του C6 και το +1 των C7/C8), με την αργία της 28/10 μέσα. Σύγκριση πραγματικού και πλάνου στο τέλος κάθε βήματος. Σειρά περικοπών C1, σε ό,τι δεν έχει ακόμη υλοποιηθεί· τα κλεισίματα δεν κόβονται.                                            |
 
 ## Αναβάλλονται
 
@@ -794,3 +900,5 @@
 | Πλήρη αγγλικά κείμενα (τα κλειδιά μένουν συγχρονισμένα)                                                  | Πριν την εμπορική διάθεση    |
 | «Τι νέο υπάρχει» και CHANGELOG                                                                           | Από τον πιλότο (Φάση 4)      |
 | Σκούρο θέμα                                                                                              | v1                           |
+| Gallery δουλειάς και κάρτες υπηρεσιών με φωτογραφίες στη σελίδα κράτησης (G4, E9, E10), φωτογραφία εξωφύλλου στο G6 | v1                           |
+| Site μάρκετινγκ anaklo.gr με το πλήρες επίπεδο κίνησης (E7, E10, E11, G7)                                | Φάση 5                       |

@@ -14,13 +14,18 @@ const BOOKING_SHELL = `<!doctype html>
 `
 const PRO_SHELL = '<!doctype html><html lang="el"><head><title>Anaklo Pro</title></head></html>'
 
-const PROFILE = {
-  slug: 'demo-barber',
-  name: 'Demo <Barber>',
-  vertical: 'barber',
-  timezone: 'Europe/Athens',
-  locale: 'el',
-  theme: { primary: '#1F3A5F' },
+const CATALOGUE = {
+  business: {
+    slug: 'demo-barber',
+    name: 'Demo <Barber>',
+    vertical: 'barber',
+    timezone: 'Europe/Athens',
+    locale: 'el',
+    theme: { primary: '#1F3A5F' },
+  },
+  categories: [],
+  services: [],
+  staff: [],
 }
 
 function assetsFetch() {
@@ -44,11 +49,11 @@ function env(overrides: Partial<Env> = {}): Env {
   }
 }
 
-function supabase(rows: unknown[] | 'down' | 'error' = [PROFILE]) {
+function supabase(body: unknown = CATALOGUE) {
   return vi.fn<FetchLike>(() => {
-    if (rows === 'down') return Promise.reject(new TypeError('fetch failed'))
-    if (rows === 'error') return Promise.resolve(new Response('oops', { status: 500 }))
-    return Promise.resolve(Response.json(rows))
+    if (body === 'down') return Promise.reject(new TypeError('fetch failed'))
+    if (body === 'error') return Promise.resolve(new Response('oops', { status: 500 }))
+    return Promise.resolve(Response.json(body))
   })
 }
 
@@ -66,6 +71,10 @@ describe('resolveWorkerRoute', () => {
     ['/app/', 'pro-app'],
     ['/app/login', 'pro-app'],
     ['/m/abcdefghijklmnopqrstuv', 'token-page'],
+    ['/m/not-a-token', 'token-page'],
+    ['/r/demo01', 'short-link'],
+    ['/r/DEMO01', 'short-link'],
+    ['/r/nope', 'not-found'],
     ['/', 'landing'],
     ['/demo-barber', 'business'],
     ['/api-barber', 'business'],
@@ -92,13 +101,13 @@ describe('handleRequest', () => {
     expect(html).toContain('id="anaklo-initial"')
 
     const [url, init] = fetch.mock.calls[0] ?? []
-    expect(url).toBe('https://ref.supabase.co/rest/v1/rpc/public_business_profile')
+    expect(url).toBe('https://ref.supabase.co/rest/v1/rpc/public_booking_catalogue')
     expect(new Headers(init?.headers).get('apikey')).toBe('sb_publishable_server')
     expect(init?.body).toBe('{"p_slug":"demo-barber"}')
   })
 
   it('serves the shell with 404 for an unknown or hidden business', async () => {
-    const response = await handleRequest(get('/no-such-shop'), env(), supabase([]))
+    const response = await handleRequest(get('/no-such-shop'), env(), supabase(null))
     expect(response.status).toBe(404)
     expect(await response.text()).toBe(BOOKING_SHELL)
   })
@@ -108,6 +117,33 @@ describe('handleRequest', () => {
     async (state) => {
       const response = await handleRequest(get('/demo-barber'), env(), supabase(state))
       expect(response.status).toBe(200)
+      expect(await response.text()).toBe(BOOKING_SHELL)
+    },
+  )
+
+  it('redirects /r/<code> to the booking page, uncached', async () => {
+    const fetch = supabase('demo-barber')
+    const response = await handleRequest(get('/r/DEMO01'), env(), fetch)
+    expect(response.status).toBe(302)
+    expect(response.headers.get('Location')).toBe('/demo-barber')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    const [url, init] = fetch.mock.calls[0] ?? []
+    expect(url).toBe('https://ref.supabase.co/rest/v1/rpc/public_slug_for_code')
+    expect(init?.body).toBe('{"p_code":"demo01"}')
+  })
+
+  it('serves the shell with 404 for an unknown short code', async () => {
+    const response = await handleRequest(get('/r/zzzzzz'), env(), supabase(null))
+    expect(response.status).toBe(404)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+  })
+
+  it.each(['down', 'error'] as const)(
+    'serves the shell with 200 no-store for a short code when Supabase is %s',
+    async (state) => {
+      const response = await handleRequest(get('/r/demo01'), env(), supabase(state))
+      expect(response.status).toBe(200)
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
       expect(await response.text()).toBe(BOOKING_SHELL)
     },
   )

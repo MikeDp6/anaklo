@@ -1,0 +1,31 @@
+.mark {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--color-brand);
+}
+
+.svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.disc {
+  fill: var(--color-brand);
+}
+
+.check {
+  fill: none;
+  stroke: var(--color-on-brand);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

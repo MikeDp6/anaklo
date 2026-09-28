@@ -55,7 +55,12 @@ export const PROXY_ALLOW_LIST: readonly ProxyRoute[] = [
   // 1.2: the booking page's catalogue and free slots (anon RPCs, 0004)
   { method: 'POST', path: '/rest/v1/rpc/public_booking_catalogue' },
   { method: 'POST', path: '/rest/v1/rpc/available_slots' },
+  // 1.3: fallback of `/r/<code>` when the Worker could not resolve it (anon RPC, 0005)
+  { method: 'POST', path: '/rest/v1/rpc/public_slug_for_code' },
   { method: 'GET', path: '/functions/v1/health' },
+  // 1.3: online booking and the manage link. POST only: nothing changes on GET.
+  { method: 'POST', path: '/functions/v1/public-booking' },
+  { method: 'POST', path: '/functions/v1/manage' },
   { method: 'POST', path: '/functions/v1/spike-td' },
 ]
 

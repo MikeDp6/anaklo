@@ -16,7 +16,7 @@ export function EmailStep({
   sending: boolean
   onSubmit: (email: string) => void
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('pro')
   const inputId = useId()
   const errorId = useId()
   const [email, setEmail] = useState('')
@@ -29,10 +29,10 @@ export function EmailStep({
 
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <p className={styles.lead}>{t('pro.login.intro')}</p>
+      <p className={styles.lead}>{t('login.intro')}</p>
       <div className={styles.field}>
         <label htmlFor={inputId} className={styles.label}>
-          {t('pro.login.emailLabel')}
+          {t('login.emailLabel')}
         </label>
         <input
           id={inputId}
@@ -56,7 +56,7 @@ export function EmailStep({
         </p>
       )}
       <Button type="submit" disabled={sending}>
-        {sending ? t('pro.login.sendingCode') : t('pro.login.sendCode')}
+        {sending ? t('login.sendingCode') : t('login.sendCode')}
       </Button>
     </form>
   )

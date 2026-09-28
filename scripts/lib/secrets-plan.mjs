@@ -23,11 +23,26 @@ const MIN_PROXY_SECRET = 32
 /** HMAC keys: at least 32 characters of base64, base64url or hex (e.g. 32 random bytes). */
 const HMAC_KEY = /^[A-Za-z0-9+/_=-]{32,}$/
 
+/**
+ * The dev-only Vault keys that `supabase/seed.sql` writes locally (contract 1.3 §2.11). Public
+ * by design, so they must never become a remote key; and `phone_hmac_key` never rotates, so a
+ * wrong first value would stay for good.
+ */
+export const LOCAL_SEED_HMAC_KEYS = [
+  'local-dev-only-otp-hmac-key-not-a-secret-01',
+  'local-dev-only-phone-hmac-key-not-a-secret-1',
+]
+
 /** @param {string} value */
-const hmacKeyCheck = (value) =>
-  HMAC_KEY.test(value)
-    ? null
-    : 'must be at least 32 characters of base64 or hex (generate one, e.g. 32 random bytes)'
+const hmacKeyCheck = (value) => {
+  if (!HMAC_KEY.test(value)) {
+    return 'must be at least 32 characters of base64 or hex (generate one, e.g. 32 random bytes)'
+  }
+  if (LOCAL_SEED_HMAC_KEYS.includes(value)) {
+    return 'is the local seed value (supabase/seed.sql); generate a separate one for dev'
+  }
+  return null
+}
 
 /** @type {readonly SecretSpec[]} */
 export const SECRETS = [
@@ -73,19 +88,20 @@ export const SECRETS = [
   },
   {
     // Vault (read by SQL, never by the functions): the OTP code HMAC of 0005 (step 1.3).
-    // Optional until 1.3 makes it required.
+    // Without it every otp_start/otp_verify fails (55000 → 500 internal).
     name: 'otp_hmac_key',
     from: ['OTP_HMAC_KEY'],
     targets: ['vault'],
-    required: false,
+    required: true,
     check: hmacKeyCheck,
   },
   {
     // Vault: private.phone_hmac() of 0005 (suppression list, rate-limit keys; step 1.3).
+    // Must NEVER rotate: suppression entries and trusted devices are keyed by it.
     name: 'phone_hmac_key',
     from: ['PHONE_HMAC_KEY'],
     targets: ['vault'],
-    required: false,
+    required: true,
     check: hmacKeyCheck,
   },
   // 1.5a adds the dispatch URL and its secret (pg_net) here, with target 'vault'.
@@ -95,10 +111,7 @@ export const SECRETS = [
 const OTHER_KNOWN = [...TOOL_TOKENS, 'SUPABASE_DEV_PROJECT_REF', 'SUPABASE_SECRET_KEY']
 
 /** Groups whose members must be set together. */
-const TOGETHER = [
-  ['ONESIGNAL_APP_ID', 'ONESIGNAL_REST_API_KEY'],
-  ['otp_hmac_key', 'phone_hmac_key'],
-]
+const TOGETHER = [['ONESIGNAL_APP_ID', 'ONESIGNAL_REST_API_KEY']]
 
 /**
  * @typedef {object} SecretPlan

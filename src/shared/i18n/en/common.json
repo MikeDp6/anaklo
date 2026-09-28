@@ -1,0 +1,33 @@
+{
+  "app": {
+    "name": "Anaklo"
+  },
+  "retry": "Try again",
+  "loading": "Loading…",
+  "errors": {
+    "pageNotFoundTitle": "This page does not exist",
+    "pageNotFoundBody": "The link you followed leads nowhere.",
+    "AN001": "This time was just booked. Please choose another time.",
+    "AN002": "Choose a range of up to 14 days.",
+    "AN003": "The service you chose is not available. Please choose again.",
+    "AN004": "This request was already sent with different details. Refresh the page and try again.",
+    "AN005": "This time is outside working hours. Confirm that you want to book outside working hours.",
+    "AN006": "This time falls in the break after another appointment. Confirm that you want to squeeze it in.",
+    "AN007": "The client was not found. Choose or add the client again.",
+    "AN008": "This professional is not available. Please choose someone else.",
+    "AN009": "Online booking is not available right now.",
+    "AN010": "Wrong code. Try again.",
+    "AN011": "The code has expired. Ask for a new one.",
+    "AN012": "Too many wrong attempts. Ask for a new code or call the shop.",
+    "AN013": "Too many requests. Try again later or call the shop.",
+    "AN014": "Please confirm your mobile number first.",
+    "AN015": "This link is no longer valid.",
+    "AN016": "It is too late to change this online. Please call the shop.",
+    "AN017": "We cannot send a code right now. Please call the shop.",
+    "AN018": "A Greek mobile number (69…) is needed.",
+    "AN019": "Please wait a moment before asking for a new code.",
+    "AN020": "This appointment can no longer be changed.",
+    "network": "You are offline. Try again.",
+    "unknown": "Something went wrong. Try again."
+  }
+}

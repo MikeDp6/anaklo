@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { expect, type Page } from '@playwright/test'
 import { deleteMessagesTo, waitForLoginCode } from './mailpit'
 
-/** The screen texts the sign-in helpers rely on (el.json, `pro.login.*`). */
+/** The screen texts the sign-in helpers rely on (src/shared/i18n/el/pro.json, `login.*`). */
 export const LOGIN_TEXT = {
   emailLabel: 'Email',
   sendCode: 'Στείλε μου κωδικό',

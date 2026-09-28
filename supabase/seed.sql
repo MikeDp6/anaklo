@@ -21,9 +21,10 @@ begin
   -- Appointment writes must declare who acts (private.current_actor_type); the seed is the system.
   perform set_config('anaklo.actor_type', 'system', true);
 
-  insert into public.businesses (id, slug, name, vertical, timezone, phone_e164, booking_enabled, theme)
+  -- short_code 'demo01' = the /r/demo01 link of the local SMS and e2e (normally generated).
+  insert into public.businesses (id, slug, short_code, name, vertical, timezone, phone_e164, booking_enabled, theme)
   values (
-    v_business, 'demo-barber', 'Demo Barber', 'barber', v_tz, '+302610000000', true,
+    v_business, 'demo-barber', 'demo01', 'Demo Barber', 'barber', v_tz, '+302610000000', true,
     '{"primary": "#C8A15A", "accent": "#1F1F1F", "surface": "dark", "radius": 16, "font": "manrope"}'
   );
 
@@ -103,8 +104,48 @@ begin
          ((current_date + 2) + make_time(10 + row_number() over () :: int, 30, 0)) at time zone v_tz,
          'booked', 'online', 'otp', 1300
   from (select id from public.clients where business_id = v_business order by created_at limit 3) c;
+
+  -- A family sharing one mobile (e2e "κοινό κινητό"): Μάριος has the number of Γιώργος Π.
+  -- (+306900000001). One second later, so the choice list is always Γιώργος, Μάριος.
+  insert into public.clients (business_id, full_name, phone_e164, source, created_at)
+  values (v_business, 'Μάριος Π.', '+306900000001', 'staff', now() + interval '1 second');
 end;
 $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Vault keys of 0005 (OTP code HMAC, phone HMAC). LOCAL/DEV ONLY and not secret: created only
+-- when absent, so a real key (secrets:dev, step 1.10) is never overwritten. secrets-plan.mjs
+-- refuses these two values for a remote project.
+-- ---------------------------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from vault.secrets where name = 'otp_hmac_key') then
+    perform vault.create_secret(
+      'local-dev-only-otp-hmac-key-not-a-secret-01', 'otp_hmac_key', 'seed.sql (local dev only)'
+    );
+  end if;
+  if not exists (select 1 from vault.secrets where name = 'phone_hmac_key') then
+    perform vault.create_secret(
+      'local-dev-only-phone-hmac-key-not-a-secret-1', 'phone_hmac_key', 'seed.sql (local dev only)'
+    );
+  end if;
+end;
+$$;
+
+-- Local e2e only: Playwright re-runs OTP starts and bookings from 127.0.0.1 with the same test
+-- numbers, so the caps and the resend cooldown are relaxed here. pgTAP sets every
+-- platform_settings column itself. A remote database needs the real values back after any reset
+-- (step 1.10: defaults of 0005, sms_daily_cap = 30 on dev).
+update private.platform_settings
+set otp_per_phone_hour = 1000,
+    otp_per_ip_hour = 1000,
+    otp_per_business_day = 10000,
+    sms_daily_cap = 100000,
+    otp_resend_seconds = 0,
+    sms_per_phone_day = 10000,
+    sms_per_business_day = 100000,
+    updated_at = now()
+where id;
 
 -- ---------------------------------------------------------------------------------------------
 -- Synthetic staff accounts for local sign-in and e2e (ADR-0009): email code only, no passwords.

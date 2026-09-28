@@ -7,20 +7,20 @@ import styles from './InstallPage.module.css'
  * works only from the Home Screen. So the app asks to be installed first.
  */
 export function InstallPage() {
-  const { t } = useTranslation()
+  const { t } = useTranslation(['pro', 'common'])
   return (
     <Page>
       <header className={styles.header}>
-        <p className={styles.brand}>{t('app.name')}</p>
-        <h1>{t('pro.install.title')}</h1>
+        <p className={styles.brand}>{t('common:app.name')}</p>
+        <h1>{t('install.title')}</h1>
       </header>
-      <p>{t('pro.install.intro')}</p>
+      <p>{t('install.intro')}</p>
       <ol className={styles.steps}>
-        <li>{t('pro.install.stepShare')}</li>
-        <li>{t('pro.install.stepAdd')}</li>
-        <li>{t('pro.install.stepOpen')}</li>
+        <li>{t('install.stepShare')}</li>
+        <li>{t('install.stepAdd')}</li>
+        <li>{t('install.stepOpen')}</li>
       </ol>
-      <p className={styles.note}>{t('pro.install.note')}</p>
+      <p className={styles.note}>{t('install.note')}</p>
     </Page>
   )
 }

@@ -156,6 +156,48 @@ describe('SMS templates', () => {
       expect(sms.text).toContain(`@${LONGEST.domain} #${LONGEST.code}`)
   })
 
+  // The links send.ts builds (contract 1.3 §6): SITE_HOST without a scheme, `/m/<22>` or
+  // `/r/<6>`. Locally `localhost:5173`, on dev `dev.anaklo.gr`, and the longest SITE_HOST the
+  // config accepts (15 characters, booking-config.ts).
+  const TOKEN_22 = 'AbCdEfGhIjKlMnOp-_Qr9z'
+  const SITE_HOSTS = ['localhost:5173', 'dev.anaklo.gr', 'abcdefghij.k.gr']
+  const LINKS = SITE_HOSTS.flatMap((host) => [`${host}/m/${TOKEN_22}`, `${host}/r/demo01`])
+  const linkCases = cases.filter(([key, locale]) => templateVariables(key, locale).includes('link'))
+
+  it('covers the new rescheduled_by_client template in both languages', () => {
+    expect(linkCases).toContainEqual(['rescheduled_by_client', 'el'])
+    expect(linkCases).toContainEqual(['rescheduled_by_client', 'en'])
+    expect(TOKEN_22).toHaveLength(22)
+    expect(Math.max(...LINKS.map((link) => link.length))).toBe(SMS_VARIABLE_LIMITS.link)
+  })
+
+  it.each(linkCases)(
+    '%s (%s) fits one SMS with the real link shapes, byte-for-byte',
+    (key, locale) => {
+      for (const link of LINKS) {
+        const sms = renderSms(key, locale, { ...LONGEST, link })
+        expect(sms.segments, link).toBe(1)
+        expect(sms.encoding).toBe('GSM-7')
+        expect(sms.text).toContain(link)
+      }
+    },
+  )
+
+  it.each(cases.filter(([key]) => key === 'otp'))(
+    '%s (%s) carries the WebOTP line for the local and the dev domain',
+    (key, locale) => {
+      for (const domain of ['localhost', 'dev.anaklo.gr']) {
+        const sms = renderSms(key, locale, { ...LONGEST, domain })
+        expect(sms.segments).toBe(1)
+        expect(
+          sms.text.endsWith(`
+
+@${domain} #${LONGEST.code}`),
+        ).toBe(true)
+      }
+    },
+  )
+
   it('fails loudly when a variable is missing', () => {
     expect(() => renderSms('reminder', 'el', { business: 'X' })).toThrow(/needs \{\{date\}\}/)
   })

@@ -1,0 +1,83 @@
+/* The sentinel sits 80px down the page: once it leaves the viewport, the header turns solid. */
+.sentinel {
+  position: absolute;
+  top: 80px;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-top: env(safe-area-inset-top, 0px);
+  background-color: transparent;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    backdrop-filter var(--dur-fast) var(--ease-out);
+}
+
+.header[data-scrolled='true'] {
+  background-color: rgb(255 249 242 / 0.9); /* --lux-cream at 90% */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: var(--page-max);
+  min-height: 56px;
+  margin-inline: auto;
+  padding: var(--space-1) var(--space-4);
+}
+
+.back,
+.placeholder {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.back {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-control-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.arrow {
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid currentcolor;
+  border-left: 2px solid currentcolor;
+  transform: translateX(2px) rotate(45deg);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.name[data-visible='true'] {
+  opacity: 1;
+}
+
+.header > :last-child {
+  max-width: var(--page-max);
+  margin-inline: auto;
+  border-radius: 0;
+}

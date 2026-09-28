@@ -1,15 +1,54 @@
+/* G3 pill buttons. Motion (E1/E2/E16) comes from the global classes of motion.css. */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-5);
-  border: 0;
-  border-radius: var(--radius-control);
+  min-width: 44px;
+  padding: var(--space-2) var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: max(16px, var(--text-md));
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.primary {
+  --fill-color: var(--color-brand-strong);
+  --fill-ink: var(--color-on-brand);
   background: var(--color-brand);
   color: var(--color-on-brand);
-  font-weight: 600;
-  cursor: pointer;
+}
+
+.secondary {
+  --fill-color: var(--color-brand);
+  --fill-ink: var(--color-on-brand);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border-color: var(--color-control-border);
+}
+
+/* White 20% with a 1px gold border, on dark only (gold is never used on light). */
+.glass {
+  --fill-color: var(--lux-cream);
+  --fill-ink: var(--lux-espresso);
+  background: var(--color-glass);
+  color: var(--color-ink-on-dark);
+  border-color: var(--color-accent-on-dark);
+}
+
+.glass:focus-visible {
+  outline-color: var(--color-accent-on-dark);
+}
+
+.block {
+  width: 100%;
 }
 
 .button:disabled {

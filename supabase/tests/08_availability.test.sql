@@ -781,7 +781,7 @@ select is(
 
 select is(
   (select array_agg(k order by k collate "C") from jsonb_object_keys(pg_temp.cat() -> 'business') as k),
-  array['address', 'allow_any_staff', 'id', 'locale', 'maps_url', 'max_advance_days', 'min_notice_min', 'name',
+  array['address', 'allow_any_staff', 'currency', 'id', 'locale', 'maps_url', 'max_advance_days', 'min_notice_min', 'name',
         'phone_e164', 'slot_step_min', 'slug', 'theme', 'timezone', 'vertical'],
   'catalogue: exactly the public business fields (no settings, messaging or other policy)'
 );
@@ -789,7 +789,8 @@ select is(
 select ok(
   pg_temp.cat() -> 'business' @> jsonb_build_object(
     'id', '81000000-0000-4000-8000-00000000000a', 'slug', 'avail-athens', 'name', 'Avail Athens',
-    'vertical', 'barber', 'timezone', 'Europe/Athens', 'locale', 'el', 'theme', jsonb_build_object('primary', '#112233'),
+    'vertical', 'barber', 'timezone', 'Europe/Athens', 'locale', 'el', 'currency', 'EUR',
+    'theme', jsonb_build_object('primary', '#112233'),
     'address', 'Ermou 81, Athina', 'maps_url', 'https://maps.example/avail-athens', 'phone_e164', '+302100000081',
     'slot_step_min', 15, 'min_notice_min', 60, 'max_advance_days', 14, 'allow_any_staff', true),
   'catalogue: business values'

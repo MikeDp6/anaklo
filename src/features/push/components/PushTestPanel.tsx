@@ -11,20 +11,20 @@ import styles from './PushTestPanel.module.css'
  * `isOwner`: spike-push is for owners only, and it sends to this device's subscription only.
  */
 export function PushTestPanel({ isOwner }: { isOwner: boolean }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('pro')
   const titleId = useId()
   const push = usePushTest()
 
   return (
     <section className={styles.panel} aria-labelledby={titleId}>
       <h2 id={titleId} className={styles.title}>
-        {t('pro.push.title')}
+        {t('push.title')}
       </h2>
       <p role="status" className={styles.status}>
         {t(PUSH_STATUS_MESSAGE[push.status])}
       </p>
       <Button onClick={push.enable} disabled={!push.canEnable}>
-        {t('pro.push.enable')}
+        {t('push.enable')}
       </Button>
       {isOwner && (
         <>
@@ -34,11 +34,11 @@ export function PushTestPanel({ isOwner }: { isOwner: boolean }) {
             onClick={push.sendTest}
             disabled={!push.canSendTest}
           >
-            {t('pro.push.test')}
+            {t('push.test')}
           </button>
           {push.testResult && (
             <p role="status" className={styles.status}>
-              {t(push.testResult === 'sent' ? 'pro.push.testSent' : 'pro.push.testFailed')}
+              {t(push.testResult === 'sent' ? 'push.testSent' : 'push.testFailed')}
             </p>
           )}
         </>

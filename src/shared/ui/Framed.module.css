@@ -1,0 +1,5 @@
+.framed {
+  border-radius: var(--radius-card);
+  margin-inline-end: var(--frame-offset);
+  margin-block-end: var(--frame-offset);
+}

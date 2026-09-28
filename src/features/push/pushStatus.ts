@@ -16,11 +16,11 @@ export function pushStatus({ supported, permission, optedIn }: PushFacts): PushS
 }
 
 export const PUSH_STATUS_MESSAGE = {
-  loading: 'pro.push.statusLoading',
-  off: 'pro.push.statusOff',
-  on: 'pro.push.statusOn',
-  denied: 'pro.push.statusDenied',
-  unsupported: 'pro.push.statusUnsupported',
-  needsInstall: 'pro.push.statusNeedsInstall',
-  failed: 'pro.push.statusFailed',
+  loading: 'push.statusLoading',
+  off: 'push.statusOff',
+  on: 'push.statusOn',
+  denied: 'push.statusDenied',
+  unsupported: 'push.statusUnsupported',
+  needsInstall: 'push.statusNeedsInstall',
+  failed: 'push.statusFailed',
 } as const satisfies Record<PushStatus, string>

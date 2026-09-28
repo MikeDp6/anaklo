@@ -29,6 +29,11 @@ export const SMS_TEMPLATES = {
     el: '{{business}}: το ραντεβού σου {{date}} {{time}} ακυρώθηκε, ζητούμε συγγνώμη. Κλείσε νέο: {{link}}',
     en: '{{business}}: your appointment {{date}} {{time}} was cancelled, sorry. Book again: {{link}}',
   },
+  // The client moved the booking through the manage link (1.3): the new time and a NEW link.
+  rescheduled_by_client: {
+    el: '{{business}}: νέα ώρα ραντεβού {{date}} {{time}} με {{staff}}. Αλλαγή/ακύρωση: {{link}} (μην απαντάς εδώ)',
+    en: '{{business}}: moved to {{date}} {{time}} with {{staff}}. Change/cancel: {{link}} (replies are not read)',
+  },
 } as const satisfies Record<string, Record<SmsLocale, string>>
 
 export type SmsTemplateKey = keyof typeof SMS_TEMPLATES

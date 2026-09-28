@@ -129,6 +129,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"booking_tokens": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"created_at": string,"expires_at": string,"id": string,"issued_for": string,"revoked_at": string | null,"token_hash": string
+                  }
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"created_at"?: string,"expires_at": string,"id"?: string,"issued_for": string,"revoked_at"?: string | null,"token_hash": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"created_at"?: string,"expires_at"?: string,"id"?: string,"issued_for"?: string,"revoked_at"?: string | null,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "booking_tokens_appointment_fk"
+      columns: ["business_id","appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "booking_tokens_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"business_members": {
                   Row: {
                     "business_id": string,"created_at": string,"role": string,"staff_id": string | null,"user_id": string
@@ -156,13 +181,13 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"settings": NonNullable<Json>,"slot_step_min": number,"slug": string,"theme": NonNullable<Json>,"timezone": string,"vertical": string
+                    "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"settings": NonNullable<Json>,"short_code": string,"slot_step_min": number,"slug": string,"theme": NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Insert: {
-                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug": string,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug": string,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Update: {
-                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"slot_step_min"?: number,"slug"?: string,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug"?: string,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
                   }
                   Relationships: [
                     
@@ -241,6 +266,87 @@ isOneToOne: false
       referencedRelation: "clients"
       referencedColumns: ["business_id","id"]
     }
+                  ]
+                },"messages_log": {
+                  Row: {
+                    "appointment_id": string | null,"attempts": number,"booking_token_id": string | null,"business_id": string,"category": string,"channel": string,"client_id": string | null,"cost_cents": number | null,"created_at": string,"dedupe_key": string,"error": string | null,"id": string,"lease_id": string | null,"lease_until": string | null,"locale": string,"otp_challenge_id": string | null,"provider": string | null,"provider_message_id": string | null,"recipient_user_id": string | null,"scheduled_for": string,"segments": number | null,"sent_at": string | null,"status": string,"template": string,"to_e164": string | null,"updated_at": string
+                  }
+                  Insert: {
+                    "appointment_id"?: string | null,"attempts"?: number,"booking_token_id"?: string | null,"business_id": string,"category": string,"channel": string,"client_id"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"dedupe_key": string,"error"?: string | null,"id"?: string,"lease_id"?: string | null,"lease_until"?: string | null,"locale": string,"otp_challenge_id"?: string | null,"provider"?: string | null,"provider_message_id"?: string | null,"recipient_user_id"?: string | null,"scheduled_for"?: string,"segments"?: number | null,"sent_at"?: string | null,"status"?: string,"template": string,"to_e164"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"attempts"?: number,"booking_token_id"?: string | null,"business_id"?: string,"category"?: string,"channel"?: string,"client_id"?: string | null,"cost_cents"?: number | null,"created_at"?: string,"dedupe_key"?: string,"error"?: string | null,"id"?: string,"lease_id"?: string | null,"lease_until"?: string | null,"locale"?: string,"otp_challenge_id"?: string | null,"provider"?: string | null,"provider_message_id"?: string | null,"recipient_user_id"?: string | null,"scheduled_for"?: string,"segments"?: number | null,"sent_at"?: string | null,"status"?: string,"template"?: string,"to_e164"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "messages_log_appointment_fk"
+      columns: ["business_id","appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "messages_log_booking_token_fk"
+      columns: ["business_id","booking_token_id"]
+isOneToOne: false
+      referencedRelation: "booking_tokens"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "messages_log_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_log_client_fk"
+      columns: ["business_id","client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "messages_log_otp_challenge_fk"
+      columns: ["business_id","otp_challenge_id"]
+isOneToOne: false
+      referencedRelation: "otp_challenges"
+      referencedColumns: ["business_id","id"]
+    }
+                  ]
+                },"otp_challenges": {
+                  Row: {
+                    "attempts": number,"business_id": string,"code_hmac": string,"created_at": string,"expires_at": string,"grant_appointment_id": string | null,"grant_expires_at": string | null,"grant_hash": string | null,"grant_used_at": string | null,"id": string,"phone_hmac": string,"verified_at": string | null
+                  }
+                  Insert: {
+                    "attempts"?: number,"business_id": string,"code_hmac": string,"created_at"?: string,"expires_at": string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac": string,"verified_at"?: string | null
+                  }
+                  Update: {
+                    "attempts"?: number,"business_id"?: string,"code_hmac"?: string,"created_at"?: string,"expires_at"?: string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac"?: string,"verified_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "otp_challenges_appointment_fk"
+      columns: ["business_id","grant_appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "otp_challenges_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rate_limits": {
+                  Row: {
+                    "bucket": string,"count": number,"key": string,"window_start": string
+                  }
+                  Insert: {
+                    "bucket": string,"count"?: number,"key": string,"window_start": string
+                  }
+                  Update: {
+                    "bucket"?: string,"count"?: number,"key"?: string,"window_start"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"schedule_exceptions": {
                   Row: {
@@ -361,6 +467,25 @@ isOneToOne: false
       referencedColumns: ["business_id","id"]
     }
                   ]
+                },"suppression_list": {
+                  Row: {
+                    "business_id": string,"created_at": string,"phone_hmac": string,"reason": string
+                  }
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"phone_hmac": string,"reason": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"phone_hmac"?: string,"reason"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "suppression_list_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"time_off": {
                   Row: {
                     "business_id": string,"created_at": string,"ends_at": string,"id": string,"reason": string,"staff_id": string,"starts_at": string
@@ -384,6 +509,25 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["business_id","id"]
+    }
+                  ]
+                },"trusted_devices": {
+                  Row: {
+                    "business_id": string,"created_at": string,"expires_at": string,"id": string,"phone_hmac": string,"revoked_at": string | null,"token_hash": string
+                  }
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"expires_at": string,"id"?: string,"phone_hmac": string,"revoked_at"?: string | null,"token_hash": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"expires_at"?: string,"id"?: string,"phone_hmac"?: string,"revoked_at"?: string | null,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "trusted_devices_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
     }
                   ]
                 },"working_hours": {
@@ -422,6 +566,35 @@ isOneToOne: false
               "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
             }[]
                            },
+"book_appointment":
+{ Args: { "p_business_id": string,"p_client_id": string,"p_grant": string,"p_idempotency_key": string,"p_marketing_box": string,"p_new_client": Json,"p_phone": string,"p_policy_version": string,"p_service_ids": (string)[],"p_staff_id": string,"p_starts_at": string,"p_trusted_device_token": string }; Returns: Json
+                           },
+"claim_messages":
+{ Args: { "p_ids": (string)[] }; Returns: Json
+                           },
+"clients_for_phone":
+{ Args: { "p_business_id": string,"p_grant": string,"p_phone": string,"p_trusted_device_token": string }; Returns: Json
+                           },
+"manage_cancel":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"manage_reschedule":
+{ Args: { "p_new_starts_at": string,"p_token": string }; Returns: Json
+                           },
+"manage_slots":
+{ Args: { "p_from": string,"p_to": string,"p_token": string }; Returns: {
+              "local_date": string,"local_time": string,"starts_at": string
+            }[]
+                           },
+"manage_view":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"otp_start":
+{ Args: { "p_business_id": string,"p_code"?: string,"p_ip": string,"p_locale": string,"p_phone": string,"p_service_ids": (string)[],"p_staff_id": string,"p_starts_at": string }; Returns: Json
+                           },
+"otp_verify":
+{ Args: { "p_business_id": string,"p_challenge_id": string,"p_code": string,"p_phone": string }; Returns: Json
+                           },
 "public_booking_catalogue":
 { Args: { "p_slug": string }; Returns: Json
                            },
@@ -430,6 +603,12 @@ isOneToOne: false
               "locale": string,"name": string,"slug": string,"theme": Json,"timezone": string,"vertical": string
             }[]
                            },
+"public_slug_for_code":
+{ Args: { "p_code": string }; Returns: string
+                           },
+"record_send_result":
+{ Args: { "p_cost_cents": number,"p_error": string,"p_id": string,"p_lease_id": string,"p_outcome": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number }; Returns: boolean
+                           },
 "staff_available_slots":
 { Args: { "p_business_id": string,"p_exclude_appointment_id"?: string,"p_from": string,"p_service_ids": (string)[],"p_staff_id": string,"p_to": string }; Returns: {
               "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
@@ -437,6 +616,9 @@ isOneToOne: false
                            },
 "staff_book_appointment":
 { Args: { "p_allow_buffer_overlap"?: boolean,"p_allow_outside_hours"?: boolean,"p_business_id": string,"p_client_id"?: string,"p_idempotency_key"?: string,"p_new_client"?: Json,"p_service_ids": (string)[],"p_source"?: string,"p_staff_id": string,"p_starts_at": string }; Returns: Json
+                           },
+"trusted_device_revoke":
+{ Args: { "p_business_id": string,"p_trusted_device_token": string }; Returns: undefined
                            }
           }
           Enums: {

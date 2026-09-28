@@ -13,7 +13,7 @@ import {
 
 type Step = { name: 'email' } | { name: 'code'; email: string }
 
-export type LoginFormError = 'pro.login.emailInvalid' | 'pro.login.codeInvalidFormat'
+export type LoginFormError = 'login.emailInvalid' | 'login.codeInvalidFormat'
 
 /**
  * Email → 6-digit code (ADR-0009 §1). A pending email (iOS closed the app while the user was in
@@ -26,7 +26,7 @@ export function useLoginFlow() {
     return email ? { name: 'code', email } : { name: 'email' }
   })
   const [message, setMessage] = useState<LoginMessageKey | null>(() =>
-    step.name === 'code' ? 'pro.login.codeSentNeutral' : null,
+    step.name === 'code' ? 'login.codeSentNeutral' : null,
   )
   const [formError, setFormError] = useState<LoginFormError | null>(null)
 
@@ -49,7 +49,7 @@ export function useLoginFlow() {
   function submitEmail(input: string): void {
     const email = normaliseEmail(input)
     if (!LoginEmail.safeParse(email).success) {
-      setFormError('pro.login.emailInvalid')
+      setFormError('login.emailInvalid')
       return
     }
     setFormError(null)
@@ -61,7 +61,7 @@ export function useLoginFlow() {
     if (step.name !== 'code') return
     const code = normaliseCode(input)
     if (!LoginCode.safeParse(code).success) {
-      setFormError('pro.login.codeInvalidFormat')
+      setFormError('login.codeInvalidFormat')
       return
     }
     setFormError(null)

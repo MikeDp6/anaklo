@@ -1,6 +1,6 @@
 import { resolveBookingRoute } from '../src/app/booking/route.ts'
 import { handleApiRequest, isApiPath, type FetchLike, type ProxyEnv } from './api-proxy.ts'
-import { lookupBookingShell } from './booking-shell.ts'
+import { lookupBookingShell, lookupShortLink } from './booking-shell.ts'
 import { injectBookingShell, type BookingShellData } from './inject.ts'
 
 /**
@@ -29,6 +29,8 @@ export type WorkerRoute =
   | { kind: 'token-page' }
   | { kind: 'landing' }
   | { kind: 'business'; slug: string }
+  | { kind: 'manage'; token: string }
+  | { kind: 'short-link'; code: string }
   | { kind: 'not-found' }
 
 export function resolveWorkerRoute(pathname: string): WorkerRoute {
@@ -70,6 +72,14 @@ async function serveShell(
   return new Response(body, { status: options.status ?? 200, headers })
 }
 
+/** A same-site redirect that no cache keeps (a code may later point elsewhere). */
+function redirect(location: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location, 'Cache-Control': 'no-store' },
+  })
+}
+
 function methodNotAllowed(): Response {
   return new Response(null, {
     status: 405,
@@ -96,6 +106,7 @@ export async function handleRequest(
     case 'pro-app':
       return serveShell(request, env, PRO_APP_SHELL, { frameOptions: 'DENY' })
     case 'token-page':
+    case 'manage':
       return serveShell(request, env, BOOKING_SHELL, {
         referrerPolicy: 'no-referrer',
         cacheControl: 'no-store',
@@ -104,11 +115,21 @@ export async function handleRequest(
       return serveShell(request, env, BOOKING_SHELL)
     case 'not-found':
       return serveShell(request, env, BOOKING_SHELL, { status: 404 })
+    case 'short-link': {
+      // `/r/<code>` from an SMS: straight to the booking page when the database answers.
+      const lookup = await lookupShortLink(route.code, env, fetchImpl)
+      if (lookup.kind === 'found') return redirect(`/${lookup.slug}`)
+      if (lookup.kind === 'not-found') {
+        return serveShell(request, env, BOOKING_SHELL, { status: 404, cacheControl: 'no-store' })
+      }
+      // Supabase did not answer: the page resolves the code through /api itself.
+      return serveShell(request, env, BOOKING_SHELL, { cacheControl: 'no-store' })
+    }
     case 'business': {
       const lookup = await lookupBookingShell(route.slug, env, fetchImpl, url.origin)
       if (lookup.kind === 'not-found')
         return serveShell(request, env, BOOKING_SHELL, { status: 404 })
-      // Supabase did not answer: the plain shell, and the page loads the profile itself.
+      // Supabase did not answer: the plain shell, and the page loads the catalogue itself.
       const inject = lookup.kind === 'found' ? lookup.data : null
       return serveShell(request, env, BOOKING_SHELL, { inject })
     }

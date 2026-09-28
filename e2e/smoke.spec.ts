@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './lib/fixtures'
 
-// Phase 0 walking skeleton: booking page → /api proxy → Supabase RPC → seeded demo business.
+// Walking skeleton: booking page → /api proxy → Supabase RPC → seeded demo business (the
+// catalogue is injected into the page by the Vite dev server, as by the Worker).
 // `test` comes from the fixtures because one spec opens /app (installed-app pretence on WebKit).
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -14,7 +15,7 @@ async function expectNoHorizontalScroll(page: Page) {
 test('the booking page of the demo business loads from the database', async ({ page }) => {
   await page.goto('/demo-barber')
   await expect(page.getByRole('heading', { level: 1, name: 'Demo Barber' })).toBeVisible()
-  await expect(page.getByText('Η online κράτηση ανοίγει σύντομα.')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Τι θα κάνουμε;' })).toBeVisible()
   await expect(page).toHaveTitle('Demo Barber')
   await expectNoHorizontalScroll(page)
 })

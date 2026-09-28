@@ -50,6 +50,38 @@ export const APPOINTMENT_EVENTS = [
 ] as const
 export const EVENT_ACTOR_TYPES = ['client', 'staff', 'system', 'import'] as const
 export const AUDIT_ACTOR_TYPES = ['staff', 'nous_support', 'system'] as const
+/** The outbox, `messages_log` (0005). Every SMS template has a text in sms-templates.ts. */
+export const MESSAGE_CHANNELS = ['sms', 'push'] as const
+export const MESSAGE_TEMPLATES = [
+  'otp',
+  'booking_confirmed',
+  'reminder',
+  'cancelled_by_client',
+  'cancelled_by_business',
+  'rescheduled_by_client',
+] as const
+export const MESSAGE_CATEGORIES = ['otp', 'transactional', 'reminder', 'marketing'] as const
+export const MESSAGE_STATUSES = [
+  'queued',
+  'sending',
+  'sent',
+  'delivered',
+  'failed',
+  'cancelled',
+  'unknown',
+] as const
+export const SUPPRESSION_REASONS = ['erased', 'opted_out'] as const
+/** Why a manage-link token was issued: the booking answer or a message. */
+export const BOOKING_TOKEN_ISSUERS = ['booking', 'message'] as const
+export const RATE_LIMIT_BUCKETS = [
+  'otp_phone_hour',
+  'otp_ip_hour',
+  'otp_business_day',
+  'sms_platform_day',
+  /** SMS other than OTP, per recipient phone / per business (claim_messages). */
+  'sms_phone_day',
+  'sms_business_day',
+] as const
 
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
@@ -86,4 +118,13 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   appointment_events_event: APPOINTMENT_EVENTS,
   appointment_events_actor_type: EVENT_ACTOR_TYPES,
   audit_log_actor_type: AUDIT_ACTOR_TYPES,
+  messages_log_channel: MESSAGE_CHANNELS,
+  messages_log_locale: LOCALES,
+  messages_log_template: MESSAGE_TEMPLATES,
+  messages_log_category: MESSAGE_CATEGORIES,
+  messages_log_status: MESSAGE_STATUSES,
+  booking_tokens_issued_for: BOOKING_TOKEN_ISSUERS,
+  rate_limits_bucket: RATE_LIMIT_BUCKETS,
+  suppression_list_reason: SUPPRESSION_REASONS,
+  vertical_defaults_vertical: VERTICALS,
 }

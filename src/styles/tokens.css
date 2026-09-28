@@ -1,22 +1,80 @@
-/* Design tokens (SPEC §10). Business themes override --color-brand / --color-on-brand / --radius-card. */
+/*
+ * Design tokens: direction Δ «Ζεστή πολυτέλεια» (ADR-0011, docs/design/MOTION.md §1).
+ * The --lux-* palette feeds the semantic --color-* tokens; components read only the semantic
+ * ones, so a business theme (src/shared/lib/theme.ts) can override the brand, its text, the
+ * focus ring and the card radius with its WCAG guarantees. theme.test.ts reads this file and
+ * checks every text/background pair below.
+ */
 :root {
-  --font-body:
-    'Manrope Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  /* Palette Δ (MOTION.md §1) */
+  --lux-espresso: #503011;
+  --lux-espresso-deep: #422100;
+  --lux-night: #1c1004;
+  --lux-sand: #d9cbbc; /* marketing sections only: muted text fails AA on it */
+  --lux-sand-app: #f3ebe1;
+  --lux-cream: #fff9f2;
+  --lux-line: #dccdbb;
+  --lux-bronze: #8b5524; /* on light only, ≥ 14px bold or display size */
+  --lux-gold: #d4be6e; /* on dark only (1.8:1 on cream) */
+  --lux-ink: #2b2119;
+  --lux-muted: #6e5f50;
 
-  --color-bg: #f6f5f2;
-  --color-surface: #ffffff;
-  --color-ink: #14171c;
-  --color-muted: #555c69;
-  --color-line: #e3e1db;
-  --color-brand: #1f3a5f;
-  --color-on-brand: #ffffff;
+  /* Semantic colours (what components use) */
+  --color-bg: var(--lux-sand-app); /* = PAGE_BACKGROUND in theme.ts */
+  --color-surface: var(--lux-cream);
+  --color-ink: var(--lux-ink);
+  --color-muted: var(--lux-muted);
+  --color-line: var(--lux-line); /* decoration only (1.3:1) */
+  --color-control-border: #8f7d6b; /* field borders: ≥ 3:1 on bg and surface (WCAG 1.4.11) */
+  --color-brand: var(--lux-espresso);
+  --color-on-brand: var(--lux-cream);
+  --color-brand-strong: var(--lux-espresso-deep); /* E1 fill: more contrast with on-brand */
+  /* Non-text indicators in the brand (E19 fill, selected borders, checkbox/radio, E12 dots):
+     ≥ 3:1 on bg, surface and line (WCAG 1.4.11); themes darken a light brand for it. */
+  --color-brand-line: var(--lux-espresso);
+  --color-accent: var(--lux-bronze); /* G1 labels on light */
   --color-danger: #b42318;
-  --color-focus: #1f3a5f; /* themes set it to the brand only if it shows on the page (≥ 3:1) */
-  --color-skeleton: #e9e7e1;
+  --color-focus: var(--lux-espresso); /* themes set it to the brand only if ≥ 3:1 on the page */
+  --color-skeleton: #e4d7c8; /* E17 */
+  --color-skeleton-shine: #f7f0e6;
 
-  --radius-card: 16px;
-  --radius-control: 12px;
+  /* Dark surfaces (G3 glass button, G6 hero) */
+  --color-bg-dark: var(--lux-night);
+  --color-surface-dark: var(--lux-espresso);
+  --color-ink-on-dark: var(--lux-cream);
+  --color-accent-on-dark: var(--lux-gold);
+  --color-glass: rgb(255 255 255 / 0.2);
+  /* G6: text sits in the bottom half, where the scrim is solid (≥ 4.5:1 even over white). */
+  --hero-scrim-alpha: 0.8;
+  --hero-scrim: linear-gradient(
+    to top,
+    rgb(28 16 4 / var(--hero-scrim-alpha)) 0%,
+    rgb(28 16 4 / var(--hero-scrim-alpha)) 50%,
+    rgb(28 16 4 / 0) 100%
+  );
 
+  /* Typography (fonts.css: GFS Didot greek+latin 400, Manrope greek+latin variable) */
+  --font-display: 'GFS Didot', 'Noto Serif Display', Georgia, serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --eyebrow-tracking: 0.32em;
+  --display-tracking: -0.02em;
+
+  --text-xs: 0.75rem; /* G1 labels (12px) */
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem; /* G2 md */
+  --text-3xl: 2.5rem; /* G2 lg */
+  --text-4xl: 3.5rem; /* G2 xl (app maximum) */
+
+  /* Shapes */
+  --radius-pill: 999px;
+  --radius-card: 22px;
+  --radius-control: 14px;
+  --frame-offset: 10px; /* G5/E8 */
+
+  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -25,12 +83,18 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --text-sm: 0.875rem;
-  --text-md: 1rem;
-  --text-lg: 1.25rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
-
   --control-height: 48px; /* ≥ 44px touch target */
   --page-max: 560px;
+
+  /* Durations */
+  --dur-press: 150ms;
+  --dur-fast: 250ms;
+  --dur-base: 450ms;
+  --dur-slow: 700ms;
+  --dur-fill: 600ms; /* E1 (measured) */
+  --stagger: 40ms; /* E5, per word */
+
+  /* Easing */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); /* entrances */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* fills and rolls */
 }

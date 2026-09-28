@@ -11,20 +11,20 @@ Booking → Memory → Retention. Πρώτος κλάδος: **κουρεία**.
 ## Γλώσσα
 - Επικοινωνία με τον χρήστη (Μιχάλης): **ελληνικά**, σύντομα και πρακτικά.
 - Κώδικας, ονόματα αρχείων/μεταβλητών, commits: **αγγλικά**.
-- Κείμενα UI: **μόνο μέσω i18n** (`el.json` default, `en.json`).
+- Κείμενα UI: **μόνο μέσω i18n** (`src/shared/i18n/{el,en}/<namespace>.json`, `el` default).
 
 ## Stack
 - Vite 8 + React 19 + **TypeScript 6 strict** · TanStack Query v5 · React Hook Form + **Zod 4 μόνο `zod/mini`** · date-fns v4 + `@date-fns/tz` · i18next
 - React Router v8 (data mode) **μόνο στην εφαρμογή επαγγελματία**. Η σελίδα κράτησης δεν έχει router (`src/app/booking/route.ts`).
-- Styling: **CSS variables (design tokens) + CSS modules**. ΟΧΙ Tailwind.
+- Styling: **CSS variables (design tokens) + CSS modules**. ΟΧΙ Tailwind. Γραμματοσειρές self-hosted από npm: Manrope (`@fontsource-variable/manrope`) και GFS Didot για τίτλους (`@fontsource/gfs-didot`, μόνο `greek` + `latin` 400).
 - Supabase (Postgres + RLS, Auth μόνο για προσωπικό, Storage, Realtime, Edge Functions, pg_cron), **EU** (dev: `anaklo-dev`, eu-west-1 Ιρλανδία), ξεχωριστό project. Ποτέ άλλο project του λογαριασμού.
 - Διαθεσιμότητα και κράτηση: **SQL functions** (ADR-0003). Edge Functions μόνο για παρενέργειες (OTP, SMS, push, email).
-- Push **μόνο προσωπικού** (ADR-0010, proposed): OneSignal αν περάσει η δοκιμή του 1.1 σε PWA εγκατεστημένη στην αρχική οθόνη iPhone, αλλιώς Web Push (VAPID). **Καμία ταυτότητα στον client** (ποτέ `OneSignal.login`/`external_id`, ποτέ Identity Verification στο web app): αποστολή μόνο με `include_subscription_ids` (`_shared/onesignal.ts`), και ποια συνδρομή ανήκει σε ποιον το αποφασίζει ο server (`push_subscriptions` από το 1.5a). Πάροχος SMS (επιλογή στη Φάση 1, κριτήρια SPEC §18), Resend (email, EU), Sentry (EU).
-- Hosting: **Cloudflare Workers**: static assets + **ένας** Worker (`edge/`, από το 1.1) για σελίδα κράτησης, `/app`, `/<slug>` (Open Graph) και σκληρυμένο `/api` proxy που κατέχει το cookie της έμπιστης συσκευής (ADR-0008). Domains `anaklo.gr` / `dev.anaklo.gr`.
+- Push **μόνο προσωπικού** (ADR-0010, proposed): OneSignal αν περάσει η δοκιμή του 1.10 σε PWA εγκατεστημένη στην αρχική οθόνη iPhone, αλλιώς Web Push (VAPID). **Καμία ταυτότητα στον client** (ποτέ `OneSignal.login`/`external_id`, ποτέ Identity Verification στο web app): αποστολή μόνο με `include_subscription_ids` (`_shared/onesignal.ts`), και ποια συνδρομή ανήκει σε ποιον το αποφασίζει ο server (`push_subscriptions` από το 1.5). Πάροχος SMS (επιλογή στη Φάση 1, κριτήρια SPEC §18), Resend (email, EU), Sentry (EU).
+- Hosting: **Cloudflare Workers**: static assets + **ένας** Worker (`edge/`, από το 1.1) για σελίδα κράτησης, `/app`, `/<slug>` (Open Graph) και σκληρυμένο `/api` proxy που κατέχει το cookie της έμπιστης συσκευής (ADR-0008). Domains `anaklo.gr` / `dev.anaklo.gr` (από το 1.10).
 - Σύνδεση προσωπικού (ADR-0009): κωδικός email 6 ψηφίων, signup κλειστό. Owner/manager: κωδικός email + εφαρμογή κωδικών (TOTP, από το 1.7) σε κάθε νέα σύνδεση, υποχρεωτική πρόταση 2ης συσκευής, επαναφορά μόνο από τη Nous (runbook `mfa-reset.md`), συνεδρία λήγει μετά από 30 ημέρες αδράνειας («Inactivity timeout» 720h στο prod και φύλακας στην εφαρμογή, γιατί το Free δεν το έχει)· staff μόνο κωδικός email, ποτέ TOTP· στο UI ποτέ «TOTP/MFA/2FA» (Vitest στις τιμές i18n).
-- Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.User.PushSubscription.optOut()` (κοινά κινητά· από το 1.5a και `unregister_push_subscription`)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
+- Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.User.PushSubscription.optOut()` (κοινά κινητά· από το 1.5 και `unregister_push_subscription`)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
 - **Χωρίς Realtime στη Φάση 1:** refetch on focus και κάθε 60″, μαζί με push.
-- Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.9).
+- Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.10). **Τοπικά πρώτα:** μέχρι το 1.10 μόνο localhost, με ψεύτικο adapter SMS και δοκιμαστικούς αριθμούς· domain, deploy, λογαριασμοί, πραγματικός πάροχος SMS και δοκιμές σε συσκευές στο 1.10.
 - PWA πρώτα. Native (Capacitor) μόνο αν αποφασιστεί ρητά.
 
 ## Εντολές
@@ -67,9 +67,11 @@ src/app/              routes, layout, providers
 src/features/<name>/  components/, hooks/, api.ts, schema.ts, *.test.ts
                       (booking, calendar, clients, services, staff, insights, settings)
 src/shared/ui/        design system components
+src/shared/motion/    useReducedMotion, useInView, useCountUp, SplitWords, RollText, motion.css (ADR-0011)
 src/shared/lib/       επανεξάγει τα _shared (money, dates, phone, sms, sms-templates, domain, onesignal)
                       + supabase client (μόνο pro), publicApi (fetch /api), env, theme, database.types.ts
-src/shared/i18n/      i18next, el.json, en.json (ίδια κλειδιά — το ελέγχει test)
+src/shared/i18n/      i18next, {el,en}/{common,booking,pro}.json (ίδια κλειδιά ανά namespace — το ελέγχει
+                      test)· η σελίδα κράτησης φορτώνει μόνο common + booking
 src/styles/tokens.css design tokens
 packages/verticals/   πρότυπα κλάδων (JSON)
 supabase/migrations/  0001_*.sql … (αριθμημένα)
@@ -84,7 +86,7 @@ edge/                 Cloudflare Worker (ADR-0008): api-proxy, cookies, inject, 
                       wrangler.jsonc. Τα ίδια modules τρέχουν ως middleware του Vite.
 scripts/              npm scripts (Node)· scripts/lib/ κοινά helpers + Vitest (*.test.mjs)
 e2e/                  Playwright (e2e/lib: fixtures, login μέσω Mailpit, seed users)
-docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
+docs/                 SPEC.md, adr/, plans/, design/MOTION.md, SETUP.md, runbooks/
 ```
 
 ## Κανόνες κώδικα (υποχρεωτικοί)
@@ -124,7 +126,7 @@ docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
 - Συναινέσεις στο `client_consents` με `legal_basis` (όχι boolean). Μάρκετινγκ **μόνο** με νόμιμη βάση. Η εισαγωγή πελατών δεν δημιουργεί ποτέ συναίνεση **μάρκετινγκ** (CHECK στη βάση). Μια συναίνεση δεν αλλάζει ποτέ, μόνο ανακαλείται μία φορά (trigger σε κάθε UPDATE, και για `service_role`· μόνη εξαίρεση το `created_by → null` όταν σβήνεται ο λογαριασμός).
 - Λογική «μνήμης» σε **μία** SQL function (`private.client_memory_impl(business_id, as_of)` + public wrapper), με pgTAP. Όχι materialized view. Κανόνες: SPEC §4.
 - Expand/contract: πρώτα προσθέτεις, αφαιρείς σε επόμενη έκδοση. Σειρά deploy: migration → Edge Functions → frontend.
-- Ο χρήστης εφαρμόζει τα migrations στο remote. Όταν φτιάχνεις migration, **πες του ρητά**: νέο migration → `npm run db:push` και, από το 1.1, `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev` → `npm run secrets:dev` → `npm run provision:dev` → `npm run db:test:dev` → `npm run deploy:dev` (τα secrets/provision/deploy υπάρχουν από το 1.1· το reset σβήνει τα δεδομένα του provisioning και ίσως το Vault). Το `deploy:dev` ανεβάζει και τις Edge Functions και τον Worker.
+- Ο χρήστης εφαρμόζει τα migrations στο remote. Όταν φτιάχνεις migration, **πες του ρητά**: νέο migration → `npm run db:push` (+ `npm run db:test:dev`· προαιρετικό πριν το 1.10) και, από το 1.10, `npm run secrets:dev` → `npm run db:test:dev` → `npm run deploy:dev`· αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν τα πραγματικά δεδομένα) → `npm run db:reset:dev` → `npm run secrets:dev` → `npm run provision:dev` → `npm run db:test:dev` → `npm run deploy:dev` (τα secrets/provision/deploy τρέχουν από το 1.10· το reset σβήνει τα δεδομένα του provisioning και ίσως το Vault). Το `deploy:dev` ανεβάζει και τις Edge Functions και τον Worker.
 
 ## Δοκιμές
 - Vitest (UTC μέσω `vitest.config.ts`, όχι `TZ=` στο script): money/dates/phone/sms (1 SMS/πρότυπο), λίστες τιμών = CHECK, i18n el = en, schemas, λογική UI.
@@ -145,8 +147,12 @@ docs/                 SPEC.md, adr/, plans/, SETUP.md, runbooks/
 - Mobile-first, ένα χέρι. Κουμπιά ≥ 44px, **inputs ≥ 16px** (αποφυγή zoom iOS), `overflow-x: clip` στο root.
 - Μία κύρια ενέργεια ανά οθόνη. **Κάθε μετρική με κουμπί ενέργειας** («Δες πελάτες»).
 - Θέμα ανά επιχείρηση → CSS variables στο `:root`, με έλεγχο αντίθεσης WCAG AA. Γραμματοσειρές μόνο από επιλεγμένη λίστα με ελληνικά, self-hosted — ποτέ Google Fonts CDN.
-- Σελίδα κράτησης: αρχικό JS ≤ 120KB gzip (`npm run size`, στο τέλος της Φάσης 0: 100.7KB), LCP < 2s σε 4G, να δουλεύει στον in-app browser Instagram/Facebook, χωρίς λογαριασμό. Χωρίς supabase-js, router, RHF· μόνο `zod/mini` (το επιβάλλει το ESLint).
+- Σελίδα κράτησης: αρχικό JS ≤ 120KB gzip (`npm run size`, στο τέλος της Φάσης 0: 100.7KB· μετά το 1.3: 109.4KB), LCP < 2s σε 4G, να δουλεύει στον in-app browser Instagram/Facebook, χωρίς λογαριασμό. Χωρίς supabase-js, router, RHF· μόνο `zod/mini` (το επιβάλλει το ESLint).
 - Skeletons αντί για spinners.
+- Εμφάνιση: **Κατεύθυνση Δ** (ADR-0011, προδιαγραφή `docs/design/MOTION.md`, κωδικοί G1–G7/E1–E19). Components μόνο με σημασιολογικά tokens (`--color-*`), όχι απευθείας `--lux-*`· χρυσό μόνο σε σκούρο φόντο.
+- Κίνηση: **μόνο `transform`/`opacity`** (εξαιρέσεις μόνο όσες ορίζει το MOTION.md)· `prefers-reduced-motion` → καμία κίνηση, **με test**· **χωρίς βιβλιοθήκη κίνησης**, μόνο CSS + `src/shared/motion`.
+- Hover μόνο σε `(hover: hover) and (pointer: fine)`, σε αφή μόνο `scale(.97)`· η κίνηση δεν καθυστερεί ποτέ ενέργεια (επιβεβαίωση μόνο μετά την απάντηση του server). Επίπεδα: κράτηση μεσαίο (χωρίς splash/scroll-linked), εφαρμογή ελάχιστο.
+- Κάθε κίνηση μπαίνει μαζί με την οθόνη που τη χρησιμοποιεί· Definition of Done: MOTION.md §6.
 
 ## Περιβάλλον (Windows)
 - Το project είναι στο `C:\Users\mixal\mnemo` — **χωρίς ελληνικούς χαρακτήρες στο path, εκτός OneDrive.**

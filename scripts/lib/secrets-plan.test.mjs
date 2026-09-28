@@ -1,12 +1,25 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { SECRETS, planSecrets, redact, toDotenv, vaultUpsertSql } from './secrets-plan.mjs'
+import {
+  LOCAL_SEED_HMAC_KEYS,
+  SECRETS,
+  planSecrets,
+  redact,
+  toDotenv,
+  vaultUpsertSql,
+} from './secrets-plan.mjs'
 
 const PROXY = 'p'.repeat(48)
 const PUBLISHABLE = 'sb_publishable_dev_example'
 const HMAC = 'h'.repeat(43)
+const PHONE_HMAC = `p${HMAC}`
 const context = { knownLocalValues: ['local-dev-proxy-secret-change-me'] }
-const base = { PROXY_SECRET: PROXY, SUPABASE_DEV_PUBLISHABLE_KEY: PUBLISHABLE }
+const base = {
+  PROXY_SECRET: PROXY,
+  SUPABASE_DEV_PUBLISHABLE_KEY: PUBLISHABLE,
+  OTP_HMAC_KEY: HMAC,
+  PHONE_HMAC_KEY: PHONE_HMAC,
+}
 
 describe('planSecrets', () => {
   it('gives PROXY_SECRET the same value in the functions and the Worker', () => {
@@ -17,13 +30,11 @@ describe('planSecrets', () => {
       { name: 'PROXY_SECRET', value: PROXY },
       { name: 'SUPABASE_PUBLISHABLE_KEY', value: PUBLISHABLE },
     ])
-    expect(plan.vault).toEqual([])
-    expect(plan.skipped).toEqual([
-      'ONESIGNAL_APP_ID',
-      'ONESIGNAL_REST_API_KEY',
-      'otp_hmac_key',
-      'phone_hmac_key',
+    expect(plan.vault).toEqual([
+      { name: 'otp_hmac_key', value: HMAC },
+      { name: 'phone_hmac_key', value: PHONE_HMAC },
     ])
+    expect(plan.skipped).toEqual(['ONESIGNAL_APP_ID', 'ONESIGNAL_REST_API_KEY'])
   })
 
   it('reports missing required values without echoing anything', () => {
@@ -31,15 +42,39 @@ describe('planSecrets', () => {
     expect(plan.problems).toEqual([
       'PROXY_SECRET: missing (source: PROXY_SECRET)',
       'SUPABASE_PUBLISHABLE_KEY: missing (source: SUPABASE_DEV_PUBLISHABLE_KEY)',
+      'otp_hmac_key: missing (source: OTP_HMAC_KEY)',
+      'phone_hmac_key: missing (source: PHONE_HMAC_KEY)',
     ])
+  })
+
+  it('requires both HMAC keys of step 1.3 (contract 1.3 §9)', () => {
+    const withoutKeys = { ...base, OTP_HMAC_KEY: undefined, PHONE_HMAC_KEY: '' }
+    expect(planSecrets(withoutKeys, context).problems).toEqual([
+      'otp_hmac_key: missing (source: OTP_HMAC_KEY)',
+      'phone_hmac_key: missing (source: PHONE_HMAC_KEY)',
+    ])
+    const withoutPhone = { ...base, PHONE_HMAC_KEY: undefined }
+    expect(planSecrets(withoutPhone, context).problems).toEqual([
+      'phone_hmac_key: missing (source: PHONE_HMAC_KEY)',
+    ])
+  })
+
+  it('refuses the local seed keys of supabase/seed.sql as remote keys, without echoing them', () => {
+    const [seedOtp, seedPhone] = LOCAL_SEED_HMAC_KEYS
+    const plan = planSecrets({ ...base, OTP_HMAC_KEY: seedOtp, PHONE_HMAC_KEY: seedPhone }, context)
+    expect(plan.problems).toEqual([
+      'otp_hmac_key: is the local seed value (supabase/seed.sql); generate a separate one for dev',
+      'phone_hmac_key: is the local seed value (supabase/seed.sql); generate a separate one for dev',
+    ])
+    expect(plan.vault).toEqual([])
+    for (const problem of plan.problems) {
+      for (const key of LOCAL_SEED_HMAC_KEYS) expect(problem).not.toContain(key)
+    }
   })
 
   it('refuses short, local/example, quoted or multi-line secrets and never includes the value', () => {
     for (const bad of ['short', 'local-dev-proxy-secret-change-me', `${PROXY}'x`, `${PROXY}\nx`]) {
-      const plan = planSecrets(
-        { PROXY_SECRET: bad, SUPABASE_DEV_PUBLISHABLE_KEY: PUBLISHABLE },
-        context,
-      )
+      const plan = planSecrets({ ...base, PROXY_SECRET: bad }, context)
       expect(plan.problems).toHaveLength(1)
       expect(plan.problems[0]).toMatch(/^PROXY_SECRET: /)
       expect(plan.problems[0]).not.toContain(bad)
@@ -48,10 +83,7 @@ describe('planSecrets', () => {
   })
 
   it('refuses a secret key where the publishable key belongs', () => {
-    const plan = planSecrets(
-      { PROXY_SECRET: PROXY, SUPABASE_DEV_PUBLISHABLE_KEY: 'sb_secret_xyz' },
-      context,
-    )
+    const plan = planSecrets({ ...base, SUPABASE_DEV_PUBLISHABLE_KEY: 'sb_secret_xyz' }, context)
     expect(plan.problems).toEqual([
       'SUPABASE_PUBLISHABLE_KEY: expected the dev sb_publishable_ key',
     ])
@@ -93,18 +125,15 @@ describe('planSecrets', () => {
     expect(plan.ignored).toEqual(['RESEND_API_KEY'])
   })
 
-  it('sends the HMAC keys of step 1.3 to Vault only, as a pair (plan 1.1, Day 3)', () => {
-    const plan = planSecrets({ ...base, OTP_HMAC_KEY: HMAC, PHONE_HMAC_KEY: `p${HMAC}` }, context)
+  it('sends the HMAC keys of step 1.3 to Vault only (plan 1.1, Day 3)', () => {
+    const plan = planSecrets(base, context)
     expect(plan.problems).toEqual([])
     expect(plan.vault).toEqual([
       { name: 'otp_hmac_key', value: HMAC },
-      { name: 'phone_hmac_key', value: `p${HMAC}` },
+      { name: 'phone_hmac_key', value: PHONE_HMAC },
     ])
     expect(plan.functions.map((entry) => entry.name)).toEqual(['PROXY_SECRET'])
-    expect(planSecrets({ ...base, OTP_HMAC_KEY: HMAC }, context).problems).toEqual([
-      'OTP_HMAC_KEY and PHONE_HMAC_KEY must be set together',
-    ])
-    const weak = planSecrets({ ...base, OTP_HMAC_KEY: 'short', PHONE_HMAC_KEY: HMAC }, context)
+    const weak = planSecrets({ ...base, OTP_HMAC_KEY: 'short' }, context)
     expect(weak.problems[0]).toMatch(/^otp_hmac_key: must be at least 32 characters/)
   })
 

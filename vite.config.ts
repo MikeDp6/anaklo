@@ -8,7 +8,7 @@ import {
   isApiPath,
   type ProxyEnv,
 } from './edge/api-proxy.ts'
-import { lookupBookingShell } from './edge/booking-shell.ts'
+import { lookupBookingShell, lookupShortLink } from './edge/booking-shell.ts'
 import { injectBookingShell } from './edge/inject.ts'
 import { findServerKeys } from './scripts/lib/server-keys.mjs'
 import { resolveBookingRoute } from './src/app/booking/route.ts'
@@ -169,14 +169,41 @@ function apiProxy(env: ProxyEnv): Plugin {
 }
 
 /**
- * Dev only: `/<slug>` gets the same server-side injection as from the Worker (ADR-0008 §5),
- * so Playwright sees the production HTML. Unknown slugs keep status 200 here (the Worker
- * answers 404); the page shows its not-found message either way.
+ * Dev only, the Worker's page routes on the same modules (ADR-0008 §5, contract 1.3 §8):
+ * - `/<slug>` gets the server-side injection (catalogue, title, Open Graph), so Playwright sees
+ *   the production HTML. Unknown slugs keep status 200 here (the Worker answers 404); the page
+ *   shows its not-found message either way.
+ * - `/r/<code>` redirects (302, no-store) to `/<slug>` when the database answers; otherwise the
+ *   page resolves the code itself.
+ * - `/m/<token>` gets `Referrer-Policy: no-referrer` like the Worker (Vite's own HTML handler then
+ *   sends `Cache-Control: no-cache` in dev; the Worker sends `no-store`).
  */
 function bookingShell(env: ProxyEnv): Plugin {
+  const routes: Connect.NextHandleFunction = (req, res, next) => {
+    const path = (req.url ?? '').split('?')[0] ?? ''
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next()
+    if (path.startsWith('/m/')) {
+      res.setHeader('Referrer-Policy', 'no-referrer')
+      return next()
+    }
+    const route = resolveBookingRoute(path)
+    if (route.kind !== 'short-link') return next()
+    lookupShortLink(route.code, env, (input, init) => fetch(input, init))
+      .then((lookup) => {
+        if (lookup.kind !== 'found') return next()
+        res.statusCode = 302
+        res.setHeader('Location', `/${lookup.slug}`)
+        res.setHeader('Cache-Control', 'no-store')
+        res.end()
+      })
+      .catch(next)
+  }
   return {
     name: 'anaklo:booking-shell',
     apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(routes)
+    },
     async transformIndexHtml(html, ctx) {
       if (!ctx.server || ctx.path !== '/index.html' || !ctx.originalUrl) return html
       const route = resolveBookingRoute(new URL(ctx.originalUrl, 'http://localhost').pathname)

@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CHECKED_VALUE_LISTS } from './domain.ts'
+import { CHECKED_VALUE_LISTS, MESSAGE_TEMPLATES } from './domain.ts'
+import { SMS_TEMPLATES } from './sms-templates.ts'
 
 const MIGRATIONS_DIR = join(process.cwd(), 'supabase', 'migrations')
 
@@ -39,5 +40,11 @@ describe('value lists match the database CHECK constraints', () => {
     const inDatabase = checkValues(sql, constraint)
     expect(inDatabase, `constraint ${constraint} not found in migrations`).not.toBeNull()
     expect([...(inDatabase ?? [])].sort()).toEqual([...values].sort())
+  })
+})
+
+describe('message templates', () => {
+  it('every messages_log template has an SMS text, and every SMS text is a template', () => {
+    expect(Object.keys(SMS_TEMPLATES).sort()).toEqual([...MESSAGE_TEMPLATES].sort())
   })
 })

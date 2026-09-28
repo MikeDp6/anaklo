@@ -46,6 +46,10 @@
   - Ισχύει για: ανωνυμοποίηση πελάτη, αλλαγές μελών/ρόλων (και προσθήκη/αφαίρεση owner), αλλαγή slug/ζώνης ώρας/νομίσματος, εξαγωγή πελατολογίου, αλλαγή/αφαίρεση συσκευών κωδικών, απενεργοποίηση επιχείρησης. Όχι σε καθημερινές ενέργειες.
   - Το `business_members` αλλάζει μόνο μέσω RPC. Οι αλλαγές συσκευών κωδικών περνούν από άδεια (`authorize_factor_change`) και ελέγχονται κάθε 5′· όσες έγιναν χωρίς άδεια ανιχνεύονται: ο νέος παράγοντας σβήνεται, μια αφαίρεση δεν αναιρείται· και στις δύο περιπτώσεις ανάκληση συνεδριών και ειδοποίηση (1.9).
   - Το 1.7 γίνεται 5 μέρες (από 4), το 1.9 2,5 (από 1,5) και η Φάση 1 **37 εργάσιμες + 3 buffer** (από 35 + 3, §14).
+- **Τοπικά πρώτα και κατεύθυνση σχεδιασμού Δ** (28/9/2026, §10, §14, ADR-0011):
+  - Η Φάση 1 μένει σε localhost μέχρι το νέο τελικό βήμα **1.10**: domain, deploy στο Cloudflare, λογαριασμοί (Resend, OneSignal, Sentry, uptime), πραγματικός πάροχος SMS (ADR-0012) και όλες οι δοκιμές σε συσκευές πάνε εκεί. Μέχρι τότε τα SMS περνούν από τον ψεύτικο adapter με δοκιμαστικούς αριθμούς· τα migrations στέλνονται στο `anaklo-dev` μόνο αν το θέλει ο Μιχάλης.
+  - Η Κατεύθυνση Δ «Ζεστή πολυτέλεια» γίνεται η προεπιλεγμένη εμφάνιση, με προδιαγραφή το `docs/design/MOTION.md`. Μπαίνει σταδιακά μέσα στα βήματα: βάση (tokens, γραμματοσειρές, `src/shared/motion`) στο 1.3, και κάθε κίνηση μαζί με την οθόνη που τη χρησιμοποιεί. Νέα γραμματοσειρά τίτλων: GFS Didot, self-hosted.
+  - Η Φάση 1 γίνεται **38 εργάσιμες + 3 buffer** (από 37 + 3): το 1.10 (3,5) μαζεύει ό,τι αφαιρέθηκε από τα 1.1, 1.5 και 1.9, και ο σχεδιασμός προσθέτει +0,5 στο 1.3 και +0,5 στο 1.4.
 
 ---
 
@@ -324,7 +328,7 @@
 | Backend | **Supabase**, ξεχωριστό project, περιοχή EU. Dev: `anaklo-dev` σε eu-west-1 (Ιρλανδία). Prod: κατά προτίμηση eu-central-1 (Φρανκφούρτη), που είναι πιο κοντά στην Ελλάδα. | Postgres + RLS + Auth + Realtime + cron. Η περιοχή δεν αλλάζει μετά τη δημιουργία, αλλά κάθε περιοχή της ΕΕ καλύπτει τον GDPR χωρίς διαβίβαση εκτός ΕΕ. |
 | Διαθεσιμότητα και κράτηση | **SQL functions** στην Postgres (ADR-0003) | Μία υλοποίηση, ατομική με την κράτηση, χωρίς cold start |
 | Edge Functions | Μόνο για παρενέργειες: OTP, SMS, push, email, webhooks | |
-| Push | OneSignal, **μόνο για το προσωπικό** (εγκατεστημένη PWA). Επιβεβαιώνεται με δοκιμή στο βήμα 1.1, σε PWA εγκατεστημένη στην αρχική οθόνη iPhone. Αν αποτύχει: απλό Web Push (VAPID). (ADR-0010) | Οι πελάτες δεν εγκαθιστούν εφαρμογή |
+| Push | OneSignal, **μόνο για το προσωπικό** (εγκατεστημένη PWA). Επιβεβαιώνεται με δοκιμή στο βήμα 1.10, σε PWA εγκατεστημένη στην αρχική οθόνη iPhone. Αν αποτύχει: απλό Web Push (VAPID). (ADR-0010) | Οι πελάτες δεν εγκαθιστούν εφαρμογή |
 | SMS | Ελληνικός πάροχος (§18 ερ. 1) | Υποχρεωτικά (pass/fail): GSM-7 **χωρίς αυτόματη μετατροπή σε UCS-2** (ρητό `data_coding=0` ή αντίστοιχο, αλλιώς απόρριψη αντί για σιωπηλό UCS-2), delivery webhooks με κατάσταση και αριθμό SMS ανά μήνυμα, αλφαριθμητικό sender ID (≤11, με καταχώριση), προπληρωμένος λογαριασμός ή **σκληρό** όριο δαπάνης στον πάροχο. Βαθμολογούνται: τιμή, allow-list χωρών, link που πατιέται χωρίς `https://`, αυτόματη συμπλήρωση κωδικού στο iOS |
 | Email | Resend, περιοχή EU, από sending subdomain του anaklo.gr (π.χ. `mail.anaklo.gr`) με SPF, DKIM και DMARC (ADR-0008 §8). Είναι και το custom SMTP του Supabase Auth για τον κωδικό σύνδεσης (ADR-0009). | |
 | Hosting | **Cloudflare Workers** με static assets και έναν Worker (ADR-0008) | Εμπορική χρήση στο δωρεάν ή στο πλάνο των $5, έναντι $20/μήνα για το Vercel Pro (το Vercel Hobby απαγορεύει την εμπορική χρήση). Ο ίδιος Worker σερβίρει τη σελίδα κράτησης, το `/app`, το `/<slug>` με Open Graph και το `/api` proxy. Τα cookies της έμπιστης συσκευής είναι first-party και η πραγματική IP έρχεται από το `CF-Connecting-IP`. |
@@ -376,7 +380,7 @@
 - **Functions (μοτίβο wrapper):**
   - Η λογική που παρακάμπτει το RLS ζει στο `private.<name>_impl`, SECURITY DEFINER, με `set search_path = ''`. Κάνει η ίδια τους ελέγχους μέλους και ρόλου. Οι δημόσιες εκδοχές ελέγχουν ότι η επιχείρηση έχει ανοιχτή online κράτηση (`booking_enabled`).
   - Το API βλέπει μόνο λεπτά wrappers στο `public` (SECURITY **INVOKER**) με ρητό `GRANT EXECUTE` ανά ρόλο. Στο `public` δεν υπάρχει καμία SECURITY DEFINER function (το ελέγχει test).
-  - Entry points: `public_business_profile` (Φάση 0), `available_slots`, `book_appointment` (online κράτηση, μόνο `service_role`, μέσω της Edge Function της κράτησης), `staff_book_appointment` (λειτουργία προσωπικού, `authenticated`, με έλεγχο μέλους στο `_impl`), `busy_calendar`, `client_memory`, `merge_clients`, `erase_client`. Ο διαχωρισμός των δύο wrappers κράτησης είναι του πλάνου της Φάσης 1 (D10) και εξειδικεύει το ADR-0003.
+  - Entry points: `public_business_profile` (Φάση 0), `available_slots`, `book_appointment` (online κράτηση, μόνο `service_role`, μέσω της Edge Function της κράτησης, μαζί με `otp_start`, `otp_verify`, `clients_for_phone`, `trusted_device_revoke`, `manage_*`, `claim_messages`, `record_send_result`· 1.3), `public_slug_for_code` (`anon`, για το `/r/<code>`), `staff_book_appointment` (λειτουργία προσωπικού, `authenticated`, με έλεγχο μέλους στο `_impl`), `busy_calendar`, `client_memory`, `merge_clients`, `erase_client`. Ο διαχωρισμός των δύο wrappers κράτησης είναι του πλάνου της Φάσης 1 (D10) και εξειδικεύει το ADR-0003.
   - **Κρίσιμες ενέργειες** (§11): το `_impl` καλεί το ίδιο το `private.require_fresh_totp()`, μετά τον έλεγχο μέλους και ρόλου. Ποτέ μόνο το UI ή ο wrapper. Υπάρχει μία υλοποίηση σε SQL (`private.has_fresh_totp()`/`private.require_fresh_totp()`). Μια Edge Function που κάνει κρίσιμη ενέργεια καλεί πρώτα RPC ως ο χρήστης (ίδιος έλεγχος) και μόνο μετά φτιάχνει client `service_role`.
   - Το `EXECUTE` είναι κλειστό για το `PUBLIC`, και σε global επίπεδο, αφού οι προεπιλογές ανά schema δεν αρκούν. Ανοίγει ρητά ανά function.
   - Οι προεπιλογές δηλώνονται ρητά `for role postgres`, δηλαδή τον ρόλο που δημιουργεί αντικείμενα: migrations, CLI, dashboard. Test στο `01_security` φτιάχνει νέο πίνακα και νέες functions και ελέγχει ότι κανένας ρόλος του API δεν τα βλέπει χωρίς GRANT.
@@ -457,12 +461,29 @@ audit_log             id, business_id, actor_type (staff|nous_support|system), a
                       action, entity, entity_id, reason?, at
 
 -- Φάση 1
-otp_challenges, trusted_devices, booking_tokens (όλα με hash, λήξη, ακύρωση)
-messages_log          business_id, client_id?, appointment_id?, otp_challenge_id?, channel, template,
-                      category (otp|transactional|reminder|marketing), segments (όπως τα αναφέρει ο πάροχος),
-                      cost_cents, provider, provider_message_id, status, scheduled_for, sent_at, error
-                      -- μοναδικό κλειδί ανά ραντεβού/πρότυπο/ώρα (ή ανά otp_challenge): καμία διπλή αποστολή
-rate_limits, member_notification_prefs
+-- Οι πίνακες του 0005 (1.3) έχουν RLS χωρίς πολιτικές και χωρίς GRANT σε κανέναν ρόλο του API (ούτε
+--   service_role): μόνο μέσω των RPC του 0005 (docs/plans/contracts/1.3-public-booking.md). Κανένα
+--   token ή κωδικός σε καθαρό κείμενο: κωδικοί και τηλέφωνα ως HMAC (κλειδιά Vault), tokens ως sha256.
+businesses.short_code (1.3) 6 χαρακτήρες a-z0-9, unique, από trigger· καμία αλλαγή από το API· /r/<code>
+otp_challenges        (1.3) business_id, phone_hmac, code_hmac (δεμένο στο id), expires_at (5′),
+                      attempts (≤ 5), verified_at, grant_hash, grant_expires_at (10′), grant_used_at,
+                      grant_appointment_id (το εφάπαξ grant και η κράτηση που το κατανάλωσε)
+trusted_devices       (1.3) business_id, phone_hmac, token_hash, expires_at (180 μέρες, σταθερό), revoked_at
+booking_tokens        (1.3) business_id, appointment_id, token_hash, issued_for (booking|message), expires_at
+                      (400 μέρες), revoked_at
+                      -- πολλά ζωντανά ανά ραντεβού, ισχύουν έως 30 μέρες μετά το τέλος του· η ακύρωση
+                      --   τα ανακαλεί όλα· ποτέ το link σε καμία στήλη
+messages_log          (outbox, 1.3) business_id, client_id?, appointment_id?, otp_challenge_id?, booking_token_id?,
+                      dedupe_key, channel (sms|push), to_e164? | recipient_user_id?, locale, template,
+                      category (otp|transactional|reminder|marketing), status (queued|sending|sent|delivered|
+                      failed|cancelled|unknown), attempts, lease_id, lease_until, scheduled_for, sent_at,
+                      segments (όπως τα αναφέρει ο πάροχος), cost_cents, provider, provider_message_id, error
+                      -- μοναδικό dedupe_key ανά ραντεβού/πρότυπο/ώρα (ή ανά otp_challenge): καμία διπλή αποστολή
+                      -- to_e164: το μόνο τηλέφωνο σε καθαρό κείμενο (για την αποστολή· το σβήνει το erase_client)
+                      -- OTP ανά online κράτηση: count(template = 'otp' και sent) / count(template = 'booking_confirmed')
+rate_limits           (1.3, όλης της πλατφόρμας) bucket (otp_phone_hour|otp_ip_hour|otp_business_day|
+                      sms_platform_day), key (HMAC τηλεφώνου ή IP, business id ή 'platform'), window_start (UTC), count
+member_notification_prefs
 suppression_list      business_id, phone_hmac (HMAC-SHA256 με μυστικό κλειδί, όχι απλό hash:
                       ένα ελληνικό κινητό έχει μόλις 10^8 τιμές), reason (erased|opted_out), created_at
                       -- ψευδωνυμοποιημένο προσωπικό δεδομένο: σκοπός = να τηρούνται διαγραφές και opt-out
@@ -471,12 +492,14 @@ business_slug_aliases business_id, slug, created_at
                       --   καμία εγγραφή από το API· κανένα slug ή alias δεν περνά σε άλλη επιχείρηση
 push_subscriptions    user_id, provider (onesignal|vapid), subscription_id (OneSignal) ή endpoint και
                       κλειδιά (VAPID), created_at
-                      -- 1.5a, και για τους δύο παρόχους (ADR-0010 §2)· ανά χρήστη, όχι ανά επιχείρηση·
+                      -- 1.5, και για τους δύο παρόχους (ADR-0010 §2)· ανά χρήστη, όχι ανά επιχείρηση·
                       --   UNIQUE subscription_id: ένα κοινό κινητό ανήκει σε έναν χρήστη τη φορά
                       -- RLS user_id = auth.uid()· εγγραφή μόνο με register/unregister_push_subscription
                       --   (η νέα καταχώριση μετακινεί τη συσκευή στον καλούντα)
                       -- push μόνο με include_subscription_ids από εδώ, ποτέ με external_id
-private: platform_settings (πλατφορμικός διακόπτης SMS, όρια· 1.3), job_runs (heartbeats των cron· 1.4)
+private: platform_settings (πλατφορμικός διακόπτης SMS, ημερήσιο όριο, όρια OTP ανά αριθμό/IP/επιχείρηση,
+         αναμονή νέου κωδικού, όρια των άλλων SMS ανά αριθμό/επιχείρηση/ημέρα, μερίδιο του ορίου μόνο για OTP· 1.3), vertical_defaults (διάστημα επανάληψης ανά κλάδο = packages/verticals/*.json,
+         για την πρόταση επόμενης επίσκεψης· 1.3), job_runs (heartbeats των cron· 1.4)
                       -- platform_settings.fresh_totp_max_age_seconds (1.7): παράθυρο φρέσκου κωδικού,
                       --   προεπιλογή 300, CHECK 0–300 (οι ρυθμίσεις μόνο το αυστηραίνουν)· το τοπικό/e2e
                       --   seed βάζει 10 s (όχι 0: με 0 δεν περνά καμία κρίσιμη ενέργεια)· τα e2e περιμένουν
@@ -488,7 +511,7 @@ private.factor_change_grants   (1.7) άδειες αλλαγής συσκευώ�
 private.mfa_factor_snapshot    (1.9) οι επαληθευμένοι παράγοντες (auth.mfa_factors) των owner/manager
                       στον τελευταίο έλεγχο του private.detect_factor_changes_impl (pg_cron κάθε 5′)
 private.security_events        (1.9) αλλαγή συσκευής κωδικών χωρίς άδεια (+ audit_log, actor system)·
-                      τη χειρίζεται ο dispatch του 1.5a (διαγραφή ξένου νέου παράγοντα, ανάκληση
+                      τη χειρίζεται ο dispatch του 1.5 (διαγραφή ξένου νέου παράγοντα, ανάκληση
                       συνεδριών, email, push· μια αφαίρεση δεν αναιρείται)
 
 -- Φάση 2 / v1
@@ -612,7 +635,7 @@ anaklo/
 │  ├─ shared/ui/           # το δικό μας design system
 │  ├─ shared/lib/          # επανεξαγωγή των _shared (money, dates, phone, sms, domain),
 │  │                       # supabase client (μόνο pro), publicApi (fetch στο /api), theme, env, database.types.ts
-│  ├─ shared/i18n/         # i18next, el.json, en.json
+│  ├─ shared/i18n/         # i18next, {el,en}/{common,booking,pro}.json (namespaces)
 │  └─ styles/tokens.css    # design tokens
 ├─ supabase/
 │  ├─ migrations/          # 0001_*.sql … (αριθμημένα)
@@ -646,7 +669,7 @@ anaklo/
    - Γίνονται μόνο με το Supabase CLI (`npm run db:*`), ποτέ από τον SQL editor.
    - Πίνακας, RLS και GRANT μπαίνουν στο ίδιο αρχείο.
    - Οι αλλαγές είναι expand/contract: πρώτα προσθέτουμε, και αφαιρούμε σε επόμενη έκδοση.
-   - Νέο migration → `db:push` και, από το 1.1, `secrets:dev` → `db:test:dev` → `deploy:dev`. Αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν μπουν πραγματικά δεδομένα) → `db:reset:dev` και, από το 1.1, `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev` (`docs/plans/phase-1.md`, «Migrations»).
+   - Νέο migration → `db:push` και, από το 1.10, `secrets:dev` → `db:test:dev` → `deploy:dev` (πριν το 1.10 το remote είναι προαιρετικό). Αλλαγή σε migration που έχει ήδη σταλεί (μόνο πριν μπουν πραγματικά δεδομένα) → `db:reset:dev` και, από το 1.10, `secrets:dev` → `provision:dev` → `db:test:dev` → `deploy:dev` (`docs/plans/phase-1.md`, «Migrations»).
 10. **Σειρά deploy:** migration → Edge Functions → frontend.
 11. Secrets μόνο σε env vars / Supabase secrets. **Ποτέ πραγματικά δεδομένα πελατών στο git** (CSV, dumps). Το `.env.example` πάντα ενημερωμένο.
 12. Τα tests τρέχουν σε UTC. Το `vitest.config.ts` ορίζει `process.env.TZ = 'UTC'`, χωρίς `TZ=…` στο npm script, που δεν δουλεύει στα Windows. Ένα test αποτυγχάνει αν ξεφύγει: ο υπολογιστής ανάπτυξης είναι σε ώρα Αθήνας και θα έκρυβε bugs.
@@ -671,6 +694,11 @@ anaklo/
 ---
 
 ## 10. Σχεδιασμός, θέματα ανά επιχείρηση, απόδοση
+
+**Εμφάνιση: Κατεύθυνση Δ «Ζεστή πολυτέλεια»** (28/9/2026, [ADR-0011](adr/0011-design-direction-motion.md), προδιαγραφή στο [`docs/design/MOTION.md`](design/MOTION.md))
+- Η προεπιλεγμένη εμφάνιση της σελίδας κράτησης και της εφαρμογής: espresso, άμμος και κρεμ, μπρονζέ ετικέτες (χρυσές μόνο σε σκούρο φόντο), τίτλοι GFS Didot και κείμενο Manrope (self-hosted, `greek` + `latin`), κουμπιά pill.
+- Τα θέματα επιχείρησης (παρακάτω) αλλάζουν το brand χρώμα όπως πριν, με τις εγγυήσεις WCAG AA του `theme.ts` (κείμενο ≥ 4.5:1, focus ≥ 3:1). Τα components διαβάζουν σημασιολογικά tokens, όχι απευθείας την παλέτα της Δ· το `surface: "dark"` δίνει σκούρο εξώφυλλο.
+- Κίνηση: μόνο `transform`/`opacity`· καμία με `prefers-reduced-motion` (με test)· χωρίς βιβλιοθήκη κίνησης (CSS και τα hooks του `src/shared/motion`)· hover μόνο με ποντίκι· ποτέ καθυστέρηση ενέργειας. Μεσαίο επίπεδο στη σελίδα κράτησης (χωρίς splash και scroll-linked, για το LCP), ελάχιστο στην εφαρμογή, πλήρες μόνο στο site μάρκετινγκ (Φάση 5).
 
 **Θέμα ανά επιχείρηση** (αποθηκεύεται στο `businesses.theme`):
 ```json
@@ -804,7 +832,7 @@ anaklo/
   - **συσκευές κωδικών** (όριο του Supabase Pro: το Auth ζητά `aal2` για προσθήκη δεύτερου και αφαίρεση επαληθευμένου παράγοντα, αλλά όχι φρέσκο κωδικό, και το μόνο hook που θα μπορούσε να αρνηθεί, το MFA Verification Attempt, υπάρχει μόνο σε Teams/Enterprise):
     - αφαίρεση **μόνο** από την Edge Function `manage-factors` (`verify_jwt = true`): `authorize_factor_change('remove', factor_id)` ως ο χρήστης (φρέσκος κωδικός, `audit_log`, άδεια) και μετά `auth.admin.mfa.deleteFactor`. Ποτέ ο τελευταίος επαληθευμένος παράγοντας owner/manager (πρώτα προσθέτεις άλλον). Η εφαρμογή δεν καλεί ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
     - προσθήκη (δεύτερη συσκευή ή αντικατάσταση): πρώτα `authorize_factor_change('add')` (άδεια 10′ στο `private.factor_change_grants`), μετά `mfa.enroll` + verify. Η πρώτη εγγραφή παίρνει την άδεια χωρίς φρέσκο κωδικό· η οθόνη δεύτερης συσκευής έρχεται αμέσως μετά το πρώτο verify, άρα ο κωδικός συνήθως είναι ήδη φρέσκος (αλλιώς ανοίγει το φύλλο κωδικού). Μόνο owner ή manager· το staff δεν γράφει ποτέ παράγοντα.
-  - **εντοπισμός** (1.9, γιατί το Auth καλείται και απευθείας με κλεμμένη συνεδρία `aal2`): κάθε 5′ το `private.detect_factor_changes_impl` συγκρίνει τους επαληθευμένους παράγοντες των owner/manager με το `private.mfa_factor_snapshot`. Κάθε αλλαγή πρέπει να ταιριάζει με άδεια (`authorize_factor_change`, `mfa-reset` της Nous, υποβιβασμός, διαγραφή από τον dispatch). Αλλιώς γραμμή στο `private.security_events` και στο `audit_log` (`system`), και ο dispatch (1.5a): σβήνει τον παράγοντα που προστέθηκε χωρίς άδεια, ανακαλεί όλες τις συνεδρίες του χρήστη (`revoke_user_sessions`), στέλνει email (Resend) στον χρήστη και στον owner και push στον owner. Αφαίρεση χωρίς άδεια δεν αναιρείται (το μυστικό χάθηκε): ανάκληση συνεδριών και ειδοποίηση, και στην επόμενη σύνδεση νέα εγγραφή, αν δεν έμεινε επαληθευμένος παράγοντας. Τη μέρα 1 του 1.7 ελέγχεται αν το hosted Supabase επιτρέπει trigger στο `auth.mfa_factors`· αν ναι, η ίδια λογική τρέχει αμέσως από trigger. Υπολειπόμενος κίνδυνος: έως 5′ με παράγοντα του επιτιθέμενου πριν σβηστεί.
+  - **εντοπισμός** (1.9, γιατί το Auth καλείται και απευθείας με κλεμμένη συνεδρία `aal2`): κάθε 5′ το `private.detect_factor_changes_impl` συγκρίνει τους επαληθευμένους παράγοντες των owner/manager με το `private.mfa_factor_snapshot`. Κάθε αλλαγή πρέπει να ταιριάζει με άδεια (`authorize_factor_change`, `mfa-reset` της Nous, υποβιβασμός, διαγραφή από τον dispatch). Αλλιώς γραμμή στο `private.security_events` και στο `audit_log` (`system`), και ο dispatch (1.5): σβήνει τον παράγοντα που προστέθηκε χωρίς άδεια, ανακαλεί όλες τις συνεδρίες του χρήστη (`revoke_user_sessions`), στέλνει email (Resend) στον χρήστη και στον owner και push στον owner. Αφαίρεση χωρίς άδεια δεν αναιρείται (το μυστικό χάθηκε): ανάκληση συνεδριών και ειδοποίηση, και στην επόμενη σύνδεση νέα εγγραφή, αν δεν έμεινε επαληθευμένος παράγοντας. Στο `anaklo-dev` (προαιρετικά τη μέρα 1 του 1.7, αλλιώς στο 1.10) ελέγχεται αν το hosted Supabase επιτρέπει trigger στο `auth.mfa_factors`· αν ναι, η ίδια λογική μπορεί να τρέχει αμέσως από trigger. Υπολειπόμενος κίνδυνος: έως 5′ με παράγοντα του επιτιθέμενου πριν σβηστεί.
   - **οδηγός σε απλή γλώσσα:** το UI δεν λέει ποτέ TOTP, MFA ή 2FA, αλλά «εφαρμογή κωδικών», «κωδικός 6 ψηφίων», «δεύτερη συσκευή». Τρία βήματα: κατέβασε μια εφαρμογή κωδικών (π.χ. Google Authenticator, Microsoft Authenticator· στο iPhone και οι ενσωματωμένοι «Κωδικοί») → σκάναρε τον κωδικό QR από άλλη συσκευή, ή στο ίδιο κινητό «Άνοιγμα στην εφαρμογή κωδικών» ή «Αντιγραφή κλειδιού» → γράψε τον κωδικό 6 ψηφίων. Vitest: καμία τιμή των καταλόγων i18n (el, en, όλα τα namespaces) δεν περιέχει «TOTP», «MFA» ή «2FA» (ελέγχονται οι τιμές, όχι τα κλειδιά).
 - **Συνεδρίες** (όλοι οι ρόλοι):
   - access token 1 ώρα, με rotation του refresh token
@@ -912,6 +940,7 @@ anaklo/
 - [ ] Ελληνικά + αγγλικά (τα αγγλικά ολοκληρώνονται υποχρεωτικά πριν την εμπορική διάθεση)
 - [ ] Τα tests (Vitest/pgTAP) περνάνε, typecheck και lint καθαρά
 - [ ] RLS + GRANT για κάθε νέο δεδομένο
+- [ ] Οθόνες με κίνηση: οι έλεγχοι του `docs/design/MOTION.md` §6 (reduced-motion, CLS ≈ 0, αντίθεση, όριο μεγέθους· ADR-0011)
 - [ ] Από την έναρξη του πιλότου: ενημέρωση «Τι νέο υπάρχει» + CHANGELOG
 
 ---
@@ -944,21 +973,24 @@ anaklo/
 > - Μετά τη σκλήρυνση πριν τη Φάση 1 (βλ. «Τι άλλαξε»), τοπικά: pgTAP 141/141, Vitest 178/178, Playwright 10/10, σελίδα κράτησης 100.9 KB. Mutation tests: κάθε διόρθωση που αναιρείται σπάει τουλάχιστον ένα test.
 > - `anaklo-dev`: signup κλειστό, pgTAP 138/138 στην πρώτη εκδοχή της σκλήρυνσης. Εκκρεμεί ένα ακόμη `npm run db:reset:dev` + `npm run db:test:dev` (141) για τη διόρθωση του guard συναινέσεων (διαγραφή λογαριασμού).
 
-**Φάση 1 — Πυρήνας κράτησης (~8 εβδομάδες: 37 εργάσιμες + 3 buffer)**
+**Φάση 1 — Πυρήνας κράτησης (~8,5 εβδομάδες: 38 εργάσιμες + 3 buffer)**
 
-Εγκρίθηκε στις 27/9/2026· ο φρέσκος κωδικός για κρίσιμες ενέργειες προστέθηκε στις 28/9/2026 (+2 μέρες). Το αναλυτικό πλάνο ανά βήμα (βάση, Edge Functions, frontend, tests, κριτήρια εξόδου, προαπαιτούμενα) βρίσκεται στο `docs/plans/phase-1.md`. Με 1η μέρα τη Δευτέρα 28/9/2026 και την αργία της 28/10, η μέρα 37 είναι η 18/11/2026 και το buffer τελειώνει στις 23/11/2026.
+Εγκρίθηκε στις 27/9/2026· ο φρέσκος κωδικός για κρίσιμες ενέργειες προστέθηκε στις 28/9/2026 (+2 μέρες). Την ίδια μέρα: **τοπικά πρώτα** (όλα τα remote, οι λογαριασμοί και οι δοκιμές σε συσκευές στο νέο τελικό βήμα 1.10) και **κατεύθυνση σχεδιασμού Δ** (ADR-0011), μαζί +1 μέρα. Το αναλυτικό πλάνο ανά βήμα (βάση, Edge Functions, frontend, tests, κριτήρια εξόδου, προαπαιτούμενα) βρίσκεται στο `docs/plans/phase-1.md`. Με 1η μέρα τη Δευτέρα 28/9/2026 και την αργία της 28/10, η μέρα 38 είναι η 19/11/2026 και το buffer τελειώνει στις 24/11/2026.
+
+> Κατάσταση (28/9/2026): το 1.1 (τοπικό μέρος) και το 1.2 ολοκληρώθηκαν. Το 1.3 υλοποιήθηκε τοπικά (0005, `public-booking`, `manage`, σελίδα κράτησης με την εμφάνιση Δ, ψεύτικος adapter SMS) με όλα τα tests πράσινα· εκκρεμούν commit και CI, και τα remote του στο 1.10. Επόμενο το 1.4.
 
 | Βήμα | Περιεχόμενο | Μέρες |
 |---|---|---|
-| 1.1 | Υποδομή: Cloudflare Worker (ADR-0008) με `/api` proxy και cookie έμπιστης συσκευής· σύνδεση προσωπικού με κωδικό email 6 ψηφίων (ADR-0009) και πολιτική συνεδριών (access token 1 ώρα, 30 μέρες αδράνειας με έλεγχο και στην εφαρμογή, αποσύνδεση μόνο της συσκευής)· toolchain Edge Functions· script provisioning· δοκιμές σε συσκευές: cookie στους in-app browsers, session στην εγκατεστημένη PWA του iPhone, **push σε PWA εγκατεστημένη στην αρχική οθόνη iPhone** (ADR-0010) | 5 |
-| 1.2 | `available_slots` + `book_core`/`move_core` σε SQL (advisory lock, idempotency, τιμή από τον server), με pgTAP για DST, μεσάνυχτα, κλεισίματα και ταυτόχρονες κρατήσεις | 4,5 |
-| 1.3 | Online κράτηση end-to-end: OTP νέας συσκευής, έμπιστη συσκευή και βραχύβιο εφάπαξ verification grant, link διαχείρισης, επιβεβαίωση, Google Calendar/.ics, Open Graph, χωριστοί κατάλογοι i18n για τη σελίδα κράτησης | 6,5 |
-| 1.4 | PWA επαγγελματία: «Σήμερα», ημερολόγιο ημέρας (**χωρίς Realtime:** refetch on focus και κάθε 60″, μαζί με push), γρήγορο ραντεβού/walk-in, μετακίνηση, αυτόματη ολοκλήρωση | 3,5 |
-| 1.5 | Ειδοποιήσεις. 1.5a: planner, dispatcher, dedupe, όρια, push προσωπικού, με ψεύτικο adapter SMS. 1.5b: ο πάροχος SMS που επιλέχθηκε (§18 ερ. 1), με delivery webhooks | 3,5 |
+| 1.1 | Υποδομή, τοπικό μέρος (ολοκληρώθηκε): Cloudflare Worker (ADR-0008) με `/api` proxy και cookie έμπιστης συσκευής, με τα ίδια modules ως middleware του Vite· σύνδεση προσωπικού με κωδικό email 6 ψηφίων (ADR-0009) και πολιτική συνεδριών (access token 1 ώρα, 30 μέρες αδράνειας με έλεγχο και στην εφαρμογή, αποσύνδεση μόνο της συσκευής)· toolchain Edge Functions· script provisioning· scripts για deploy και μυστικά του dev (τρέχουν στο 1.10) | 4 |
+| 1.2 | `available_slots` + `book_core`/`move_core` σε SQL (advisory lock, idempotency, τιμή από τον server), με pgTAP για DST, μεσάνυχτα, κλεισίματα και ταυτόχρονες κρατήσεις (ολοκληρώθηκε) | 4,5 |
+| 1.3 | Online κράτηση end-to-end, τοπικά: OTP νέας συσκευής, έμπιστη συσκευή και βραχύβιο εφάπαξ verification grant, link διαχείρισης, επιβεβαίωση, Google Calendar/.ics, Open Graph, χωριστοί κατάλογοι i18n για τη σελίδα κράτησης· SMS από τον ψεύτικο adapter· **βάση σχεδιασμού Δ** (tokens, GFS Didot + Manrope, `src/shared/motion`, restyle του `shared/ui`) και μεσαίο επίπεδο κίνησης (ADR-0011) | 7 |
+| 1.4 | PWA επαγγελματία: «Σήμερα», ημερολόγιο ημέρας (**χωρίς Realtime:** refetch on focus και κάθε 60″, μαζί με push), γρήγορο ραντεβού/walk-in, μετακίνηση, αυτόματη ολοκλήρωση· εμφάνιση Δ με ελάχιστο επίπεδο κίνησης | 4 |
+| 1.5 | Ειδοποιήσεις: planner, dispatcher, dedupe, όρια, push προσωπικού, με ψεύτικο adapter SMS και ψεύτικη αποστολή push (ο πραγματικός πάροχος στο 1.10) | 2 |
 | 1.6 | Οθόνες ρυθμίσεων: υπηρεσίες, προσωπικό, ωράρια, **κλεισίματα**, άδειες, πολιτική κρατήσεων· ροή «έκτακτη απουσία» (άδεια `leave` + ανάθεση/ακύρωση της ημέρας) | 4 |
 | 1.7 | Ασφάλεια και μέλη (ADR-0009): **εγγραφή TOTP για owner/manager**, με υποχρεωτική οθόνη δεύτερης συσκευής, οθόνη «Χάσατε τη συσκευή σας;», επαναφορά από τη Nous (runbook + `mfa-reset.mjs`), «Αποσύνδεση από όλες τις συσκευές» και οδηγό σε απλή γλώσσα· **φρέσκος κωδικός (≤5′) για κρίσιμες ενέργειες** (`private.require_fresh_totp()` σε κάθε κρίσιμο `_impl`, hints και φύλλο κωδικού)· `business_members` μόνο μέσω RPC· `authorize_factor_change` + Edge Function `manage-factors`· προσκλήσεις μελών μέσω Edge Function (μετά το TOTP)· RPCs μελών (`set_member_role`, `remove_member`, με ανάκληση συνεδριών)· RPC του owner για slug/ζώνη ώρας/νόμισμα | 5 |
 | 1.8 | Καρτέλα πελάτη: ιστορικό, σημειώσεις, συναινέσεις, αναζήτηση· `merge_clients` (SQL)· ανωνυμοποίηση (`erase_client` + `suppression_list`, owner με φρέσκο κωδικό) | 2,5 |
-| 1.9 | Παρακολούθηση: Sentry (upload των hidden source maps και διαγραφή τους από το `dist`), uptime, heartbeats για τα cron, runbooks· **εντοπισμός μη εξουσιοδοτημένων αλλαγών συσκευών κωδικών** (κάθε 5′, διαγραφή του μη εγκεκριμένου νέου παράγοντα μέσω του dispatch του 1.5a, ανάκληση συνεδριών, email ασφαλείας)· τελική πρόβα σε πραγματικές συσκευές | 2,5 |
+| 1.9 | Heartbeats για τα cron και `health`, runbooks· **εντοπισμός μη εξουσιοδοτημένων αλλαγών συσκευών κωδικών** (κάθε 5′, διαγραφή του μη εγκεκριμένου νέου παράγοντα μέσω του dispatch του 1.5, ανάκληση συνεδριών, email ασφαλείας), τοπικά | 1,5 |
+| 1.10 | Ανάπτυξη, λογαριασμοί και συσκευές: dashboard, μυστικά, provisioning και deploy στο `anaklo-dev`/`dev.anaklo.gr` (domain, DNS, Worker)· Resend· OneSignal και go/no-go του push (ADR-0010)· πάροχος SMS με delivery webhooks και έλεγχο 1 SMS σε Cosmote/Vodafone/Nova (§18 ερ. 1, ADR-0012)· Sentry (upload των hidden source maps και διαγραφή τους από το `dist`) και uptime· όλες οι δοκιμές σε συσκευές (cookie στους in-app browsers, session και push στην εγκατεστημένη PWA του iPhone)· καθαρισμός των spikes· τελική πρόβα σε πραγματικές συσκευές | 3,5 |
 
 - **Σειρά περικοπών**, αν η σύγκριση πραγματικού/πλάνου στο τέλος ενός βήματος δείξει ότι δεν φτάνει το buffer που απομένει. Κόβεται ό,τι δεν έχει ακόμη υλοποιηθεί:
   1. Sentry στη σελίδα κράτησης
@@ -967,7 +999,7 @@ anaklo/
 
   Οι οθόνες **κλεισιμάτων δεν κόβονται**.
 - **Αναβάλλονται για τη Φάση 3:** Realtime, καθημερινό email στον owner, UI συγχώνευσης πελατών.
-- **Κόστος TOTP:** ~2,5 μέρες με τις προσθήκες (δεύτερη συσκευή, επαναφορά, συνεδρίες, οδηγός), μαζί με εγγραφή, step-up και e2e. Περίπου 0,5 ήταν ήδη στο αρχικό πλάνο για το step-up της ανωνυμοποίησης, άρα **+2 μέρες**. Η υπόλοιπη ~1,5 μέρα του 1.7 (οι προσκλήσεις, το RPC ταυτότητας και τα RPCs μελών) ήταν ήδη στο πλάνο, οπότε το 1.7 έκανε 4 μέρες. Ο **φρέσκος κωδικός** (28/9/2026) προσθέτει άλλες **+2 μέρες**: ~1 στο 1.7 (έλεγχοι φρέσκου κωδικού, hints και UI, `business_members` μόνο μέσω RPC, `authorize_factor_change`, `manage-factors`), που γίνεται **5 μέρες**, και ~1 στο 1.9 (εντοπισμός, αναίρεση, email ειδοποίησης), που γίνεται **2,5 μέρες**. Το 1.9 εξαρτάται από το 1.5a (dispatch) και το 1.7 (άδειες, `revoke_user_sessions`), που προηγούνται. Φάση 1: 37 εργάσιμες + 3 buffer = 40.
+- **Κόστος TOTP:** ~2,5 μέρες με τις προσθήκες (δεύτερη συσκευή, επαναφορά, συνεδρίες, οδηγός), μαζί με εγγραφή, step-up και e2e. Περίπου 0,5 ήταν ήδη στο αρχικό πλάνο για το step-up της ανωνυμοποίησης, άρα **+2 μέρες**. Η υπόλοιπη ~1,5 μέρα του 1.7 (οι προσκλήσεις, το RPC ταυτότητας και τα RPCs μελών) ήταν ήδη στο πλάνο, οπότε το 1.7 έκανε 4 μέρες. Ο **φρέσκος κωδικός** (28/9/2026) προσθέτει άλλες **+2 μέρες**: ~1 στο 1.7 (έλεγχοι φρέσκου κωδικού, hints και UI, `business_members` μόνο μέσω RPC, `authorize_factor_change`, `manage-factors`), που γίνεται **5 μέρες**, και ~1 στο 1.9 (εντοπισμός, αναίρεση, email ειδοποίησης), που γίνεται **2,5 μέρες**. Το 1.9 εξαρτάται από το 1.5 (dispatch) και το 1.7 (άδειες, `revoke_user_sessions`), που προηγούνται. Στις 28/9/2026 το 1.9 έδωσε Sentry, uptime και την τελική πρόβα στο 1.10 και έμεινε 1,5 μέρα. Φάση 1: 38 εργάσιμες + 3 buffer = 41.
 
 **Φάση 2 — Η «μνήμη» (2–3 εβδομάδες)**
 
@@ -1090,7 +1122,7 @@ anaklo/
 
 | # | Ερώτημα | Πότε |
 |---|---|---|
-| 1 | Πάροχος SMS. Δοκιμαστικοί λογαριασμοί σε 2–3 ελληνικούς παρόχους από την 1η μέρα της Φάσης 1 (π.χ. Apifon, Routee, Yuboto). **Υποχρεωτικά (pass/fail):** (α) GSM-7 **χωρίς αυτόματη μετατροπή σε UCS-2**: ρητό `data_coding=0` ή αντίστοιχη ρύθμιση, και αν δεν γίνεται, το μήνυμα απορρίπτεται αντί να σταλεί ως UCS-2 (κάθε πρότυπο με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω φτάνει ως 1 SMS σε Cosmote/Vodafone/Nova)· (β) **delivery webhooks** με κατάσταση και αριθμό SMS ανά μήνυμα· (γ) αλφαριθμητικό **sender ID** (≤11 χαρακτήρες, με καταχώριση)· (δ) **προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης** στον πάροχο, επιπλέον των δικών μας ορίων. Επιπλέον: τιμή, allow-list χωρών, link που πατιέται χωρίς `https://`, αυτόματη συμπλήρωση κωδικού στο iOS, Viber αργότερα. | Επιλογή γύρω στη 12η μέρα της Φάσης 1 (πριν το 1.5b) |
+| 1 | Πάροχος SMS. Δοκιμαστικοί λογαριασμοί σε 2–3 ελληνικούς παρόχους πριν το 1.10 της Φάσης 1 (π.χ. Apifon, Routee, Yuboto). **Υποχρεωτικά (pass/fail):** (α) GSM-7 **χωρίς αυτόματη μετατροπή σε UCS-2**: ρητό `data_coding=0` ή αντίστοιχη ρύθμιση, και αν δεν γίνεται, το μήνυμα απορρίπτεται αντί να σταλεί ως UCS-2 (κάθε πρότυπο με όλα τα Γ Δ Θ Λ Ξ Π Σ Φ Ψ Ω φτάνει ως 1 SMS σε Cosmote/Vodafone/Nova)· (β) **delivery webhooks** με κατάσταση και αριθμό SMS ανά μήνυμα· (γ) αλφαριθμητικό **sender ID** (≤11 χαρακτήρες, με καταχώριση)· (δ) **προπληρωμένος λογαριασμός ή σκληρό όριο δαπάνης** στον πάροχο, επιπλέον των δικών μας ορίων. Επιπλέον: τιμή, allow-list χωρών, link που πατιέται χωρίς `https://`, αυτόματη συμπλήρωση κωδικού στο iOS, Viber αργότερα. | Επιλογή στο 1.10 (ADR-0012)· οι αιτήσεις μπορούν να ξεκινήσουν νωρίτερα, γιατί το KYC και το sender ID θέλουν χρόνο |
 | 2 | ~~Hosting~~ **Απαντήθηκε:** Cloudflare Workers με static assets και έναν Worker (ADR-0008). | Κλειστό (27/9/2026) |
 | 3 | Νομικό: soft opt-in για νέους πελάτες και για πελάτες από εισαγωγή | Πριν τον 1ο πληρωμένο πελάτη |
 | 4 | Ποιος υπογράφει το DPA και τον λογαριασμό SMS μέχρι να υπάρξει νομικό πρόσωπο της Nous. **Απόφαση για τη Φάση 1:** ο Μιχάλης προσωπικά (λογαριασμοί SMS, sender ID, DPA παρόχων), με μεταφορά στη Nous όταν ιδρυθεί· επιβεβαίωση με λογιστή/νομικό. | Πριν τα πρώτα πραγματικά δεδομένα |

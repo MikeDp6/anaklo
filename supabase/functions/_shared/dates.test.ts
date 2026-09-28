@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   addLocalDays,
+  formatInstant,
   formatInZone,
+  formatLocalDate,
   isValidTimeZone,
   localDateTimeToInstant,
   toLocalDate,
@@ -137,5 +141,46 @@ describe('validation and formatting', () => {
     expect(formatInZone(instant, ATHENS, 'EEEE d MMMM, HH:mm', 'en')).toBe(
       'Tuesday 3 November, 17:30',
     )
+  })
+})
+
+describe('Intl formatting (the booking page: no date-fns)', () => {
+  it('formats a calendar date without shifting it, on any device zone', () => {
+    const previous = process.env.TZ
+    for (const hostZone of ['Pacific/Auckland', 'America/New_York']) {
+      process.env.TZ = hostZone
+      expect(formatLocalDate('2026-10-01', 'el', { weekday: 'long', day: 'numeric' })).toBe(
+        'Πέμπτη 1',
+      )
+    }
+    process.env.TZ = previous
+    expect(formatLocalDate('2026-10-01', 'en', { weekday: 'short' })).toBe('Thu')
+    expect(() => formatLocalDate('2026-02-30', 'el', { day: 'numeric' })).toThrow(RangeError)
+  })
+
+  it('formats an instant in the business zone, 24h', () => {
+    const instant = new Date('2026-10-25T00:30:00Z') // 03:30 EEST (before the change back)
+    const time = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } as const
+    expect(formatInstant(instant, ATHENS, 'el', time)).toBe('03:30')
+    expect(formatInstant(instant, NEW_YORK, 'en', time)).toBe('20:30')
+    expect(formatInstant(new Date('2026-11-03T22:30:00Z'), ATHENS, 'el', { day: 'numeric' })).toBe(
+      '4',
+    )
+    expect(() => formatInstant(instant, 'Mars/Olympus', 'el', time)).toThrow(RangeError)
+  })
+
+  it('reads midnight as 00, never 24', () => {
+    expect(toLocalTime(new Date('2026-10-31T22:00:00Z'), ATHENS)).toBe('00:00')
+    expect(toLocalDate(new Date('2026-10-31T22:00:00Z'), ATHENS)).toBe('2026-11-01')
+  })
+})
+
+describe('local-dates.ts (what the booking page imports)', () => {
+  it('uses Intl only: no date-fns and no @date-fns/tz (module side effects, size budget)', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'supabase/functions/_shared/local-dates.ts'),
+      'utf8',
+    )
+    expect(source).not.toMatch(/from\s+['"](date-fns|@date-fns)/)
   })
 })

@@ -4,11 +4,11 @@ import styles from './SignOutButton.module.css'
 
 /** Signs out this device only (ADR-0009 §19). */
 export function SignOutButton() {
-  const { t } = useTranslation()
+  const { t } = useTranslation('pro')
   const { signOut, pending } = useSignOut()
   return (
     <button type="button" className={styles.button} onClick={signOut} disabled={pending}>
-      {pending ? t('pro.signingOut') : t('pro.signOut')}
+      {pending ? t('signingOut') : t('signOut')}
     </button>
   )
 }

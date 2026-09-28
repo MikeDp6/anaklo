@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod/mini'
 import { localSupabase } from '../../../scripts/lib/cli.mjs'
 import type { Database } from '../../../src/shared/lib/database.types.ts'
 
@@ -57,4 +58,37 @@ export async function signInAs(email: string): Promise<Db> {
 export async function signOut(client: Db): Promise<void> {
   const { error } = await client.auth.signOut({ scope: 'local' })
   if (error) throw error
+}
+
+/** PostgREST's error body: SQLSTATE in `code`, the domain code (AN0xx) in `message`. */
+const PostgrestError = z.object({ code: z.nullable(z.string()), message: z.string() })
+
+export type ServiceRpcResult = {
+  data: unknown
+  error: { code?: unknown; message?: unknown } | null
+}
+
+/**
+ * One service_role RPC over PostgREST, the way the Edge Functions call the 0005 RPCs (step 1.3).
+ * Untyped like theirs (`_shared/booking-rpc.ts`): the generated Args cannot express the null
+ * arguments those RPCs take (a grant or a trusted device, an existing or a new client).
+ */
+export async function serviceRpc(
+  fn: string,
+  args: Readonly<Record<string, unknown>>,
+): Promise<ServiceRpcResult> {
+  const { apiUrl, secretKey } = localStack()
+  const response = await fetch(`${apiUrl}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      apikey: secretKey,
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(args),
+  })
+  const body: unknown = await response.json()
+  if (response.ok) return { data: body, error: null }
+  const error = PostgrestError.safeParse(body)
+  return { data: null, error: error.success ? error.data : { message: `HTTP ${response.status}` } }
 }

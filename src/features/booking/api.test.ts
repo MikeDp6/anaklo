@@ -1,23 +1,33 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { injectBookingShell } from '../../../edge/inject.ts'
-import { readInitialProfile } from './api'
+import { readInitialCatalogue } from './api'
 
-const PROFILE = {
-  slug: 'demo-barber',
-  name: 'Demo </script> "Barber"',
-  vertical: 'barber',
-  timezone: 'Europe/Athens',
-  locale: 'el',
-  theme: { primary: '#1F3A5F' },
+const CATALOGUE = {
+  business: {
+    id: '00000000-0000-4000-8000-000000000001',
+    slug: 'demo-barber',
+    name: 'Demo </script> "Barber"',
+    vertical: 'barber',
+    timezone: 'Europe/Athens',
+    locale: 'el',
+    currency: 'EUR',
+    theme: { primary: '#1F3A5F' },
+    address: null,
+    maps_url: null,
+    phone_e164: '+302610000000',
+    min_notice_min: 60,
+    max_advance_days: 60,
+    allow_any_staff: true,
+  },
+  categories: [],
+  services: [],
+  staff: [],
 }
 
 function loadShell(initial: unknown) {
   const html = injectBookingShell(
     '<html lang="el"><head><title>x</title></head><body></body></html>',
-    {
-      title: 'x',
-      initial,
-    },
+    { title: 'x', initial },
   )
   document.documentElement.innerHTML = new DOMParser().parseFromString(
     html,
@@ -29,23 +39,23 @@ afterEach(() => {
   document.getElementById('anaklo-initial')?.remove()
 })
 
-describe('readInitialProfile', () => {
-  it('reads the profile the Worker injected, surviving HTML-sensitive names', () => {
-    loadShell({ profile: PROFILE })
-    expect(readInitialProfile('demo-barber')).toEqual(PROFILE)
+describe('readInitialCatalogue', () => {
+  it('reads the catalogue the Worker injected, surviving HTML-sensitive names', () => {
+    loadShell({ catalogue: CATALOGUE })
+    expect(readInitialCatalogue('demo-barber')).toEqual(CATALOGUE)
   })
 
   it('ignores data for another slug', () => {
-    loadShell({ profile: PROFILE })
-    expect(readInitialProfile('other-shop')).toBeUndefined()
+    loadShell({ catalogue: CATALOGUE })
+    expect(readInitialCatalogue('other-shop')).toBeUndefined()
   })
 
   it('ignores invalid data and a missing element', () => {
-    expect(readInitialProfile('demo-barber')).toBeUndefined()
-    loadShell({ profile: { ...PROFILE, locale: 'xx' } })
-    expect(readInitialProfile('demo-barber')).toBeUndefined()
+    expect(readInitialCatalogue('demo-barber')).toBeUndefined()
+    loadShell({ catalogue: { ...CATALOGUE, business: { ...CATALOGUE.business, locale: 'xx' } } })
+    expect(readInitialCatalogue('demo-barber')).toBeUndefined()
     const element = document.getElementById('anaklo-initial')
     if (element) element.textContent = '{not json'
-    expect(readInitialProfile('demo-barber')).toBeUndefined()
+    expect(readInitialCatalogue('demo-barber')).toBeUndefined()
   })
 })

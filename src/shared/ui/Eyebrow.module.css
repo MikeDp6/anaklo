@@ -1,0 +1,15 @@
+/* G1: 14px bold capitals (bronze needs ≥ 14px bold on light, MOTION.md §1). */
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.onDark {
+  color: var(--color-accent-on-dark);
+}

@@ -8,7 +8,7 @@ export function LoadingPage() {
   return (
     <Page busy>
       <p role="status" className="visually-hidden">
-        {t('common.loading')}
+        {t('loading')}
       </p>
       <Skeleton height={32} width="40%" />
       <Skeleton height={112} />

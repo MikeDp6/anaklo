@@ -4,7 +4,8 @@
  * PostgREST forwards them as `{ code: 'P0001', message: 'AN001', hint: 'slot_taken' }`.
  *
  * errors.test.ts fails if this list and the SQL list disagree, or if a code has no i18n text
- * (`errors.<code>` in el.json and en.json). Pure module: no Deno/DOM/Node APIs (ADR-0002 §3).
+ * (`errors.<code>` in the `common` namespace: src/shared/i18n/{el,en}/common.json).
+ * Pure module: no Deno/DOM/Node APIs (ADR-0002 §3).
  */
 export const DOMAIN_ERRORS = {
   AN001: 'slot_taken',
@@ -16,6 +17,19 @@ export const DOMAIN_ERRORS = {
   AN007: 'invalid_client',
   AN008: 'invalid_staff',
   AN009: 'not_bookable',
+  // 0005 (online booking, manage link). AN010–AN012 come from otp_verify's result, mapped by the
+  // Edge Function; the SQL list carries them too so that both lists stay equal.
+  AN010: 'otp_invalid',
+  AN011: 'otp_expired',
+  AN012: 'otp_attempts',
+  AN013: 'rate_limited',
+  AN014: 'verification_required',
+  AN015: 'manage_token_invalid',
+  AN016: 'change_too_late',
+  AN017: 'sms_unavailable',
+  AN018: 'phone_not_supported',
+  AN019: 'otp_resend_too_soon',
+  AN020: 'not_modifiable',
 } as const
 
 export type DomainErrorCode = keyof typeof DOMAIN_ERRORS

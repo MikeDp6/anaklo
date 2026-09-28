@@ -885,9 +885,10 @@ $$;
 
 -- ---------------------------------------------------------------------------------------------
 -- private.move_core: the only way an appointment changes time or staff member (client link in
--- 1.3, staff app in 1.4). Row lock first, then the local days of the old AND the new block in
--- ascending order (same order as book_core, so no deadlocks); recheck without the appointment
--- itself; update in place (the 0003 trigger writes rescheduled/reassigned). Duration and price
+-- 1.3, staff app in 1.4). Row lock first (FOR NO KEY UPDATE), then the local days of the old
+-- AND the new block in ascending order (same order as book_core, so no deadlocks); recheck
+-- without the appointment itself; update in place (the 0003 trigger writes
+-- rescheduled/reassigned). Duration and price
 -- are recomputed only when the staff member changes (custom terms); otherwise they are kept.
 -- Whatever block is written is the block that is checked: in public mode it must be a free slot
 -- for exactly that length + buffer (a catalogue change since the booking changes nothing), in
@@ -940,10 +941,13 @@ begin
     raise exception 'p_new_starts_at is required' using errcode = '22023';
   end if;
 
+  -- NO KEY UPDATE, not UPDATE: a move never changes a key column, and the weaker lock lets the
+  -- foreign-key checks of rows that reference the appointment (a new manage token of a claim or
+  -- a replay, 0005) through instead of waiting here while this move waits on them.
   select * into v_appointment
   from public.appointments a
   where a.business_id = p_business_id and a.id = p_appointment_id
-  for update;
+  for no key update;
   if not found then
     raise exception 'appointment not found in this business' using errcode = '42501';
   end if;
@@ -1099,7 +1103,7 @@ as $$
   select jsonb_build_object(
     'business', jsonb_build_object(
       'id', b.id, 'slug', b.slug, 'name', b.name, 'vertical', b.vertical,
-      'timezone', b.timezone, 'locale', b.locale, 'theme', b.theme,
+      'timezone', b.timezone, 'locale', b.locale, 'currency', b.currency, 'theme', b.theme,
       'address', b.address, 'maps_url', b.maps_url, 'phone_e164', b.phone_e164,
       'slot_step_min', b.slot_step_min, 'min_notice_min', b.min_notice_min,
       'max_advance_days', b.max_advance_days, 'allow_any_staff', b.allow_any_staff

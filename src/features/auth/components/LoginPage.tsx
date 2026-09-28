@@ -7,14 +7,14 @@ import styles from './LoginPage.module.css'
 
 /** /app/login: email → 6-digit code (ADR-0009 §1, §4, §5). */
 export function LoginPage() {
-  const { t } = useTranslation()
+  const { t } = useTranslation(['pro', 'common'])
   const login = useLoginFlow()
 
   return (
     <Page>
       <header className={styles.header}>
-        <p className={styles.brand}>{t('app.name')}</p>
-        <h1>{t('pro.login.title')}</h1>
+        <p className={styles.brand}>{t('common:app.name')}</p>
+        <h1>{t('login.title')}</h1>
       </header>
       {login.step.name === 'email' ? (
         <EmailStep

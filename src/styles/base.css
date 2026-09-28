@@ -7,6 +7,7 @@
 html {
   overflow-x: clip; /* no sideways scroll on iOS */
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent; /* E16 press feedback replaces the grey flash */
 }
 
 body {
@@ -17,13 +18,28 @@ body {
   font-family: var(--font-body);
   font-size: var(--text-md);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* G2: page and section titles in Didot. It has one weight (400): never let the browser fake bold. */
 h1,
-h2,
-h3 {
-  line-height: 1.2;
+h2 {
   margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: var(--display-tracking);
+  line-height: 1.1;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+}
+
+h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.25;
 }
 
 p {
@@ -42,15 +58,6 @@ button {
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
 }
 
 /* Hidden visually, still read by screen readers (loading status, labels). */
