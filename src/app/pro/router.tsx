@@ -7,6 +7,7 @@ import {
   noAccessLoader,
   requireMembership,
 } from '@/features/auth/loaders'
+import { DayPage } from '@/features/calendar/components/DayPage'
 import { TodayPage } from '@/features/calendar/components/TodayPage'
 import { NotFoundPage } from '../shared/NotFoundPage'
 import { LoadingPage } from './LoadingPage'
@@ -35,7 +36,10 @@ export const router = createBrowserRouter(
           element: <MemberLayout />,
           loader: requireMembership,
           errorElement: <RouteErrorPage />,
-          children: [{ index: true, element: <TodayPage /> }],
+          children: [
+            { index: true, element: <TodayPage /> },
+            { path: 'day', element: <DayPage /> },
+          ],
         },
         { path: '*', element: <NotFoundPage /> },
       ],

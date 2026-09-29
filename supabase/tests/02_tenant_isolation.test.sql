@@ -276,14 +276,20 @@ $loop$;
 
 select set_config('anaklo.actor_type', 'system', true);
 
+-- The minimum grows with every step: 1.2 staff_available_slots, staff_book_appointment; 1.4 (0006)
+-- busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_move_appointment,
+-- today_summary.
 select ok(
-  (select count(distinct signature) from tenant_rpc_calls) >= 2,
-  'the generic loop found at least 2 business-scoped RPCs'
+  (select count(distinct signature) from tenant_rpc_calls) >= 8,
+  'the generic loop found at least 8 business-scoped RPCs'
 );
 
 select ok(
-  array['staff_available_slots', 'staff_book_appointment'] <@ (select array_agg(proname) from tenant_rpc_calls),
-  'the loop covers staff_available_slots and staff_book_appointment'
+  array['busy_calendar', 'cancel_appointment', 'search_clients', 'set_appointment_status', 'staff_available_slots',
+        'staff_book_appointment', 'staff_move_appointment', 'today_summary']
+    <@ (select array_agg(proname) from tenant_rpc_calls),
+  'the loop covers busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_available_slots, '
+  || 'staff_book_appointment, staff_move_appointment and today_summary'
 );
 
 select is(

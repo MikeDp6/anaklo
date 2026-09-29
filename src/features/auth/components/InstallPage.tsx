@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next'
+import { DisplayTitle } from '@/shared/ui/DisplayTitle'
+import { Eyebrow } from '@/shared/ui/Eyebrow'
 import { Page } from '@/shared/ui/Page'
 import styles from './InstallPage.module.css'
 
@@ -11,10 +13,10 @@ export function InstallPage() {
   return (
     <Page>
       <header className={styles.header}>
-        <p className={styles.brand}>{t('common:app.name')}</p>
-        <h1>{t('install.title')}</h1>
+        <Eyebrow>{t('common:app.name')}</Eyebrow>
+        <DisplayTitle size="md">{t('install.title')}</DisplayTitle>
       </header>
-      <p>{t('install.intro')}</p>
+      <p className={styles.intro}>{t('install.intro')}</p>
       <ol className={styles.steps}>
         <li>{t('install.stepShare')}</li>
         <li>{t('install.stepAdd')}</li>

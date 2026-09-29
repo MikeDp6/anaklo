@@ -30,6 +30,10 @@ export const DOMAIN_ERRORS = {
   AN018: 'phone_not_supported',
   AN019: 'otp_resend_too_soon',
   AN020: 'not_modifiable',
+  // 0006 (pro app day operations)
+  AN021: 'appointment_changed',
+  AN022: 'correction_closed',
+  AN023: 'not_started',
 } as const
 
 export type DomainErrorCode = keyof typeof DOMAIN_ERRORS

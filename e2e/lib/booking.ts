@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, type APIRequestContext, type Page, type TestInfo } from '@playwright/test'
+import { rememberManageToken } from './cleanup'
 import { DEMO_BUSINESS_ID } from './seedUsers'
 
 /**
@@ -93,6 +94,29 @@ export async function chooseDay(page: Page, index: number): Promise<string> {
     await strip.getByRole('button', { name: 'Επόμενες ημέρες' }).click()
   }
   throw new Error(`no bookable day #${index}`)
+}
+
+/**
+ * Picks exactly `date` (yyyy-MM-dd) in the strip, paging forward if needed. Use it to come back
+ * to a day chosen earlier in the same test: `chooseDay` counts days WITH free times, so its index
+ * moves on when parallel tests fill an earlier day in between.
+ */
+export async function chooseDate(page: Page, date: string): Promise<void> {
+  const strip = page.getByRole('group', { name: 'Ημερομηνίες' })
+  const day = strip.locator(`button[data-date="${date}"]`)
+  for (let window = 0; window < 5; window += 1) {
+    await expect(page.getByRole('group', { name: /^Ελεύθερες ώρες/ })).toBeVisible()
+    const last = await strip.locator('button[data-date]').last().getAttribute('data-date')
+    if ((await day.count()) > 0) break
+    await strip.getByRole('button', { name: 'Επόμενες ημέρες' }).click()
+    // The next window is on screen once its last day differs from this window's.
+    await expect(strip.locator('button[data-date]').last()).not.toHaveAttribute(
+      'data-date',
+      last ?? '',
+    )
+  }
+  await day.click()
+  await expect(day).toHaveAttribute('aria-pressed', 'true')
 }
 
 export function times(page: Page) {
@@ -206,4 +230,6 @@ export async function bookViaApi(
     },
   })
   expect(book.status(), await book.text()).toBe(200)
+  const { manage_token } = (await book.json()) as { manage_token: string }
+  rememberManageToken(manage_token)
 }

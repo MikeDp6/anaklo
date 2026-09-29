@@ -1,7 +1,7 @@
 import { expect, test } from './lib/fixtures'
 import {
   bookOnce,
-  chooseDay,
+  chooseDate,
   chooseService,
   chooseStaff,
   openShop,
@@ -42,7 +42,9 @@ test.describe('manage link', () => {
     await openShop(page)
     await chooseService(page)
     await chooseStaff(page, staff)
-    await chooseDay(page, 5)
+    // The booked date itself: counting «bookable day 5» again could land on another day if a
+    // parallel test filled an earlier one meanwhile.
+    await chooseDate(page, booked.date)
     await expect(
       times(page).and(page.locator(`[data-starts-at="${booked.startsAt}"]`)),
     ).toBeVisible()

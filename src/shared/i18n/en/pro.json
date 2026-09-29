@@ -1,6 +1,4 @@
 {
-  "todayTitle": "Today",
-  "todayPlaceholder": "Here you will see today's appointments, the gaps and which clients are overdue.",
   "signOut": "Sign out",
   "signingOut": "Signing out…",
   "loadErrorTitle": "The app did not load",
@@ -50,5 +48,196 @@
     "statusFailed": "Notifications did not load. Try again later.",
     "testSent": "The test notification was sent.",
     "testFailed": "The test notification was not sent. Try again."
+  },
+  "saving": "Saving…",
+  "nav": {
+    "label": "Main navigation",
+    "today": "Today",
+    "day": "Calendar"
+  },
+  "errors": {
+    "loadTitle": "Did not load",
+    "refreshTitle": "Not refreshed: this is what loaded last.",
+    "offline": "Not saved — no connection",
+    "offlineHint": "If you are not sure it went through, tap “Try again”: the same request is sent and nothing is doubled.",
+    "forbidden": "You are not allowed to do this.",
+    "AN001": "That time is no longer free. Choose another time.",
+    "AN020": "This change is not possible for an appointment in this state."
+  },
+  "sheet": {
+    "close": "Close",
+    "done": "Done"
+  },
+  "today": {
+    "title": "Today",
+    "appointments": "Appointments today",
+    "appointmentsOwn": "Your appointments today",
+    "remaining_one": "{{count}} to go",
+    "remaining_other": "{{count}} to go",
+    "openDay": "Open the calendar",
+    "revenue": "Expected revenue",
+    "revenueHint": "From today’s booked and completed appointments.",
+    "revenueAction": "See the appointments",
+    "next": "Next",
+    "nextEmpty": "No more appointments today.",
+    "inProgress": "Now",
+    "gaps": "Gaps",
+    "gapsEmpty": "No more gaps today.",
+    "gapRange": "{{from}}–{{to}}",
+    "gapMinutes": "{{minutes}}′ free",
+    "gapBook": "Book here",
+    "toMark": "To mark",
+    "toMarkBody_one": "{{count}} appointment ended without a mark. Did the client come?",
+    "toMarkBody_other": "{{count}} appointments ended without a mark. Did the clients come?",
+    "markCompletedFor": "Came: {{name}}",
+    "markNoShowFor": "No-show: {{name}}",
+    "walkIn": "Walk-in now",
+    "walkInHint": "Tap the staff member who will serve the client."
+  },
+  "day": {
+    "title": "Calendar",
+    "previous": "Previous day",
+    "next": "Next day",
+    "today": "Go to today",
+    "columns": "Staff columns",
+    "busy": "Busy",
+    "nowAt": "Now, {{time}}"
+  },
+  "appointment": {
+    "title": "Appointment",
+    "noClient": "Walk-in without a name",
+    "unknownService": "A service that no longer exists",
+    "when": "When",
+    "staff": "Staff member",
+    "services": "Service",
+    "total": "Total",
+    "source": "Booked via",
+    "timeRange": "{{from}}–{{to}}",
+    "call": "Call {{phone}}",
+    "correction": "Correction",
+    "notFound": "This appointment is no longer on this day. It may have been changed on another device.",
+    "status": {
+      "booked": "Booked",
+      "confirmed": "Confirmed",
+      "completed": "Came",
+      "no_show": "No-show",
+      "cancelled": "Cancelled"
+    },
+    "sources": {
+      "online": "Online",
+      "phone": "Phone",
+      "walkin": "Walk-in",
+      "staff": "In the shop",
+      "import": "Import"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "complete": "Came",
+      "noShow": "No-show",
+      "move": "Move",
+      "cancel": "Cancel"
+    }
+  },
+  "cancel": {
+    "title": "Cancel appointment",
+    "reason": "Reason",
+    "reasons": {
+      "client_request": "The client asked",
+      "staff_unavailable": "Staff member unavailable",
+      "shop_closed": "Shop closed",
+      "rescheduled": "Will be booked at another time",
+      "duplicate": "Duplicate booking",
+      "other": "Other reason"
+    },
+    "submit": "Cancel appointment",
+    "submitting": "Cancelling…",
+    "keep": "Back",
+    "done": "The appointment was cancelled"
+  },
+  "notify": {
+    "label": "Notify by SMS",
+    "hint": "The client gets an SMS about the change.",
+    "notSent": "No SMS was sent to the client."
+  },
+  "move": {
+    "title": "Move appointment",
+    "submit": "Move here",
+    "submitting": "Moving…",
+    "back": "Back",
+    "done": "The appointment was moved",
+    "doneSummary": "{{date}} at {{time}} · {{staff}}"
+  },
+  "slots": {
+    "staff": "Staff member",
+    "dates": "Dates",
+    "earlier": "Earlier days",
+    "later": "Later days",
+    "times": "Free times, {{date}}",
+    "none": "No free time on this day. Choose another day.",
+    "chosen": "Chosen time: {{time}}"
+  },
+  "quickAdd": {
+    "open": "New appointment",
+    "title": "New appointment",
+    "progress": "Step {{step}} of {{total}}",
+    "steps": {
+      "client": "Client",
+      "service": "Service",
+      "time": "Staff member and time"
+    },
+    "search": "Find a client",
+    "searchHint": "Name or the last digits of the mobile",
+    "searching": "Searching…",
+    "results": "Clients",
+    "noResults": "No client found. Add them as new.",
+    "lastVisit": "Last visit {{date}}",
+    "newClient": "New client",
+    "backToSearch": "Back to the search",
+    "fullName": "Full name",
+    "phone": "Mobile",
+    "phoneHint": "Optional. Needed for SMS reminders.",
+    "continue": "Continue",
+    "back": "Back",
+    "forClient": "For: {{client}}",
+    "duration": "{{minutes}}′",
+    "submit": "Book the appointment",
+    "submitting": "Booking…",
+    "done": "The appointment is booked",
+    "doneSummary": "{{client}} · {{date}} at {{time}} · {{staff}}",
+    "errors": {
+      "clientRequired": "Choose or add a client.",
+      "nameRequired": "Enter the client’s name.",
+      "nameTooLong": "The name is too long.",
+      "phoneInvalid": "Enter a valid mobile or leave it empty.",
+      "serviceRequired": "Choose a service.",
+      "staffRequired": "Choose a staff member.",
+      "timeRequired": "Choose a time."
+    }
+  },
+  "walkIn": {
+    "for": "Walk-in: {{name}}",
+    "short": "Walk-in",
+    "title": "Walk-in: {{name}}",
+    "service": "Service",
+    "name": "Client name",
+    "nameHint": "Optional. No phone needed.",
+    "submit": "Start now",
+    "submitting": "Saving…",
+    "done": "The walk-in is saved",
+    "doneSummary": "From {{time}} · {{staff}}"
+  },
+  "d8": {
+    "question": {
+      "outside_hours": "This time is outside the working hours. Book it anyway?",
+      "buffer_overlap": "This time falls in the break after another appointment. Squeeze it in anyway?"
+    },
+    "confirm": {
+      "outside_hours": "Yes, outside the hours",
+      "buffer_overlap": "Yes, squeeze it in"
+    },
+    "warning": {
+      "outside_hours": "Outside the working hours.",
+      "buffer_overlap": "In the break after another appointment."
+    }
   }
 }

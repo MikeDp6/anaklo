@@ -27,6 +27,9 @@
     "AN018": "A Greek mobile number (69…) is needed.",
     "AN019": "Please wait a moment before asking for a new code.",
     "AN020": "This appointment can no longer be changed.",
+    "AN021": "This appointment changed in the meantime. Check its current state and try again.",
+    "AN022": "The time for corrections has passed. Ask the owner to change it.",
+    "AN023": "This appointment has not started yet.",
     "network": "You are offline. Try again.",
     "unknown": "Something went wrong. Try again."
   }

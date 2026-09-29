@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/ui/Button'
+import { cx } from '@/shared/ui/cx'
 import type { LoginFormError } from '../hooks/useLoginFlow'
 import type { LoginMessageKey } from '../loginErrors'
 import { normaliseCode } from '../schema'
@@ -68,14 +69,19 @@ export function CodeStep({
           {t(error)}
         </p>
       )}
-      <Button type="submit" disabled={verifying}>
+      <Button type="submit" disabled={verifying} block>
         {verifying ? t('login.verifying') : t('login.verify')}
       </Button>
       <div className={styles.secondaryActions}>
-        <button type="button" className={styles.link} onClick={onResend} disabled={sending}>
+        <button
+          type="button"
+          className={cx(styles.link, 'pressable')}
+          onClick={onResend}
+          disabled={sending}
+        >
           {t('login.resend')}
         </button>
-        <button type="button" className={styles.link} onClick={onChangeEmail}>
+        <button type="button" className={cx(styles.link, 'pressable')} onClick={onChangeEmail}>
           {t('login.changeEmail')}
         </button>
       </div>

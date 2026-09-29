@@ -1,14 +1,14 @@
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/shared/ui/Button'
 import { useSignOut } from '../hooks/useSignOut'
-import styles from './SignOutButton.module.css'
 
-/** Signs out this device only (ADR-0009 §19). */
+/** Signs out this device only (ADR-0009 §19). A secondary G3 pill (E16 press, E2 with a mouse). */
 export function SignOutButton() {
   const { t } = useTranslation('pro')
   const { signOut, pending } = useSignOut()
   return (
-    <button type="button" className={styles.button} onClick={signOut} disabled={pending}>
+    <Button variant="secondary" onClick={signOut} disabled={pending}>
       {pending ? t('signingOut') : t('signOut')}
-    </button>
+    </Button>
   )
 }

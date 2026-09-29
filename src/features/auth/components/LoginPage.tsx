@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next'
+import { DisplayTitle } from '@/shared/ui/DisplayTitle'
+import { Eyebrow } from '@/shared/ui/Eyebrow'
 import { Page } from '@/shared/ui/Page'
 import { useLoginFlow } from '../hooks/useLoginFlow'
 import { CodeStep } from './CodeStep'
@@ -13,8 +15,8 @@ export function LoginPage() {
   return (
     <Page>
       <header className={styles.header}>
-        <p className={styles.brand}>{t('common:app.name')}</p>
-        <h1>{t('login.title')}</h1>
+        <Eyebrow>{t('common:app.name')}</Eyebrow>
+        <DisplayTitle size="lg">{t('login.title')}</DisplayTitle>
       </header>
       {login.step.name === 'email' ? (
         <EmailStep

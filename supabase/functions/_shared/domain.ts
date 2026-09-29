@@ -83,6 +83,9 @@ export const RATE_LIMIT_BUCKETS = [
   'sms_business_day',
 ] as const
 
+/** Cron jobs that write a heartbeat to `private.job_runs` (0006; 1.5/1.9 extend the list). */
+export const JOB_NAMES = ['auto_complete'] as const
+
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
 export const MemberRole = z.enum(MEMBER_ROLES)
@@ -127,4 +130,5 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   rate_limits_bucket: RATE_LIMIT_BUCKETS,
   suppression_list_reason: SUPPRESSION_REASONS,
   vertical_defaults_vertical: VERTICALS,
+  job_runs_job: JOB_NAMES,
 }

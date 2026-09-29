@@ -18,7 +18,7 @@ describe('DOMAIN_ERROR_HTTP_STATUS', () => {
     expect(byStatus).toEqual({
       403: ['AN014', 'AN015'],
       404: ['AN009'],
-      409: ['AN001', 'AN004'],
+      409: ['AN001', 'AN004', 'AN021'],
       422: [
         'AN002',
         'AN003',
@@ -32,6 +32,8 @@ describe('DOMAIN_ERROR_HTTP_STATUS', () => {
         'AN016',
         'AN018',
         'AN020',
+        'AN022',
+        'AN023',
       ],
       429: ['AN013', 'AN019'],
       503: ['AN017'],

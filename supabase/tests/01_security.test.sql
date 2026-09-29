@@ -7,7 +7,7 @@ create extension if not exists pgtap with schema extensions;
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(27);
+select plan(31);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -130,6 +130,42 @@ select is(
   'no API role and not PUBLIC holds any table or column privilege on the 0005 tables'
 );
 
+-- Job heartbeats and move idempotency (0006) are private bookkeeping: RLS on, no policy, and no
+-- privilege of any kind for any API role or PUBLIC. Only the definer RPCs and the cron job write.
+select is(
+  (select count(*) from pg_class c
+   where c.oid = any (array['private.job_runs', 'private.move_requests']::regclass[]) and c.relrowsecurity),
+  2::bigint,
+  'the 0006 tables (private.job_runs, private.move_requests) have row level security enabled'
+);
+
+select is(
+  (select count(*) from pg_policies p
+   where (p.schemaname, p.tablename) in (('private', 'job_runs'), ('private', 'move_requests'))),
+  0::bigint,
+  'the 0006 tables have no RLS policy (no API role reads them directly)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || t.table_name order by r.role_name, t.table_name)
+   from unnest(array['private.job_runs', 'private.move_requests']) as t (table_name)
+   cross join unnest(array['anon', 'authenticated', 'service_role', 'public']) as r (role_name)
+   where has_table_privilege(r.role_name, t.table_name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      or has_any_column_privilege(r.role_name, t.table_name, 'SELECT,INSERT,UPDATE,REFERENCES')),
+  null::text[],
+  'no API role and not PUBLIC holds any table or column privilege on the 0006 tables'
+);
+
+-- pg_cron (0006) keeps its objects in schema cron; the API roles cannot even look into it (a grant
+-- to PUBLIC would show up here as well).
+select is(
+  (select array_agg(r.role_name order by r.role_name)
+   from unnest(array['anon', 'authenticated', 'service_role']) as r (role_name)
+   where has_schema_privilege(r.role_name, 'cron', 'USAGE')),
+  null::text[],
+  'no API role has USAGE on schema cron'
+);
+
 select is(
   (select array_agg(c.table_name || '.' || c.column_name order by c.table_name, c.column_name)
    from information_schema.column_privileges c
@@ -222,15 +258,19 @@ select is(
    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'private') and has_function_privilege('authenticated', p.oid, 'execute')),
   array[
-    'private.available_slots_impl', 'private.has_role', 'private.is_member', 'private.is_reserved_slug',
+    'private.available_slots_impl', 'private.busy_calendar_impl', 'private.cancel_appointment_impl',
+    'private.has_role', 'private.is_member', 'private.is_reserved_slug',
     'private.is_valid_timezone', 'private.my_business_ids', 'private.my_business_ids_with_role',
     'private.my_staff_id', 'private.my_staff_ids', 'private.public_booking_catalogue_impl',
-    'private.public_business_profile_impl', 'private.public_slug_for_code_impl', 'private.staff_available_slots_impl',
-    'private.staff_book_appointment_impl',
-    'public.available_slots', 'public.public_booking_catalogue', 'public.public_business_profile',
-    'public.public_slug_for_code', 'public.staff_available_slots', 'public.staff_book_appointment'
+    'private.public_business_profile_impl', 'private.public_slug_for_code_impl', 'private.search_clients_impl',
+    'private.set_appointment_status_impl', 'private.staff_available_slots_impl',
+    'private.staff_book_appointment_impl', 'private.staff_move_appointment_impl', 'private.today_summary_impl',
+    'public.available_slots', 'public.busy_calendar', 'public.cancel_appointment', 'public.public_booking_catalogue',
+    'public.public_business_profile', 'public.public_slug_for_code', 'public.search_clients',
+    'public.set_appointment_status', 'public.staff_available_slots', 'public.staff_book_appointment',
+    'public.staff_move_appointment', 'public.today_summary'
   ]::text[],
-  'authenticated may execute only the membership helpers and granted RPCs'
+  'authenticated may execute only the membership helpers and granted RPCs (0006: the six day-ops RPCs and their _impl)'
 );
 
 -- service_role: the booking-page RPCs, the helpers that its CHECKs/policies need and (0005) the

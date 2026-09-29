@@ -152,7 +152,16 @@ function book(
   })
 }
 
-async function appointmentsAt(slot: { startsAt: string; staffId: string }): Promise<string[]> {
+/**
+ * Ids of every appointment (any status) of the slot's staff member starting exactly then, minus
+ * `existing`. A slot that an earlier run booked and then cancelled or moved away (the lock-order
+ * cases below) is free again and becomes the next run's last free slot, so each case subtracts
+ * the rows that were there before it started.
+ */
+async function appointmentsAt(
+  slot: { startsAt: string; staffId: string },
+  existing: readonly string[] = [],
+): Promise<string[]> {
   const { data, error } = await admin
     .from('appointments')
     .select('id')
@@ -160,12 +169,13 @@ async function appointmentsAt(slot: { startsAt: string; staffId: string }): Prom
     .eq('staff_id', slot.staffId)
     .eq('starts_at', slot.startsAt)
   if (error) throw error
-  return data.map((row) => row.id)
+  return data.map((row) => row.id).filter((id) => !existing.includes(id))
 }
 
 describe('online booking race (local stack, service_role over HTTP)', () => {
   it('10 parallel retries of one book (same key, same grant): 1 appointment, 9 replays, 1 confirmation', async () => {
     const slot = await lastFreeSlot()
+    const existing = await appointmentsAt(slot)
     const grant = await grantFor(slot)
     const key = randomUUID()
     const name = `Online race ${key.slice(0, 8)}`
@@ -186,7 +196,7 @@ describe('online booking race (local stack, service_role over HTTP)', () => {
     // One confirmation SMS, returned to every retry (a replay heals a send that never ran).
     const messages = new Set(bookings.flatMap((booking) => booking.message_ids))
     expect(messages.size).toBe(1)
-    expect(await appointmentsAt(slot)).toEqual([...ids])
+    expect(await appointmentsAt(slot, existing)).toEqual([...ids])
 
     const clients = await admin
       .from('clients')
@@ -199,6 +209,7 @@ describe('online booking race (local stack, service_role over HTTP)', () => {
 
   it('10 parallel books with different keys and one grant: the grant books once, 9 × AN014', async () => {
     const slot = await lastFreeSlot()
+    const existing = await appointmentsAt(slot)
     const grant = await grantFor(slot)
     await warmUp(grant)
 
@@ -212,7 +223,7 @@ describe('online booking race (local stack, service_role over HTTP)', () => {
     expect(replies.map(outcome).sort()).toEqual([...Array<string>(9).fill('AN014'), 'ok'])
     const winner = Booked.parse(replies.find((reply) => reply.error === null)?.data)
     expect(winner.replayed).toBe(false)
-    expect(await appointmentsAt(slot)).toEqual([winner.appointment_id])
+    expect(await appointmentsAt(slot, existing)).toEqual([winner.appointment_id])
   })
 })
 

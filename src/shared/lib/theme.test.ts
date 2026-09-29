@@ -224,6 +224,18 @@ describe('non-text indicators never use the raw brand (it may be a light gold)',
     expect(found).toEqual([])
   })
 
+  it('the «Κατειλημμένο» label of the day view reads at 4.5:1 on both of its stripes', () => {
+    const css = modules.find(({ file }) => file.endsWith('DayView.module.css'))?.css ?? ''
+    const busy = /\.busy\s*{([^}]*)}/.exec(css)?.[1] ?? ''
+    const text = /(?:^|\s)color:\s*var\((--[\w-]+)\)/.exec(busy)?.[1]
+    const stripes = [...busy.matchAll(/var\((--[\w-]+)\)\s+\d+(?:px)?/g)].map((m) => m[1] ?? '')
+    expect(text).toBeDefined()
+    expect(new Set(stripes)).toEqual(new Set(['--color-skeleton', '--color-surface']))
+    for (const stripe of stripes) {
+      expect(contrastRatio(color(text ?? ''), color(stripe))).toBeGreaterThanOrEqual(AA_TEXT)
+    }
+  })
+
   it('the E19 progress fill and the active E12 dot use --color-brand-line', () => {
     const css = (name: string) => modules.find(({ file }) => file.endsWith(name))?.css ?? ''
     expect(css('ProgressBar.module.css')).toMatch(

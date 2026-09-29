@@ -25,7 +25,9 @@ export type Log = (event: string, fields: Readonly<Record<string, LogValue>>) =>
 /**
  * HTTP status of every domain error (contract 1.3 §2.1). Typed against `DOMAIN_ERRORS`, so a
  * new code does not compile until it has a status here. AN005/AN006 are raised for staff only;
- * AN010–AN012 are emitted by `public-booking` itself (from `otp_verify`'s result).
+ * AN010–AN012 are emitted by `public-booking` itself (from `otp_verify`'s result). AN021–AN023
+ * (0006) come only from the pro app's RPCs through PostgREST; their status here is for
+ * completeness (a conflict for AN021, like AN001/AN004).
  */
 export const DOMAIN_ERROR_HTTP_STATUS = {
   AN001: 409,
@@ -48,6 +50,9 @@ export const DOMAIN_ERROR_HTTP_STATUS = {
   AN018: 422,
   AN019: 429,
   AN020: 422,
+  AN021: 409,
+  AN022: 422,
+  AN023: 422,
 } as const satisfies Record<DomainErrorCode, number>
 
 /** `{ error: { code: 'AN0xx', message: <name> } }` with the status of §2.1. */

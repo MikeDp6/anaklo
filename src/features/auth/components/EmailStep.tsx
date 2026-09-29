@@ -55,7 +55,7 @@ export function EmailStep({
           {t(error)}
         </p>
       )}
-      <Button type="submit" disabled={sending}>
+      <Button type="submit" disabled={sending} block>
         {sending ? t('login.sendingCode') : t('login.sendCode')}
       </Button>
     </form>

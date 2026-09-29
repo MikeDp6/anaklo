@@ -569,6 +569,12 @@ isOneToOne: false
 "book_appointment":
 { Args: { "p_business_id": string,"p_client_id": string,"p_grant": string,"p_idempotency_key": string,"p_marketing_box": string,"p_new_client": Json,"p_phone": string,"p_policy_version": string,"p_service_ids": (string)[],"p_staff_id": string,"p_starts_at": string,"p_trusted_device_token": string }; Returns: Json
                            },
+"busy_calendar":
+{ Args: { "p_business_id": string,"p_local_date": string }; Returns: Json
+                           },
+"cancel_appointment":
+{ Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_notify": boolean,"p_reason": string }; Returns: Json
+                           },
 "claim_messages":
 { Args: { "p_ids": (string)[] }; Returns: Json
                            },
@@ -609,6 +615,14 @@ isOneToOne: false
 "record_send_result":
 { Args: { "p_cost_cents": number,"p_error": string,"p_id": string,"p_lease_id": string,"p_outcome": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number }; Returns: boolean
                            },
+"search_clients":
+{ Args: { "p_business_id": string,"p_query": string }; Returns: {
+              "full_name": string,"id": string,"last_visit_at": string,"phone_e164": string
+            }[]
+                           },
+"set_appointment_status":
+{ Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_status": string }; Returns: Json
+                           },
 "staff_available_slots":
 { Args: { "p_business_id": string,"p_exclude_appointment_id"?: string,"p_from": string,"p_service_ids": (string)[],"p_staff_id": string,"p_to": string }; Returns: {
               "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
@@ -616,6 +630,12 @@ isOneToOne: false
                            },
 "staff_book_appointment":
 { Args: { "p_allow_buffer_overlap"?: boolean,"p_allow_outside_hours"?: boolean,"p_business_id": string,"p_client_id"?: string,"p_idempotency_key"?: string,"p_new_client"?: Json,"p_service_ids": (string)[],"p_source"?: string,"p_staff_id": string,"p_starts_at": string }; Returns: Json
+                           },
+"staff_move_appointment":
+{ Args: { "p_allow_buffer_overlap"?: boolean,"p_allow_outside_hours"?: boolean,"p_appointment_id": string,"p_business_id": string,"p_idempotency_key": string,"p_new_staff_id"?: string,"p_new_starts_at": string,"p_notify": boolean }; Returns: Json
+                           },
+"today_summary":
+{ Args: { "p_business_id": string }; Returns: Json
                            },
 "trusted_device_revoke":
 { Args: { "p_business_id": string,"p_trusted_device_token": string }; Returns: undefined

@@ -12,6 +12,7 @@ export const LOGIN_TEXT = {
   neutral: 'Αν το email έχει λογαριασμό, σου στείλαμε κωδικό.',
   codeLabel: 'Κωδικός 6 ψηφίων',
   verify: 'Σύνδεση',
+  resend: 'Στείλε νέο κωδικό',
 } as const
 
 const LOCK_ROOT = join(tmpdir(), 'anaklo-e2e-locks')
@@ -50,12 +51,49 @@ export async function withEmailLock<T>(email: string, work: () => Promise<T>): P
   }
 }
 
-/** Asks for a code on /app/login; returns once the (neutral) confirmation shows. */
+/** Auth's per-address pacing (`[auth.email] max_frequency` of supabase/config.toml). */
+const OVER_EMAIL_SEND_RATE_LIMIT = 'over_email_send_rate_limit'
+const MAX_CODE_REQUESTS = 5
+
+/**
+ * Asks for a code on /app/login; returns once the (neutral) confirmation shows.
+ *
+ * Auth sends at most one code per address per `max_frequency` (1 s locally). The screen answers a
+ * refused request with the same neutral message on purpose (ADR-0009 §4), so no code would ever
+ * arrive: when sign-ins of one address follow each other that closely (the next worker takes the
+ * lock of withEmailLock right after the previous sign-in), read Auth's own answer and ask again
+ * once the interval it names has passed.
+ */
 export async function requestCode(page: Page, email: string): Promise<void> {
   await page.goto('/app/login')
   await page.getByLabel(LOGIN_TEXT.emailLabel).fill(email)
-  await page.getByRole('button', { name: LOGIN_TEXT.sendCode }).click()
-  await expect(page.getByText(LOGIN_TEXT.neutral)).toBeVisible()
+  // First the email step's button; a retry uses the code step's «Στείλε νέο κωδικό» (the page
+  // keeps the pending email, so a reload would open on the code step, not on the email field).
+  let send = page.getByRole('button', { name: LOGIN_TEXT.sendCode })
+  for (let attempt = 1; ; attempt += 1) {
+    const answer = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/auth/v1/otp',
+    )
+    await send.click()
+    const response = await answer
+    await expect(page.getByText(LOGIN_TEXT.neutral)).toBeVisible()
+    if (response.status() !== 429) return
+
+    // GoTrue answers { code, message } (older versions: { error_code, msg }).
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null
+    const code = body?.code ?? body?.error_code
+    if (code !== OVER_EMAIL_SEND_RATE_LIMIT || attempt >= MAX_CODE_REQUESTS) {
+      throw new Error(`Auth refused the code for ${email}: ${JSON.stringify(body)}`)
+    }
+    // «…you can only request this after N seconds»: wait exactly that long (+1 s of rounding).
+    const text = body?.message ?? body?.msg
+    const message = typeof text === 'string' ? text : ''
+    const seconds = Number(/after (\d+) seconds?/.exec(message)?.[1] ?? 1)
+    await delay((seconds + 1) * 1000)
+    send = page.getByRole('button', { name: LOGIN_TEXT.resend })
+  }
 }
 
 /** The whole sign-in (ADR-0009 §1): email → code from Mailpit → leaves the login screen. */

@@ -47,8 +47,8 @@ npm run db:start
 | `npm run lint` | ESLint |
 | `npm test` | Vitest (τρέχει πάντα σε UTC, όποια ώρα κι αν έχει ο υπολογιστής) |
 | `npm run db:test` | pgTAP: RLS, δικαιώματα, διπλοκράτηση, events κ.λπ. |
-| `npm run test:race` | Ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (20 στην ίδια ώρα → 1 ραντεβού· 10 επαναλήψεις μιας online κράτησης με ίδιο κλειδί → 1 ραντεβού, ένα grant → μία κράτηση). Θέλει `db:start`· μην το τρέχεις μαζί με το `e2e` (συνδέουν τον ίδιο owner). |
-| `npm run e2e` | Playwright σε μέγεθος κινητού (Chrome + WebKit). Θέλει να τρέχει το `db:start`. Από το βήμα 1.1 θέλει και `PROXY_SECRET` και `APP_ENV=local` στο `.env.local`. |
+| `npm run test:race` | Ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (20 στην ίδια ώρα → 1 ραντεβού· 10 επαναλήψεις μιας online κράτησης με ίδιο κλειδί → 1 ραντεβού, ένα grant → μία κράτηση· από το 1.4 μετακίνηση από την εφαρμογή και κράτηση στην ίδια ώρα → πετυχαίνει μία, και όταν η μετακίνηση δίνει το ραντεβού σε συνάδελφο· 10 ίδιες μετακινήσεις με ένα κλειδί → μία). Θέλει `db:start`· μην το τρέχεις μαζί με το `e2e` (συνδέουν τον ίδιο owner). |
+| `npm run e2e` | Playwright σε μέγεθος κινητού (Chrome + WebKit). Θέλει να τρέχει το `db:start`. Από το βήμα 1.1 θέλει και `PROXY_SECRET` και `APP_ENV=local` στο `.env.local`. Κάθε online κράτηση ενός test ακυρώνεται στο τέλος του (μέσω του link διαχείρισης), ώστε οι επαναλήψεις να βρίσκουν τις ίδιες ελεύθερες ώρες· τα ραντεβού των tests της εφαρμογής επαγγελματία μένουν σε δικές τους μέρες, 2–5 εβδομάδες μπροστά (`npm run db:reset` τα καθαρίζει). Το test «δεύτερη συσκευή» περιμένει το refetch των 60″ (~70″). |
 | `npm run build`, μετά `npm run size` | Build και έλεγχος ότι η σελίδα κράτησης μένει ≤ 120 KB gzip |
 | `npm run gen:types` | Ξαναφτιάχνει το `src/shared/lib/database.types.ts` από την τοπική βάση. Τρέξ' το μετά από κάθε αλλαγή σχήματος: το CI ελέγχει με το `check:types` ότι είναι ενημερωμένο. |
 | `npm run fn:check` | `deno check` + `deno lint` στις Edge Functions (`supabase/functions`), με το deno του `node_modules`. Αποτυγχάνει και αν μια function δεν έχει `[functions.<name>]` με ρητό `verify_jwt` στο `config.toml`. Τρέχει στο CI. |
@@ -63,6 +63,8 @@ npm run db:start
 - http://127.0.0.1:54324: Mailpit (τα emails του τοπικού Auth)
 - http://127.0.0.1:54323: Supabase Studio (τοπικό)
 - Στο iPhone Simulator/Safari η `/app` ζητά πρώτα «Πρόσθεσε στην αρχική οθόνη»· στον desktop browser όχι.
+
+Αυτόματη ολοκλήρωση (1.4): το pg_cron τρέχει το job `auto-complete` κάθε 10′ και στην τοπική βάση (ολοκληρώνει τα ραντεβού που τελείωσαν πριν από `auto_complete_after_min`). Κάθε εκτέλεση γράφει μια γραμμή στο `private.job_runs`: `docker exec supabase_db_anaklo psql -U postgres -c "select * from private.job_runs order by id desc limit 5"`.
 
 Μετά από αλλαγή στο `supabase/config.toml`, στο `supabase/templates/` ή στο `PROXY_SECRET`: `npm run db:stop` και `npm run db:start` (το `db:reset` δεν αρκεί). Περίμενε λίγα δευτερόλεπτα πριν ζητήσεις κωδικό: τα πρώτα emails μετά την εκκίνηση μπορεί να βγουν με το προεπιλεγμένο πρότυπο.
 

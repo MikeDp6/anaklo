@@ -1,3 +1,10 @@
+.shell {
+  --nav-height: calc(64px + env(safe-area-inset-bottom, 0px));
+
+  min-height: 100dvh;
+  padding-bottom: var(--nav-height);
+}
+
 .bar {
   display: flex;
   align-items: center;
@@ -9,7 +16,41 @@
   padding: var(--space-3) var(--space-4) 0;
 }
 
+/* G1 label: bronze, bold, widely spaced capitals. */
 .brand {
-  color: var(--color-brand);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
   font-weight: 700;
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.nav {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+  height: var(--nav-height);
+  padding: var(--space-2) max(var(--space-4), calc((100% - var(--page-max)) / 2 + var(--space-4)))
+    calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.active {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
 }
