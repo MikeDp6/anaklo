@@ -1,4 +1,5 @@
-import { optOutPush } from '@/features/push/oneSignal'
+import { unregisterPushSubscription } from '@/features/push/api'
+import { optOutPush, retryPendingOptOut } from '@/features/push/oneSignal'
 import {
   getSessionUser,
   sendEmailCode,
@@ -25,14 +26,29 @@ import { deviceStorage } from './storage'
 
 /** Sign-in, sign-out and the session guard of the pro app, wired to the real device. */
 
+/**
+ * The sign-out while the session still exists (ADR-0009 §19, ADR-0010 §7): this device opts out
+ * of push AND its `push_subscriptions` row is unregistered, before Auth forgets the session.
+ * (1.7: «all devices», `scope: 'global'`, unregisters every row with `p_all => true` first,
+ * contract 1.5 D13.)
+ */
 export function signOut(options?: SignOutOptions): Promise<SignOutResult> {
-  return runSignOut({ optOutPush, signOutOfSupabase, clearDeviceState }, options)
+  return runSignOut(
+    {
+      optOutPush: () => optOutPush({ unregister: unregisterPushSubscription }),
+      signOutOfSupabase,
+      clearDeviceState,
+    },
+    options,
+  )
 }
 
 /**
  * The device-side part of a sign-out, for when supabase-js has already dropped the session
  * (revoked session, another tab, or simply signed out). Idempotent. It keeps a pending sign-in:
- * that belongs to someone signing in right now (ADR-0009 §5).
+ * that belongs to someone signing in right now (ADR-0009 §5). Without a session nothing can be
+ * unregistered: only the opt-out runs (the row goes with the membership change that revoked the
+ * session, or moves when this device registers again).
  */
 export async function cleanUpDevice(): Promise<void> {
   await optOutPush()
@@ -48,7 +64,10 @@ function clearDeviceState(): void {
 
 /**
  * The current user if the session is present and not idle for more than 30 days. A stale
- * session is signed out here (ADR-0009 §19). Otherwise the activity timestamp moves to now.
+ * session is signed out here (ADR-0009 §19). Otherwise the activity timestamp moves to now, and
+ * an opt-out that the previous user's sign-out could not finish is retried now (in the
+ * background: the guard never waits for push), so a shared phone stops receiving that user's
+ * pushes even when the next user never opens the Notifications screen (ADR-0010 §2).
  */
 export async function currentActiveUser(now = new Date()): Promise<SessionUser | null> {
   const user = await getSessionUser()
@@ -61,6 +80,7 @@ export async function currentActiveUser(now = new Date()): Promise<SessionUser |
     await signOut()
     return null
   }
+  void retryPendingOptOut()
   return user
 }
 

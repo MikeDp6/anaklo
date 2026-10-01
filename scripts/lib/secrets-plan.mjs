@@ -16,9 +16,12 @@ import { TOOL_TOKENS } from './cli.mjs'
 /**
  * @typedef {object} PlanContext
  * @property {readonly string[]} knownLocalValues local/example secrets that must never go remote
+ * @property {string} [projectRef] the dev project ref (SUPABASE_DEV_PROJECT_REF): the only
+ *   project whose `dispatch` the dev database may call
  */
 
 const MIN_PROXY_SECRET = 32
+const MIN_DISPATCH_SECRET = 32
 
 /** HMAC keys: at least 32 characters of base64, base64url or hex (e.g. 32 random bytes). */
 const HMAC_KEY = /^[A-Za-z0-9+/_=-]{32,}$/
@@ -32,6 +35,28 @@ export const LOCAL_SEED_HMAC_KEYS = [
   'local-dev-only-otp-hmac-key-not-a-secret-01',
   'local-dev-only-phone-hmac-key-not-a-secret-1',
 ]
+
+/**
+ * The dispatch secret that `supabase/seed.sql` writes to the LOCAL Vault and `.env.example` gives
+ * the local functions (contract 1.5 §2.12). Public by design: never a remote value.
+ */
+export const LOCAL_SEED_DISPATCH_SECRET = 'local-dev-only-dispatch-secret-not-a-secret-01'
+
+/** @param {string} value @param {PlanContext} context */
+const dispatchSecretCheck = (value, context) => {
+  if (value.length < MIN_DISPATCH_SECRET) {
+    return `must be at least ${MIN_DISPATCH_SECRET} characters (generate one, e.g. 32 random bytes in base64url)`
+  }
+  if (value === LOCAL_SEED_DISPATCH_SECRET || context.knownLocalValues.includes(value)) {
+    return 'is the local seed/example value (supabase/seed.sql); generate a separate one for dev'
+  }
+  return null
+}
+
+/** The only URL pg_net may call on dev: that project's own `dispatch` (contract 1.5 §3.5). */
+export function dispatchUrlFor(/** @type {string} */ projectRef) {
+  return `https://${projectRef}.supabase.co/functions/v1/dispatch`
+}
 
 /** @param {string} value */
 const hmacKeyCheck = (value) => {
@@ -73,6 +98,25 @@ export const SECRETS = [
       value.startsWith('sb_publishable_') ? null : 'expected the dev sb_publishable_ key',
   },
   {
+    // The push sender of public-booking, manage and dispatch (contract 1.5 §3.5): `fake` until
+    // the C5 go of 1.10, then `onesignal` (which needs both OneSignal values below).
+    name: 'PUSH_PROVIDER',
+    from: ['PUSH_PROVIDER'],
+    targets: ['functions'],
+    required: true,
+    check: (value) =>
+      value === 'fake' || value === 'onesignal' ? null : 'must be fake or onesignal',
+  },
+  {
+    // The header pg_net sends to `dispatch` (contract 1.5 §2.5, §3.1): the function checks it
+    // (DISPATCH_SECRET) and the database sends it (Vault dispatch_secret, below): same value.
+    name: 'DISPATCH_SECRET',
+    from: ['DISPATCH_SECRET'],
+    targets: ['functions'],
+    required: true,
+    check: dispatchSecretCheck,
+  },
+  {
     // spike-push (ADR-0010 §3), later dispatch. Optional until the push test; the app id and the
     // REST key go together. No identity key: pushes go to subscription ids (ADR-0010 §2).
     name: 'ONESIGNAL_APP_ID',
@@ -104,7 +148,27 @@ export const SECRETS = [
     required: true,
     check: hmacKeyCheck,
   },
-  // 1.5a adds the dispatch URL and its secret (pg_net) here, with target 'vault'.
+  {
+    // Vault: private.nudge_dispatch() of 0007 sends it as x-anaklo-dispatch-secret (step 1.5).
+    name: 'dispatch_secret',
+    from: ['DISPATCH_SECRET'],
+    targets: ['vault'],
+    required: true,
+    check: dispatchSecretCheck,
+  },
+  {
+    // Vault: where private.nudge_dispatch() posts (pg_net). Exactly the dev project's dispatch.
+    name: 'dispatch_url',
+    from: ['DISPATCH_URL'],
+    targets: ['vault'],
+    required: true,
+    check: (value, context) => {
+      if (!context.projectRef) return 'cannot be checked without the dev project ref'
+      return value === dispatchUrlFor(context.projectRef)
+        ? null
+        : 'must be exactly https://<SUPABASE_DEV_PROJECT_REF>.supabase.co/functions/v1/dispatch'
+    },
+  },
 ]
 
 /** Names an env file may hold for the other dev scripts; not reported as unused. */
@@ -162,6 +226,10 @@ export function planSecrets(values, context, fileNames = []) {
       const names = group.map((name) => SECRETS.find((spec) => spec.name === name)?.from[0] ?? name)
       plan.problems.push(`${names.join(' and ')} must be set together`)
     }
+  }
+  const pushProvider = plan.functions.find((entry) => entry.name === 'PUSH_PROVIDER')?.value
+  if (pushProvider === 'onesignal' && !present.has('ONESIGNAL_APP_ID')) {
+    plan.problems.push('PUSH_PROVIDER: onesignal needs ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY')
   }
   const used = new Set([...SECRETS.flatMap((spec) => spec.from), ...OTHER_KNOWN])
   plan.ignored = fileNames.filter((name) => !used.has(name))

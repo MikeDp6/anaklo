@@ -1,11 +1,11 @@
-// TEMPORARY: the push test C5 of ADR-0010 §3. Delete once its result is recorded in ADR-0010,
-// at the latest in 1.5a where `dispatch` takes over; also remove [functions.spike-push] in
-// supabase/config.toml and the "test push" button.
+// TEMPORARY: the push test C5 of ADR-0010 §3. Unused by the pro app since 1.5 (its test push goes
+// through request_test_push and `dispatch`); kept only for the device test C5 and deleted in 1.10
+// together with [functions.spike-push] in supabase/config.toml (contract 1.5 D17).
 //
 // Sends one test push through the OneSignal REST API to ONE subscription: the one named in the
 // body, which the pro app reads from the SDK on the calling device (`{ subscription_id }`). It
 // never addresses a user identity (no external_id, no aliases: ADR-0010 §2), so no member can
-// receive someone else's pushes by claiming an identity in the browser. Until 1.5a there is no
+// receive someone else's pushes by claiming an identity in the browser. Until 1.5 there was no
 // table to prove that the subscription is the caller's own; for a temporary, owners-only test
 // with a fixed text that is acceptable (subscription ids are random and never shown to other
 // users). Only owners may call it (role read from business_members under RLS, never from the
@@ -93,7 +93,7 @@ async function handle(req: Request): Promise<Response> {
   const payload = buildPushPayload({
     appId,
     subscriptionIds: [body.data.subscription_id],
-    texts: renderPushAllLocales('spike_test'),
+    texts: renderPushAllLocales('push_test'),
     url: pushClickUrl(req.headers.get('Origin')),
   })
 

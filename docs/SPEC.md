@@ -465,6 +465,10 @@ audit_log             id, business_id, actor_type (staff|nous_support|system), a
 --   service_role): μόνο μέσω των RPC του 0005 (docs/plans/contracts/1.3-public-booking.md). Κανένα
 --   token ή κωδικός σε καθαρό κείμενο: κωδικοί και τηλέφωνα ως HMAC (κλειδιά Vault), tokens ως sha256.
 businesses.short_code (1.3) 6 χαρακτήρες a-z0-9, unique, από trigger· καμία αλλαγή από το API· /r/<code>
+businesses (1.5)      quiet_start/quiet_end (τοπικές, προεπιλογή 22:00–09:00, παράθυρο 1–12 ώρες),
+                      reminder_mode (24h|evening_before) — UPDATE για owner/manager (οθόνες στο 1.6)·
+                      sms_sender_id (≤ 11, null = της πλατφόρμας), sms_daily_cap, sms_monthly_budget_cents
+                      (σταματά μόνο υπενθυμίσεις και μάρκετινγκ), import_reminders (§15) — μόνο provisioning
 otp_challenges        (1.3) business_id, phone_hmac, code_hmac (δεμένο στο id), expires_at (5′),
                       attempts (≤ 5), verified_at, grant_hash, grant_expires_at (10′), grant_used_at,
                       grant_appointment_id (το εφάπαξ grant και η κράτηση που το κατανάλωσε)
@@ -481,9 +485,18 @@ messages_log          (outbox, 1.3) business_id, client_id?, appointment_id?, ot
                       -- μοναδικό dedupe_key ανά ραντεβού/πρότυπο/ώρα (ή ανά otp_challenge): καμία διπλή αποστολή
                       -- to_e164: το μόνο τηλέφωνο σε καθαρό κείμενο (για την αποστολή· το σβήνει το erase_client)
                       -- OTP ανά online κράτηση: count(template = 'otp' και sent) / count(template = 'booking_confirmed')
+                      -- 1.5: πρότυπα SMS otp, booking_confirmed, reminder, cancelled_by_client|business,
+                      --   rescheduled_by_client|business· push push_booking_created|cancelled|moved, push_test
+                      --   (channel = push ⇔ πρότυπο push_*, με recipient_user_id και χωρίς client_id/to_e164)·
+                      --   κλειδιά appt:<id>:<πρότυπο>[:<event id>|:<epoch έναρξης>][:<χρήστης>]· τα SMS
+                      --   με πελάτη φεύγουν στο ΤΡΕΧΟΝ τηλέφωνο/γλώσσα του (στο claim)· κανόνες: §12
 rate_limits           (1.3, όλης της πλατφόρμας) bucket (otp_phone_hour|otp_ip_hour|otp_business_day|
-                      sms_platform_day), key (HMAC τηλεφώνου ή IP, business id ή 'platform'), window_start (UTC), count
-member_notification_prefs
+                      sms_platform_day|sms_phone_day|sms_business_day|sms_platform_month (1.5, μήνας UTC)),
+                      key (HMAC τηλεφώνου ή IP, business id ή 'platform'), window_start (UTC), count
+member_notification_prefs (1.5) business_id, user_id (σύνθετο FK στο business_members, cascade),
+                      push_own (null = true), push_all (null = μόνο owner), updated_at
+                      -- κανένα row = οι προεπιλογές· SELECT μόνο τις δικές μου· καμία εγγραφή από το API
+                      --   μέχρι να υπάρξει οθόνη
 suppression_list      business_id, phone_hmac (HMAC-SHA256 με μυστικό κλειδί, όχι απλό hash:
                       ένα ελληνικό κινητό έχει μόλις 10^8 τιμές), reason (erased|opted_out), created_at
                       -- ψευδωνυμοποιημένο προσωπικό δεδομένο: σκοπός = να τηρούνται διαγραφές και opt-out
@@ -497,14 +510,19 @@ push_subscriptions    user_id, provider (onesignal|vapid), subscription_id (OneS
                       -- RLS user_id = auth.uid()· εγγραφή μόνο με register/unregister_push_subscription
                       --   (η νέα καταχώριση μετακινεί τη συσκευή στον καλούντα)
                       -- push μόνο με include_subscription_ids από εδώ, ποτέ με external_id
+                      -- κάθε διαγραφή μέλους ή αλλαγή ρόλου σβήνει ΟΛΕΣ τις συσκευές του χρήστη (trigger
+                      --   business_members_drop_push, 1.5)· το revoke_user_sessions του 1.7 καλεί
+                      --   private.drop_push_subscriptions
 private: platform_settings (πλατφορμικός διακόπτης SMS, ημερήσιο όριο, όρια OTP ανά αριθμό/IP/επιχείρηση,
          αναμονή νέου κωδικού, όρια των άλλων SMS ανά αριθμό/επιχείρηση/ημέρα, μερίδιο του ορίου μόνο για OTP· 1.3), vertical_defaults (διάστημα επανάληψης ανά κλάδο = packages/verticals/*.json,
          για την πρόταση επόμενης επίσκεψης· 1.3), job_runs και move_requests (1.4, παρακάτω)
+                      -- platform_settings (1.5): push_enabled (διακόπτης push), sms_monthly_cap (όλα τα
+                      --   SMS με τα OTP, μήνας UTC), sms_unit_cost_cents (εκτίμηση για τον προϋπολογισμό)
                       -- platform_settings.fresh_totp_max_age_seconds (1.7): παράθυρο φρέσκου κωδικού,
                       --   προεπιλογή 300, CHECK 0–300 (οι ρυθμίσεις μόνο το αυστηραίνουν)· το τοπικό/e2e
                       --   seed βάζει 10 s (όχι 0: με 0 δεν περνά καμία κρίσιμη ενέργεια)· τα e2e περιμένουν
                       --   να παλιώσει ο κωδικός, ώστε το φύλλο κωδικού να εμφανίζεται πάντα
-private.job_runs      (1.4) id, job (auto_complete· τα 1.5/1.9 επεκτείνουν τη λίστα), started_at, finished_at,
+private.job_runs      (1.4) id, job (auto_complete· 1.5: dispatch_sweep, dispatch, purge· το 1.9 επεκτείνει), started_at, finished_at,
                       ok, rows_affected?, error? (SQLSTATE ή κωδικός, ≤ 200, ποτέ προσωπικά στοιχεία)
                       -- μία γραμμή ανά εκτέλεση cron, και στις αποτυχίες (ok = (error is null))· τη γράφει
                       --   μόνο το private.record_job_run· το health του 1.9 διαβάζει το τελευταίο ok ανά job
@@ -921,6 +939,15 @@ anaklo/
 - Τα παλιά ραντεβού που έρχονται από εισαγωγή δεν στέλνουν **ποτέ** μηνύματα.
 - Κάθε μήνυμα στέλνεται στη γλώσσα του πελάτη (`clients.locale`).
 
+**Όπως υλοποιήθηκε στο 1.5** (29/9/2026, [contract 1.5](plans/contracts/1.5-messaging.md) §0, D1–D32· προεπιλογές που περιμένουν το ΟΚ του Μιχάλη):
+- «24ω πριν» = η ίδια τοπική ώρα την προηγούμενη τοπική μέρα (25ω πριν από την Κυριακή της αλλαγής ώρας τον Οκτώβριο, 23ω τον Μάρτιο). Μια υπενθύμιση που μετά τη μετάθεση των ωρών ησυχίας πέφτει πριν από τον προγραμματισμό + 2ω δεν μπαίνει καθόλου (ποτέ αργότερα). Όλοι οι κανόνες χρόνου ζουν στο `private.reminder_at`.
+- Οι αλλαγές ρυθμίσεων ισχύουν για όσες υπενθυμίσεις προγραμματίζονται μετά· μια αλλαγή επαγγελματία στην ίδια ώρα κρατά την υπενθύμιση όπως ήταν.
+- Όσα προκαλεί η εφαρμογή επαγγελματία (ακύρωση/αλλαγή με «Ενημέρωση με SMS», δοκιμαστική ειδοποίηση) φεύγουν αμέσως μετά το commit μέσω της Edge Function `dispatch`, που την καλεί η ίδια η βάση (pg_net)· το `dispatch-sweep` κάθε 5′ πιάνει τις υπενθυμίσεις και ό,τι έμεινε.
+- Προθεσμίες: υπενθύμιση έως 60′ μετά την ώρα της (και ποτέ μετά την έναρξη ή μέσα στις ώρες ησυχίας), push 60′, δοκιμαστικό push 10′· OTP, επιβεβαιώσεις και ακυρώσεις χωρίς προθεσμία. Αποτυχία που σίγουρα δεν έφτασε στον πάροχο: έως 3 προσπάθειες (5′, 10′), ποτέ για OTP· άγνωστη έκβαση (timeout, dispatcher που «πέθανε») = `unknown`, ποτέ δεύτερη αποστολή.
+- Φρένα: διακόπτες SMS και push της πλατφόρμας, ημερήσιο και μηνιαίο όριο πλατφόρμας, ημερήσιο όριο ανά επιχείρηση και ανά αριθμό· ο μηνιαίος προϋπολογισμός της επιχείρησης σταματά μόνο υπενθυμίσεις και μάρκετινγκ. SMS σε ελληνικό σταθερό (+30 χωρίς 69) ούτε προγραμματίζεται ούτε στέλνεται· γι' αυτό η «Ενημέρωση με SMS» δεν προσφέρεται σε τέτοιον πελάτη.
+- Διατήρηση: το `messages_log` σβήνεται 12 μήνες μετά την τελευταία στιγμή του μηνύματος (δημιουργία, προγραμματισμός, αποστολή)· μήνυμα που περιμένει ακόμα να σταλεί δεν σβήνεται ποτέ.
+- Push προσωπικού: στον χρήστη του επαγγελματία του ραντεβού (και στον προηγούμενο σε αλλαγή επαγγελματία) και σε κάθε owner, ποτέ σε όποιον έκανε την αλλαγή· για νέα online κράτηση και κάθε μετακίνηση/ακύρωση μελλοντικού ραντεβού. Περιεχόμενο: μόνο μικρό όνομα πελάτη, υπηρεσία, ώρα, επαγγελματίας (ποτέ επώνυμο ή τηλέφωνο). Δοκιμαστική ειδοποίηση από Ρυθμίσεις → Ειδοποιήσεις, σε όλες τις συσκευές του χρήστη.
+
 ---
 
 ## 13. Δοκιμές & ποιότητα
@@ -987,6 +1014,8 @@ anaklo/
 
 Εγκρίθηκε στις 27/9/2026· ο φρέσκος κωδικός για κρίσιμες ενέργειες προστέθηκε στις 28/9/2026 (+2 μέρες). Την ίδια μέρα: **τοπικά πρώτα** (όλα τα remote, οι λογαριασμοί και οι δοκιμές σε συσκευές στο νέο τελικό βήμα 1.10) και **κατεύθυνση σχεδιασμού Δ** (ADR-0011), μαζί +1 μέρα. Το αναλυτικό πλάνο ανά βήμα (βάση, Edge Functions, frontend, tests, κριτήρια εξόδου, προαπαιτούμενα) βρίσκεται στο `docs/plans/phase-1.md`. Με 1η μέρα τη Δευτέρα 28/9/2026 και την αργία της 28/10, η μέρα 38 είναι η 19/11/2026 και το buffer τελειώνει στις 24/11/2026.
 
+> Κατάσταση (29/9/2026): τα 1.3 (`bcd79ba`) και 1.4 (`7eb568a`) έγιναν commit. Το 1.5 υλοποιήθηκε τοπικά: `0007_messaging.sql` (planner v2 με `reminder_at`, claim για τις functions και για τον `dispatch`, pg_net προς `dispatch`, `dispatch-sweep` κάθε 5′, `nightly-purge`, `push_subscriptions`), Edge Function `dispatch` με ψεύτικους αποστολείς SMS και push, Ρυθμίσεις → Ειδοποιήσεις στην εφαρμογή· όλα τα tests πράσινα· commit 1/10/2026 (οι αποφάσεις D1–D32 του contract 1.5 εγκρίθηκαν)· το `db:push` του 0007 στο 1.10. Επόμενο το 1.6.
+>
 > Κατάσταση (28/9/2026): το 1.1 (τοπικό μέρος) και το 1.2 ολοκληρώθηκαν. Το 1.3 υλοποιήθηκε τοπικά (0005, `public-booking`, `manage`, σελίδα κράτησης με την εμφάνιση Δ, ψεύτικος adapter SMS) με όλα τα tests πράσινα· εκκρεμούν commit και CI, και τα remote του στο 1.10. Το 1.4 υλοποιήθηκε τοπικά: `0006_day_ops.sql` (busy_calendar, today_summary, set/cancel/move ραντεβού από το προσωπικό, search_clients, αυτόματη ολοκλήρωση με pg_cron και `job_runs`) και η εφαρμογή επαγγελματία («Σήμερα», ημερολόγιο ημέρας, γρήγορο ραντεβού, walk-in, μετακίνηση, ακύρωση, no-show) με την εμφάνιση Δ σε ελάχιστο επίπεδο κίνησης· όλα τα tests πράσινα (pgTAP, Vitest, `test:race`, Playwright σε Chromium + WebKit)· εκκρεμούν commit και CI, και το `db:push` του 0006 στο 1.10. Επόμενο το 1.5.
 
 | Βήμα | Περιεχόμενο | Μέρες |

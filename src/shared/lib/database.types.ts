@@ -181,13 +181,13 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"settings": NonNullable<Json>,"short_code": string,"slot_step_min": number,"slug": string,"theme": NonNullable<Json>,"timezone": string,"vertical": string
+                    "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"import_reminders": boolean,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"quiet_end": string,"quiet_start": string,"reminder_mode": string,"settings": NonNullable<Json>,"short_code": string,"slot_step_min": number,"slug": string,"sms_daily_cap": number | null,"sms_monthly_budget_cents": number | null,"sms_sender_id": string | null,"theme": NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Insert: {
-                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug": string,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"import_reminders"?: boolean,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name": string,"phone_e164"?: string | null,"quiet_end"?: string,"quiet_start"?: string,"reminder_mode"?: string,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug": string,"sms_daily_cap"?: number | null,"sms_monthly_budget_cents"?: number | null,"sms_sender_id"?: string | null,"theme"?: NonNullable<Json>,"timezone": string,"vertical": string
                   }
                   Update: {
-                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug"?: string,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
+                    "address"?: string | null,"allow_any_staff"?: boolean,"auto_complete_after_min"?: number,"booking_enabled"?: boolean,"cancel_min_notice_min"?: number,"correction_window_days"?: number,"created_at"?: string,"currency"?: string,"id"?: string,"import_reminders"?: boolean,"locale"?: string,"maps_url"?: string | null,"max_advance_days"?: number,"messaging_enabled"?: boolean,"min_notice_min"?: number,"name"?: string,"phone_e164"?: string | null,"quiet_end"?: string,"quiet_start"?: string,"reminder_mode"?: string,"settings"?: NonNullable<Json>,"short_code"?: string,"slot_step_min"?: number,"slug"?: string,"sms_daily_cap"?: number | null,"sms_monthly_budget_cents"?: number | null,"sms_sender_id"?: string | null,"theme"?: NonNullable<Json>,"timezone"?: string,"vertical"?: string
                   }
                   Relationships: [
                     
@@ -267,6 +267,25 @@ isOneToOne: false
       referencedColumns: ["business_id","id"]
     }
                   ]
+                },"member_notification_prefs": {
+                  Row: {
+                    "business_id": string,"push_all": boolean | null,"push_own": boolean | null,"updated_at": string,"user_id": string
+                  }
+                  Insert: {
+                    "business_id": string,"push_all"?: boolean | null,"push_own"?: boolean | null,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"push_all"?: boolean | null,"push_own"?: boolean | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "member_notification_prefs_member_fk"
+      columns: ["business_id","user_id"]
+isOneToOne: true
+      referencedRelation: "business_members"
+      referencedColumns: ["business_id","user_id"]
+    }
+                  ]
                 },"messages_log": {
                   Row: {
                     "appointment_id": string | null,"attempts": number,"booking_token_id": string | null,"business_id": string,"category": string,"channel": string,"client_id": string | null,"cost_cents": number | null,"created_at": string,"dedupe_key": string,"error": string | null,"id": string,"lease_id": string | null,"lease_until": string | null,"locale": string,"otp_challenge_id": string | null,"provider": string | null,"provider_message_id": string | null,"recipient_user_id": string | null,"scheduled_for": string,"segments": number | null,"sent_at": string | null,"status": string,"template": string,"to_e164": string | null,"updated_at": string
@@ -334,6 +353,19 @@ isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
     }
+                  ]
+                },"push_subscriptions": {
+                  Row: {
+                    "auth_secret": string | null,"created_at": string,"endpoint": string | null,"id": string,"p256dh": string | null,"provider": string,"subscription_id": string | null,"updated_at": string,"user_id": string
+                  }
+                  Insert: {
+                    "auth_secret"?: string | null,"created_at"?: string,"endpoint"?: string | null,"id"?: string,"p256dh"?: string | null,"provider": string,"subscription_id"?: string | null,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "auth_secret"?: string | null,"created_at"?: string,"endpoint"?: string | null,"id"?: string,"p256dh"?: string | null,"provider"?: string,"subscription_id"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"rate_limits": {
                   Row: {
@@ -575,6 +607,9 @@ isOneToOne: false
 "cancel_appointment":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_notify": boolean,"p_reason": string }; Returns: Json
                            },
+"claim_due_messages":
+{ Args: { "p_limit": number }; Returns: Json
+                           },
 "claim_messages":
 { Args: { "p_ids": (string)[] }; Returns: Json
                            },
@@ -612,8 +647,20 @@ isOneToOne: false
 "public_slug_for_code":
 { Args: { "p_code": string }; Returns: string
                            },
+"record_delivery_report":
+{ Args: { "p_cost_cents": number,"p_error": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number,"p_status": string }; Returns: boolean
+                           },
+"record_dispatch_run":
+{ Args: { "p_error": string,"p_ok": boolean,"p_rows": number,"p_started_at": string }; Returns: number
+                           },
 "record_send_result":
 { Args: { "p_cost_cents": number,"p_error": string,"p_id": string,"p_lease_id": string,"p_outcome": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number }; Returns: boolean
+                           },
+"register_push_subscription":
+{ Args: { "p_auth"?: string,"p_endpoint"?: string,"p_p256dh"?: string,"p_provider": string,"p_subscription_id"?: string }; Returns: Json
+                           },
+"request_test_push":
+{ Args: { "p_business_id": string }; Returns: Json
                            },
 "search_clients":
 { Args: { "p_business_id": string,"p_query": string }; Returns: {
@@ -639,6 +686,9 @@ isOneToOne: false
                            },
 "trusted_device_revoke":
 { Args: { "p_business_id": string,"p_trusted_device_token": string }; Returns: undefined
+                           },
+"unregister_push_subscription":
+{ Args: { "p_all"?: boolean,"p_endpoint"?: string,"p_subscription_id"?: string }; Returns: number
                            }
           }
           Enums: {

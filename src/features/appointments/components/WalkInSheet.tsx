@@ -86,7 +86,6 @@ export function WalkInSheet({
             staff: staffName,
           })}
           warnings={book.result.warnings}
-          smsNotSent={false}
           onDone={close}
         />
       </Sheet>

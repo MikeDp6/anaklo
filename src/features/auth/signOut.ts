@@ -17,7 +17,8 @@ export interface SignOutResult {
 export interface SignOutDeps {
   /**
    * Stops push to this device for the user who leaves: `OneSignal.User.PushSubscription.optOut()`
-   * (from 1.5a also `unregister_push_subscription`). Never throws.
+   * and `unregister_push_subscription` (ADR-0010 §7), bounded in time. Never throws; if it did,
+   * the sign-out would still go on.
    */
   optOutPush(): Promise<void>
   signOutOfSupabase(scope: SignOutScope): Promise<SignOutResult>
@@ -29,8 +30,12 @@ export async function runSignOut(
   deps: SignOutDeps,
   { scope = 'local' }: SignOutOptions = {},
 ): Promise<SignOutResult> {
-  // Push first, while the session still exists (from 1.5a its push_subscriptions row goes too).
-  await deps.optOutPush()
+  // Push first, while the session still exists: its push_subscriptions row can go only now.
+  try {
+    await deps.optOutPush()
+  } catch {
+    // Push must never block a sign-out.
+  }
   try {
     return await deps.signOutOfSupabase(scope)
   } finally {

@@ -1,9 +1,11 @@
 import type { AnakloEnv, SmsProviderName } from './booking-config.ts'
+import type { SendResult } from './push-provider.ts'
 
 /**
- * The SMS adapter behind `send.ts` (contract 1.3 §6). Pure (ADR-0002 §3): the settings come in
- * as arguments from each `index.ts`. Only the fake adapter exists until the real provider
- * (1.5b); `booking-config.ts` refuses it when `ANAKLO_ENV` is prod, and so does this factory.
+ * The SMS adapter behind `send.ts` (contract 1.3 §6, 1.5 §3.2). Pure (ADR-0002 §3): the
+ * settings come in as arguments from each `index.ts`. Only the fake adapter exists until the
+ * real provider (1.10); `booking-config.ts` refuses it when `ANAKLO_ENV` is prod, and so does
+ * this factory.
  */
 
 export type SmsSendRequest = {
@@ -14,19 +16,13 @@ export type SmsSendRequest = {
   readonly segments: number
 }
 
-export type SmsSendResult =
-  | {
-      ok: true
-      providerMessageId: string
-      /** As the provider reports them (SPEC §12), which is what `messages_log` records. */
-      segments: number
-      costCents: number | null
-    }
-  | {
-      ok: false
-      /** A short code (never personal data), stored in `messages_log.error`. */
-      error: string
-    }
+/**
+ * The adapter's answer: the result type shared with the push senders (contract 1.5 §3.3). On
+ * success `segments` and `costCents` are as the provider reports them (SPEC §12), which is what
+ * `messages_log` records; a failure says whether the SMS certainly did not leave (`failed`), was
+ * refused for good (`rejected`) or may have left (`unknown`, never retried).
+ */
+export type SmsSendResult = SendResult
 
 export interface SmsProvider {
   readonly name: string

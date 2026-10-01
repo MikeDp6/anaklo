@@ -132,6 +132,37 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------------------------
+-- Where private.nudge_dispatch (0007) sends its nudge, and the shared secret dispatch checks.
+-- UPSERTED (unlike the HMAC keys above: these may change freely). The URL is seen from INSIDE the
+-- database container: `kong` is the network alias the Supabase CLI gives the API gateway on
+-- supabase_network_<project_id>, on Docker Desktop and on Linux CI alike (never 127.0.0.1:54321,
+-- never host.docker.internal). The secret equals DISPATCH_SECRET of .env.example (public, local
+-- only); secrets:dev (1.10) writes the remote values and refuses this one.
+-- ---------------------------------------------------------------------------------------------
+do $$
+declare
+  v_secret record;
+begin
+  for v_secret in
+    select x.name, x.value
+    from (values
+      ('dispatch_url', 'http://kong:8000/functions/v1/dispatch'),
+      ('dispatch_secret', 'local-dev-only-dispatch-secret-not-a-secret-01')
+    ) as x (name, value)
+  loop
+    if exists (select 1 from vault.secrets s where s.name = v_secret.name) then
+      perform vault.update_secret(
+        (select s.id from vault.secrets s where s.name = v_secret.name),
+        v_secret.value, v_secret.name, 'seed.sql (local dev only)'
+      );
+    else
+      perform vault.create_secret(v_secret.value, v_secret.name, 'seed.sql (local dev only)');
+    end if;
+  end loop;
+end;
+$$;
+
 -- Local e2e only: Playwright re-runs OTP starts and bookings from 127.0.0.1 with the same test
 -- numbers, so the caps and the resend cooldown are relaxed here. pgTAP sets every
 -- platform_settings column itself. A remote database needs the real values back after any reset
@@ -144,6 +175,7 @@ set otp_per_phone_hour = 1000,
     otp_resend_seconds = 0,
     sms_per_phone_day = 10000,
     sms_per_business_day = 100000,
+    sms_monthly_cap = 1000000,
     updated_at = now()
 where id;
 
@@ -189,4 +221,12 @@ insert into public.business_members (business_id, user_id, role, staff_id) value
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a001', 'owner', '00000000-0000-4000-8000-000000000101'),
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a002', 'manager', null),
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a003', 'staff', '00000000-0000-4000-8000-000000000102')
+on conflict do nothing;
+
+-- Synthetic push subscriptions (0007), so e2e can observe the fake pushes: nothing registers
+-- through the UI without VITE_ONESIGNAL_APP_ID (until 1.10). Owner ...a001 (staff Νίκος) and staff
+-- ...a003 (Άλεξ); the manager has none (the no_subscription path). Not real OneSignal ids.
+insert into public.push_subscriptions (user_id, provider, subscription_id) values
+  ('00000000-0000-4000-8000-00000000a001', 'onesignal', '00000000-0000-4000-8000-0000000f0001'),
+  ('00000000-0000-4000-8000-00000000a003', 'onesignal', '00000000-0000-4000-8000-0000000f0003')
 on conflict do nothing;

@@ -25,7 +25,7 @@ npm run db:start
 
 Το `.env.example` έχει ήδη τις τοπικές τιμές του Supabase. Είναι δημόσιες, αφού αφορούν μόνο την τοπική βάση στο Docker.
 
-Αν το `.env.local` σου είναι παλιότερο από το βήμα 1.3, πρόσθεσε από το `.env.example` τις μεταβλητές που λείπουν (και μετά `npm run db:stop` και `npm run db:start`):
+Αν το `.env.local` σου είναι παλιότερο από το βήμα 1.5 (ή το 1.3), πρόσθεσε από το `.env.example` τις μεταβλητές που λείπουν (και μετά `npm run db:stop` και `npm run db:start`):
 
 | Μεταβλητή (`.env.local`) | Τι είναι |
 |---|---|
@@ -33,7 +33,8 @@ npm run db:start
 | `PROXY_SECRET` | Κοινό μυστικό του `/api` proxy (Vite) και των Edge Functions (μέσω `[edge_runtime.secrets]` του `config.toml`). Τοπική τιμή, ≥ 16 χαρακτήρες. **Μετά από αλλαγή του: `npm run db:stop` και `npm run db:start`**, αλλιώς οι functions κρατούν την παλιά τιμή. |
 | `APP_ENV=local` | Χαλαρώνει μόνο το cookie έμπιστης συσκευής (`td_<id>` χωρίς `Secure`, σε http://localhost). |
 | `ANAKLO_ENV=local`, `SITE_HOST=localhost:5173`, `SMS_PROVIDER=fake`, `OTP_TEST_NUMBERS`, `OTP_TEST_CODE=424242`, `SMS_ALLOWED_RECIPIENTS=` | Οι functions `public-booking` και `manage` (1.3), μέσω `[edge_runtime.secrets]`. Τοπικές τιμές, όχι μυστικά. Χωρίς αυτές (ή με `ANAKLO_ENV` κενό = prod) απαντούν 500 `not_configured`. Ο ψεύτικος adapter δεν στέλνει τίποτα· με `ANAKLO_ENV=local` τυπώνει κάθε SMS (με κρυμμένο αριθμό) στα logs: `docker logs -f supabase_edge_runtime_anaklo`. |
-| `VITE_ONESIGNAL_APP_ID` | Κενό: κρύβει τα κουμπιά της δοκιμής push. Τοπικό app του OneSignal μόνο αν δοκιμάζεις push τοπικά. |
+| `PUSH_PROVIDER=fake`, `DISPATCH_SECRET=local-dev-only-dispatch-secret-not-a-secret-01` | Ειδοποιήσεις (1.5), μέσω `[edge_runtime.secrets]`, για τις `public-booking`, `manage` και `dispatch`. Τοπικές τιμές, όχι μυστικά. Ο ψεύτικος αποστολέας push φτιάχνει το ακριβές payload του OneSignal και δεν στέλνει τίποτα (η γραμμή του `messages_log` γίνεται `sent` με provider `fake`). Το `DISPATCH_SECRET` πρέπει να είναι ίδιο με το `dispatch_secret` που γράφει το `seed.sql` στο Vault: με αυτό η βάση (pg_net) καλεί την `dispatch`. Χωρίς αυτές οι τρεις functions απαντούν 500 `not_configured`. |
+| `VITE_ONESIGNAL_APP_ID` | Κενό (τοπικά μέχρι το 1.10): η οθόνη Ρυθμίσεις → Ειδοποιήσεις λέει ότι οι ειδοποιήσεις δεν είναι διαθέσιμες ακόμη. Τοπικό app του OneSignal μόνο αν δοκιμάζεις push τοπικά. |
 | `SUPABASE_DEV_PROJECT_REF`, `SUPABASE_DEV_PUBLISHABLE_KEY` | Το remote dev project (δημόσια). Τα χρειάζονται τα `*:dev`. |
 
 Κλειδιά και tokens (`SUPABASE_SECRET_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, το remote `PROXY_SECRET`, `ONESIGNAL_*`) **δεν** μπαίνουν ποτέ στο `.env.local` ή στο repo: βλ. §4.
@@ -47,7 +48,7 @@ npm run db:start
 | `npm run lint` | ESLint |
 | `npm test` | Vitest (τρέχει πάντα σε UTC, όποια ώρα κι αν έχει ο υπολογιστής) |
 | `npm run db:test` | pgTAP: RLS, δικαιώματα, διπλοκράτηση, events κ.λπ. |
-| `npm run test:race` | Ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (20 στην ίδια ώρα → 1 ραντεβού· 10 επαναλήψεις μιας online κράτησης με ίδιο κλειδί → 1 ραντεβού, ένα grant → μία κράτηση· από το 1.4 μετακίνηση από την εφαρμογή και κράτηση στην ίδια ώρα → πετυχαίνει μία, και όταν η μετακίνηση δίνει το ραντεβού σε συνάδελφο· 10 ίδιες μετακινήσεις με ένα κλειδί → μία). Θέλει `db:start`· μην το τρέχεις μαζί με το `e2e` (συνδέουν τον ίδιο owner). |
+| `npm run test:race` | Ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (20 στην ίδια ώρα → 1 ραντεβού· 10 επαναλήψεις μιας online κράτησης με ίδιο κλειδί → 1 ραντεβού, ένα grant → μία κράτηση· από το 1.4 μετακίνηση από την εφαρμογή και κράτηση στην ίδια ώρα → πετυχαίνει μία, και όταν η μετακίνηση δίνει το ραντεβού σε συνάδελφο· 10 ίδιες μετακινήσεις με ένα κλειδί → μία· από το 1.5 δύο dispatchers ταυτόχρονα → κάθε μήνυμα το πολύ μία φορά, και dispatcher που «πεθαίνει» στη μέση της παρτίδας → τίποτα διπλό). Θέλει `db:start`· μην το τρέχεις μαζί με το `e2e` (συνδέουν τον ίδιο owner· το e2e προκαλεί και αποστολές). |
 | `npm run e2e` | Playwright σε μέγεθος κινητού (Chrome + WebKit). Θέλει να τρέχει το `db:start`. Από το βήμα 1.1 θέλει και `PROXY_SECRET` και `APP_ENV=local` στο `.env.local`. Κάθε online κράτηση ενός test ακυρώνεται στο τέλος του (μέσω του link διαχείρισης), ώστε οι επαναλήψεις να βρίσκουν τις ίδιες ελεύθερες ώρες· τα ραντεβού των tests της εφαρμογής επαγγελματία μένουν σε δικές τους μέρες, 2–5 εβδομάδες μπροστά (`npm run db:reset` τα καθαρίζει). Το test «δεύτερη συσκευή» περιμένει το refetch των 60″ (~70″). |
 | `npm run build`, μετά `npm run size` | Build και έλεγχος ότι η σελίδα κράτησης μένει ≤ 120 KB gzip |
 | `npm run gen:types` | Ξαναφτιάχνει το `src/shared/lib/database.types.ts` από την τοπική βάση. Τρέξ' το μετά από κάθε αλλαγή σχήματος: το CI ελέγχει με το `check:types` ότι είναι ενημερωμένο. |
@@ -65,6 +66,8 @@ npm run db:start
 - Στο iPhone Simulator/Safari η `/app` ζητά πρώτα «Πρόσθεσε στην αρχική οθόνη»· στον desktop browser όχι.
 
 Αυτόματη ολοκλήρωση (1.4): το pg_cron τρέχει το job `auto-complete` κάθε 10′ και στην τοπική βάση (ολοκληρώνει τα ραντεβού που τελείωσαν πριν από `auto_complete_after_min`). Κάθε εκτέλεση γράφει μια γραμμή στο `private.job_runs`: `docker exec supabase_db_anaklo psql -U postgres -c "select * from private.job_runs order by id desc limit 5"`.
+
+Ειδοποιήσεις (1.5): τα SMS και τα push στέλνονται από το `messages_log`. Όσα προκαλεί ο πελάτης (OTP, επιβεβαίωση, ακύρωση/αλλαγή από το link) τα στέλνουν αμέσως οι `public-booking`/`manage`· όσα προκαλεί η εφαρμογή επαγγελματία (π.χ. ακύρωση με «Ενημέρωση με SMS», δοκιμαστική ειδοποίηση) τα στέλνει η Edge Function `dispatch`, που την καλεί η ίδια η βάση μέσω pg_net στο `http://kong:8000/functions/v1/dispatch` αμέσως μετά το commit. Το job `dispatch-sweep` (κάθε 5′) την ξανακαλεί για τις υπενθυμίσεις και ό,τι έμεινε, και το `nightly-purge` (01:17 UTC) καθαρίζει τα παλιά. Όλα φαίνονται στο `messages_log` (`docker exec supabase_db_anaklo psql -U postgres -c "select template, channel, status, error, scheduled_for from public.messages_log order by created_at desc limit 10"`), τα κείμενα των SMS και οι γραμμές `fake-push` στο `docker logs -f supabase_edge_runtime_anaklo`, και οι εκτελέσεις του dispatch στο `private.job_runs` (`job = 'dispatch'`). Αν δεν στέλνει τίποτα: έλεγξε ότι το `DISPATCH_SECRET` του `.env.local` είναι ίδιο με του `seed.sql` και ξαναξεκίνα το stack (`db:stop`/`db:start`).
 
 Μετά από αλλαγή στο `supabase/config.toml`, στο `supabase/templates/` ή στο `PROXY_SECRET`: `npm run db:stop` και `npm run db:start` (το `db:reset` δεν αρκεί). Περίμενε λίγα δευτερόλεπτα πριν ζητήσεις κωδικό: τα πρώτα emails μετά την εκκίνηση μπορεί να βγουν με το προεπιλεγμένο πρότυπο.
 
@@ -103,13 +106,16 @@ ONESIGNAL_APP_ID=…           # προαιρετικό ζεύγος, για τ�
 ONESIGNAL_REST_API_KEY=…
 OTP_HMAC_KEY=…               # υποχρεωτικό από το 1.3: Vault otp_hmac_key (≥ 32 χαρακτήρες base64/hex)· όχι η τιμή του seed.sql
 PHONE_HMAC_KEY=…             # υποχρεωτικό από το 1.3: Vault phone_hmac_key (private.phone_hmac())· ΠΟΤΕ δεν αλλάζει μετά
+PUSH_PROVIDER=fake           # υποχρεωτικό από το 1.5: fake ή onesignal (το onesignal θέλει και τα δύο ONESIGNAL_*)
+DISPATCH_SECRET=…            # υποχρεωτικό από το 1.5: ≥ 32 χαρακτήρες, όχι η τιμή του seed.sql· functions + Vault dispatch_secret
+DISPATCH_URL=https://<DEV_REF>.supabase.co/functions/v1/dispatch   # υποχρεωτικό από το 1.5: Vault dispatch_url, ακριβώς αυτό
 VITE_ONESIGNAL_APP_ID=…      # το ίδιο app id, για το build του dev (δημόσιο)
 SUPABASE_SECRET_KEY=…        # μόνο για provision:dev
 ```
 
 | Εντολή | Τι κάνει |
 |---|---|
-| `npm run secrets:dev -- --env-file <αρχείο>` | `PROXY_SECRET` (+ `ONESIGNAL_*`) στις functions (`supabase secrets set`), `PROXY_SECRET` και `SUPABASE_PUBLISHABLE_KEY` στον Worker (`wrangler secret put`), `OTP_HMAC_KEY`/`PHONE_HMAC_KEY` στο Vault (`otp_hmac_key`, `phone_hmac_key`: ένα `DO` με create ή update ανά όνομα μέσω `supabase db query --linked`· θέλει `supabase link` στο dev, αλλιώς αρνείται πριν γράψει οτιδήποτε). Idempotent· `--dry-run` δείχνει μόνο ονόματα. Αν ο Worker δεν υπάρχει ακόμη και αποτύχει, τρέξε πρώτα `deploy:dev`. |
+| `npm run secrets:dev -- --env-file <αρχείο>` | `PROXY_SECRET`, `PUSH_PROVIDER`, `DISPATCH_SECRET` (+ `ONESIGNAL_*`) στις functions (`supabase secrets set`), `PROXY_SECRET` και `SUPABASE_PUBLISHABLE_KEY` στον Worker (`wrangler secret put`), `OTP_HMAC_KEY`/`PHONE_HMAC_KEY`/`DISPATCH_SECRET`/`DISPATCH_URL` στο Vault (`otp_hmac_key`, `phone_hmac_key`, `dispatch_secret`, `dispatch_url`: ένα `DO` με create ή update ανά όνομα μέσω `supabase db query --linked`· θέλει `supabase link` στο dev, αλλιώς αρνείται πριν γράψει οτιδήποτε). Το ίδιο `DISPATCH_SECRET` πάει στην `dispatch` και στο Vault (με αυτό η βάση καλεί την `dispatch` μέσω pg_net). Idempotent· `--dry-run` δείχνει μόνο ονόματα. Αν ο Worker δεν υπάρχει ακόμη και αποτύχει, τρέξε πρώτα `deploy:dev`. |
 | `npm run deploy:dev -- --env-file <αρχείο>` | `db push` → `fn:deploy:dev` → build με το URL/κλειδί του dev → σβήσιμο `dist/**/*.map` → `wrangler deploy`. Idempotent· `--yes` χωρίς ερώτηση, `--dry-run` μόνο σχέδιο. Δεν αγγίζει ποτέ ρυθμίσεις Auth. Έλεγχος μετά: `https://<worker>/api/functions/v1/health` → 200. |
 | `npm run fn:deploy:dev` | Μόνο οι Edge Functions (`--use-api` αν δεν τρέχει Docker). Δεν σβήνει functions που αφαιρέθηκαν από το repo: αυτές (π.χ. `spike-td`, `spike-push`, και το `push-identity` αν είχε σταλεί) σβήνονται με το χέρι, όπως και ένα secret που δεν χρησιμοποιείται πια (π.χ. `ONESIGNAL_IDENTITY_KEY`). |
 | `npm run provision:dev -- --file <json εκτός repo> --env-file <αρχείο>` | Επιχείρηση, προσωπικό, υπηρεσίες, ωράρια, μέλη (χρήστες Auth χωρίς link). Προεπιλογή αρχείου: `C:\Users\mixal\anaklo-private\provision.json`· `--validate` ελέγχει μόνο το JSON. Δείγμα: `supabase/provision/demo-barber.example.json`. |
@@ -143,4 +149,5 @@ Worker: στο `edge/wrangler.jsonc` το `vars.SUPABASE_URL` πρέπει να 
 | Η σελίδα κράτησης γράφει «Δεν φόρτωσε η σελίδα» | Το τοπικό Supabase δεν τρέχει (`npm run db:status`) ή λείπει το `.env.local`. |
 | `EBADENGINE` στο `npm install` | Αναβάθμισε το Node σε 24.15+. |
 | `/api/functions/v1/*` δίνει 500 `proxy_not_configured` ή 403 | Το `PROXY_SECRET` λείπει από το `.env.local`, είναι < 16 χαρακτήρες ή άλλαξε χωρίς επανεκκίνηση: `npm run db:stop` και `npm run db:start`. |
+| Μετά το 1.5 η κράτηση ή το link διαχείρισης δίνει 500 `not_configured`, ή η `dispatch` 404 «Function not found» | Λείπουν `PUSH_PROVIDER`/`DISPATCH_SECRET` από το `.env.local` ή το stack δεν ξαναξεκίνησε: πρόσθεσέ τα από το `.env.example` και `npm run db:stop` → `npm run db:start` → `npm run db:reset`. |
 | Δεν φτάνει κωδικός στο Mailpit | Το email δεν ανήκει σε χρήστη (κλειστό signup: σωστά δεν στέλνεται τίποτα) ή ζήτησες δεύτερο κωδικό μέσα σε 1 s. |

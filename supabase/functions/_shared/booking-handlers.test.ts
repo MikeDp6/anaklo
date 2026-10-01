@@ -2,13 +2,16 @@
 // Request/Response/Headers from Node (undici), the same Fetch API the Deno runtime provides.
 //
 // `public-booking` and `manage` end to end against an in-memory stand-in of the 0005 RPCs
-// (contract 1.3 §2.6), with the real fake SMS adapter. The SQL itself is tested by pgTAP
-// (10_public_booking); this file tests what the functions do with it.
+// (contract 1.3 §2.6; the 0007 claim item and staff push rows, contract 1.5 §2.8), with the real
+// fake SMS adapter and the real fake push sender. The SQL itself is tested by pgTAP
+// (10_public_booking, 12_messaging); this file tests what the functions do with it.
 import { describe, expect, it } from 'vitest'
 import { isBase64UrlOfLength, toBase64Url } from './base64url.ts'
 import type { BookingConfigEnv } from './booking-config.ts'
 import type { LogValue, Rpc, RpcResult } from './booking-rpc.ts'
-import { buildBookingRuntime, type BookingRuntime } from './booking-runtime.ts'
+import { buildBookingRuntime, type BookingEnv, type BookingRuntime } from './booking-runtime.ts'
+import type { OneSignalPushPayload } from './onesignal.ts'
+import type { SmsProvider } from './sms-provider.ts'
 import {
   BookResponse,
   ClientsResponse,
@@ -87,12 +90,17 @@ type Appointment = {
 }
 type Message = {
   id: string
+  channel: 'sms' | 'push'
   template: string
-  to: string
+  /** SMS only; a push row names its recipient (a user), never a phone. */
+  to: string | null
   locale: 'el' | 'en'
-  status: 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled'
+  status: 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled' | 'unknown'
   appointment: string | null
 }
+
+/** The staff member's device (push_subscriptions of the recipient the planner derived). */
+const DEVICE = '8b1f6a52-3c1e-4c0d-9a4e-2f7d1c9b0e11'
 
 /**
  * The 0005 RPCs as the contract describes them, in memory: enough behaviour to test what the
@@ -137,8 +145,44 @@ class FakeDb {
 
   private queue(template: string, to: string, locale: 'el' | 'en', appointment: string | null) {
     const id = crypto.randomUUID()
-    this.messages.set(id, { id, template, to, locale, status: 'queued', appointment })
+    this.messages.set(id, {
+      id,
+      channel: 'sms',
+      template,
+      to,
+      locale,
+      status: 'queued',
+      appointment,
+    })
     return id
+  }
+
+  /** The staff push the 1.5 planner queues next to the client's SMS (contract 1.5 §2.7). */
+  private queuePush(template: string, appointment: string) {
+    const id = crypto.randomUUID()
+    this.messages.set(id, {
+      id,
+      channel: 'push',
+      template,
+      to: null,
+      locale: 'el',
+      status: 'queued',
+      appointment,
+    })
+    return id
+  }
+
+  /** Step 1 of the planner: queued SMS of the appointment are superseded, push rows never. */
+  private supersede(appointment: string) {
+    for (const message of this.messages.values()) {
+      if (
+        message.appointment === appointment &&
+        message.channel === 'sms' &&
+        message.status === 'queued'
+      ) {
+        message.status = 'cancelled'
+      }
+    }
   }
 
   private queuedOf(appointment: string): string[] {
@@ -306,6 +350,7 @@ class FakeDb {
       this.appointments.set(appointment.id, appointment)
       if (grant) grant.grantAppointment = appointment.id
       this.queue('booking_confirmed', phone, 'el', appointment.id)
+      this.queuePush('push_booking_created', appointment.id)
       return ok(this.bookResult(appointment, false))
     },
 
@@ -360,11 +405,9 @@ class FakeDb {
       for (const entry of this.tokens.values()) {
         if (entry.appointment === appointment.id) entry.revoked = true
       }
-      for (const id of this.queuedOf(appointment.id)) {
-        const message = this.messages.get(id)
-        if (message) message.status = 'cancelled'
-      }
+      this.supersede(appointment.id)
       this.queue('cancelled_by_client', KNOWN, 'el', appointment.id)
+      this.queuePush('push_booking_cancelled', appointment.id)
       return ok({
         appointment_id: appointment.id,
         status: 'cancelled',
@@ -377,7 +420,9 @@ class FakeDb {
       if (!appointment) return raise('AN015', 'manage_token_invalid')
       appointment.startsAt = String(args.p_new_starts_at)
       appointment.endsAt = MOVED_ENDS
+      this.supersede(appointment.id)
       this.queue('rescheduled_by_client', KNOWN, 'el', appointment.id)
+      this.queuePush('push_booking_moved', appointment.id)
       return ok({
         appointment_id: appointment.id,
         staff_id: appointment.staffId,
@@ -397,22 +442,28 @@ class FakeDb {
         message.status = 'sending'
         const appointment = message.appointment ? this.appointments.get(message.appointment) : null
         const managed = ['booking_confirmed', 'reminder', 'rescheduled_by_client']
+        const push = message.channel === 'push'
+        // Every key always present, null where it does not apply (contract 1.5 §2.8).
         rows.push({
           id,
           lease_id: crypto.randomUUID(),
-          to_e164: message.to,
-          locale: message.locale,
+          channel: message.channel,
           template: message.template,
           category: message.template === 'otp' ? 'otp' : 'transactional',
+          locale: message.locale,
           business_name: 'Κουρείο Demo',
           short_code: 'demo01',
           timezone: 'Europe/Athens',
           starts_at: appointment?.startsAt ?? null,
           staff_name: appointment ? 'Νίκος' : null,
+          to_e164: message.to,
           manage_token:
-            appointment && managed.includes(message.template)
+            !push && appointment && managed.includes(message.template)
               ? this.issueToken(appointment.id)
               : null,
+          client_first_name: push ? 'Νέος' : null,
+          service_name: push ? 'Κούρεμα' : null,
+          push_targets: push ? [{ provider: 'onesignal', subscription_id: DEVICE }] : null,
         })
       }
       return ok(rows)
@@ -421,8 +472,9 @@ class FakeDb {
     record_send_result: (args) => {
       const message = this.messages.get(String(args.p_id))
       if (!message || message.status !== 'sending') return ok(false)
+      const outcome = String(args.p_outcome)
       message.status =
-        args.p_outcome === 'sent' ? 'sent' : args.p_outcome === 'failed' ? 'failed' : 'cancelled'
+        outcome === 'sent' || outcome === 'failed' || outcome === 'unknown' ? outcome : 'cancelled'
       return ok(true)
     },
   }
@@ -448,27 +500,40 @@ type Harness = {
   runtime: BookingRuntime
   /** Every SMS text the fake adapter "sent" (its local log). */
   sms: string[]
+  /** Every payload the fake push sender would have sent to OneSignal. */
+  pushes: OneSignalPushPayload[]
   logs: Array<{ event: string; fields: Readonly<Record<string, LogValue>> }>
 }
 
-function harness(env: BookingConfigEnv = LOCAL_ENV): Harness {
+function harness(env: BookingEnv = LOCAL_ENV): Harness {
   const db = new FakeDb()
   const sms: string[] = []
+  const pushes: OneSignalPushPayload[] = []
   const logs: Harness['logs'] = []
   const runtime = buildBookingRuntime(
     {
       PROXY_SECRET: SECRET,
       SUPABASE_URL: 'http://kong:8000',
       SUPABASE_SERVICE_ROLE_KEY: 'service-role-key-for-tests',
+      PUSH_PROVIDER: 'fake',
       ...env,
     },
     {
       createRpc: () => db.rpc,
       log: (event, fields) => logs.push({ event, fields }),
       providerLog: (line) => sms.push(line),
+      pushLog: () => {},
+      pushRecord: (payload) => pushes.push(payload),
+      fetch: () => Promise.reject(new Error('no network in tests')),
     },
   )
-  return { db, runtime, sms, logs }
+  return { db, runtime, sms, pushes, logs }
+}
+
+/** The same harness with another SMS adapter (a failing or timing-out provider). */
+function withSmsProvider(h: Harness, provider: SmsProvider): Harness {
+  if (h.runtime.services === null) throw new Error('the harness is not configured')
+  return { ...h, runtime: { ...h.runtime, services: { ...h.runtime.services, provider } } }
 }
 
 function request(
@@ -593,6 +658,30 @@ describe('public-booking: before any action', () => {
     )
   })
 
+  it('answers 500 not_configured without a push sender, or with the fake one in prod (1.5)', async () => {
+    for (const [env, problem] of [
+      [{ ...LOCAL_ENV, PUSH_PROVIDER: undefined }, 'PUSH_PROVIDER: required (fake | onesignal)'],
+      [
+        { ...LOCAL_ENV, PUSH_PROVIDER: 'env(PUSH_PROVIDER)' },
+        'PUSH_PROVIDER: required (fake | onesignal)',
+      ],
+      [{ ...LOCAL_ENV, PUSH_PROVIDER: 'apns' }, 'PUSH_PROVIDER: unknown (fake | onesignal)'],
+      [
+        { ...LOCAL_ENV, PUSH_PROVIDER: 'onesignal' },
+        'ONESIGNAL_APP_ID: required when PUSH_PROVIDER is onesignal',
+      ],
+    ] as const) {
+      const h = harness(env)
+      const { response, body } = await booking(h, startBody(KNOWN))
+      expect(response.status).toBe(500)
+      expect(errorCode(body)).toBe('not_configured')
+      expect(h.db.calls).toEqual([])
+      expect(h.logs.find((line) => line.event === 'not_configured')?.fields.problems).toContain(
+        problem,
+      )
+    }
+  })
+
   it('refuses a body outside the schema with 400 invalid_body', async () => {
     const h = harness()
     const { response, body } = await booking(h, { ...startBody(KNOWN), verified_via: 'otp' })
@@ -670,6 +759,34 @@ describe('public-booking: start', () => {
     const { response, body } = await booking(h, startBody(KNOWN))
     expect(response.status).toBe(503)
     expect(errorCode(body)).toBe('AN017')
+  })
+
+  it('counts an OTP whose send ended unknown as sent (1.5 D29), and a failed one as AN017', async () => {
+    const timingOut: SmsProvider = {
+      name: 'flaky',
+      send: () => Promise.reject(new Error('socket timeout')),
+    }
+    const unknown = withSmsProvider(harness(), timingOut)
+    const answered = await booking(unknown, startBody(KNOWN))
+    expect(answered.response.status).toBe(200)
+    expect(StartResponse.parse(answered.body).result).toBe('otp_sent')
+    expect(unknown.db.argsOf('record_send_result')).toMatchObject({
+      p_outcome: 'unknown',
+      p_error: 'provider_exception',
+    })
+
+    const down: SmsProvider = {
+      name: 'down',
+      send: () => Promise.resolve({ ok: false, outcome: 'failed', error: 'http_503' }),
+    }
+    const failed = withSmsProvider(harness(), down)
+    const refused = await booking(failed, startBody(KNOWN))
+    expect(refused.response.status).toBe(503)
+    expect(errorCode(refused.body)).toBe('AN017')
+    expect(failed.db.argsOf('record_send_result')).toMatchObject({
+      p_outcome: 'failed',
+      p_error: 'http_503',
+    })
   })
 
   it('maps domain errors of otp_start to their HTTP status', async () => {
@@ -822,6 +939,21 @@ describe('public-booking: book', () => {
       p_policy_version: PRIVACY_NOTICE_VERSION,
     })
 
+    // The staff push goes out with it (1.5): the staff member's device, the client's first name
+    // only, the business-local time, never the phone.
+    expect(h.pushes).toHaveLength(1)
+    const push = h.pushes[0]
+    expect(push?.include_subscription_ids).toEqual([DEVICE])
+    expect(push?.headings).toEqual({ el: 'Νέα κράτηση', en: 'New booking' })
+    expect(push?.contents.el).toBe('Νέος · Κούρεμα · Τρί 06/10 10:00 με Νίκος')
+    expect(push?.url).toBe('http://localhost:5173/app/day?date=2026-10-06')
+    expect(JSON.stringify(push)).not.toContain(REAL)
+    const rows = [...h.db.messages.values()].filter((m) => m.appointment === booked.appointment.id)
+    expect(rows.map((m) => `${m.channel}:${m.template}:${m.status}`).sort()).toEqual([
+      'push:push_booking_created:sent',
+      'sms:booking_confirmed:sent',
+    ])
+
     // The confirmation SMS carries its OWN token (§2.6.9), different from the page's.
     const smsToken = lastManageToken(h.sms)
     expect(smsToken).not.toBe(booked.manage_token)
@@ -848,6 +980,7 @@ describe('public-booking: book', () => {
     expect(isManageToken(second.manage_token)).toBe(true)
     expect(h.db.appointments.size).toBe(1)
     expect(h.sms).toHaveLength(smsAfterFirst)
+    expect(h.pushes).toHaveLength(1)
 
     const view = await manage(h, { action: 'view', token: second.manage_token })
     expect(ManageViewResponse.parse(view.body).appointment.id).toBe(first.appointment.id)
@@ -953,6 +1086,10 @@ describe('manage', () => {
     expect(response.status).toBe(200)
     expect(ManageCancelResponse.parse(body)).toEqual({ status: 'cancelled' })
     expect(h.sms.at(-1)).toContain('localhost:5173/r/demo01')
+    // The staff hear of it at once (1.5), on the same device.
+    expect(h.pushes.at(-1)?.headings.el).toBe('Ακύρωση ραντεβού')
+    expect(h.pushes.at(-1)?.contents.el).toBe('Νέος · Τρί 06/10 10:00 με Νίκος')
+    expect(h.pushes.at(-1)?.include_subscription_ids).toEqual([DEVICE])
     for (const token of [manage_token, smsToken]) {
       const view = await manage(h, { action: 'view', token })
       expect(view.response.status).toBe(403)
@@ -984,6 +1121,8 @@ describe('manage', () => {
     })
     // 08:00 UTC = 11:00 in Athens, Wednesday; Greek in GSM-7 capitals.
     expect(h.sms.at(-1)).toContain('NEA ΩPA PANTEBOY TET 07/10 11:00 ME NIKOΣ')
+    expect(h.pushes.at(-1)?.contents.el).toBe('Νέος · νέα ώρα Τετ 07/10 11:00 με Νίκος')
+    expect(h.pushes.at(-1)?.url).toBe('http://localhost:5173/app/day?date=2026-10-07')
     const view = await manage(h, { action: 'view', token: lastManageToken(h.sms) })
     expect(ManageViewResponse.parse(view.body).appointment.starts_at).toBe(MOVED)
   })
@@ -1019,7 +1158,7 @@ describe('logs', () => {
     await manage(h, { action: 'cancel', token: booked.manage_token })
     const code = /^(\d{6}) /m.exec(h.sms[0] ?? '')?.[1] ?? 'missing'
     const logged = JSON.stringify(h.logs)
-    for (const secret of [REAL, code, grant, td, booked.manage_token, 'Νέος', 'Πελάτης']) {
+    for (const secret of [REAL, code, grant, td, booked.manage_token, 'Νέος', 'Πελάτης', DEVICE]) {
       expect(logged, secret).not.toContain(secret)
     }
     expect(h.logs.filter((line) => line.event === 'request').length).toBeGreaterThan(0)

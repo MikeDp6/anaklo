@@ -152,6 +152,76 @@ describe('AppointmentSheet', () => {
     expect(input).toMatchObject({ fromStatus: 'booked', reason: 'duplicate', notify: true })
   })
 
+  it('cancel with SMS that the server queued: «Ο πελάτης θα ενημερωθεί με SMS.»', async () => {
+    calendarApi.cancelAppointment.mockResolvedValue({
+      appointmentId: IDS.appointment,
+      status: 'cancelled',
+      fromStatus: 'booked',
+      changed: true,
+      cancelledBy: 'client',
+      cancelReason: 'client_request',
+      notify: true,
+      smsQueued: true,
+    })
+    open(testAppointment())
+    fireEvent.click(await screen.findByRole('button', { name: 'Ακύρωση' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ακύρωση ραντεβού' }))
+
+    expect(await screen.findByText('Το ραντεβού ακυρώθηκε')).toBeInTheDocument()
+    expect(screen.getByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeInTheDocument()
+    expect(screen.queryByText('Δεν στάλθηκε SMS στον πελάτη.')).toBeNull()
+  })
+
+  it('cancel without SMS: no note about SMS at all', async () => {
+    calendarApi.cancelAppointment.mockResolvedValue({
+      appointmentId: IDS.appointment,
+      status: 'cancelled',
+      fromStatus: 'booked',
+      changed: true,
+      cancelledBy: 'client',
+      cancelReason: 'client_request',
+      notify: false,
+      smsQueued: false,
+    })
+    open(testAppointment())
+    fireEvent.click(await screen.findByRole('button', { name: 'Ακύρωση' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ενημέρωση με SMS/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ακύρωση ραντεβού' }))
+
+    expect(await screen.findByText('Το ραντεβού ακυρώθηκε')).toBeInTheDocument()
+    expect(screen.queryByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeNull()
+    expect(screen.queryByText('Δεν στάλθηκε SMS στον πελάτη.')).toBeNull()
+  })
+
+  it('a move with SMS that the server queued says so on the success screen', async () => {
+    calendarApi.fetchStaffSlots.mockImplementation(slotsOfTheDay)
+    open(
+      testAppointment({
+        startsAt: '2026-09-29T08:00:00+00:00',
+        endsAt: '2026-09-29T08:30:00+00:00',
+      }),
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Μετακίνηση' }))
+    const dialog = screen.getByRole('dialog')
+    const times = await within(dialog).findByRole('group', { name: /^Ελεύθερες ώρες/ })
+    fireEvent.click(within(times).getByRole('button', { name: '10:00' }))
+    calendarApi.moveAppointment.mockResolvedValue({
+      appointmentId: IDS.appointment,
+      staffId: IDS.nikos,
+      startsAt: '2026-09-29T07:00:00+00:00',
+      endsAt: '2026-09-29T07:30:00+00:00',
+      fromStaffId: IDS.nikos,
+      fromStartsAt: '2026-09-29T08:00:00+00:00',
+      warnings: [],
+      replayed: false,
+      notify: true,
+      smsQueued: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Μετακίνηση εδώ' }))
+    expect(await screen.findByRole('img', { name: 'Το ραντεβού μετακινήθηκε' })).toBeInTheDocument()
+    expect(screen.getByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeInTheDocument()
+  })
+
   it('a status answer that comes after the sheet closed does not close another sheet', async () => {
     vi.setSystemTime(Date.parse('2026-09-29T07:40:00Z'))
     let answer: (value: StatusResult) => void = () => {}
@@ -292,6 +362,33 @@ describe('AppointmentSheet', () => {
     const [, input] = calendarApi.moveAppointment.mock.calls[0] as [string, MoveInput]
     expect(input.newStartsAt).toBe('2026-09-30T07:00:00+00:00')
     expect(await screen.findByRole('img', { name: 'Το ραντεβού μετακινήθηκε' })).toBeInTheDocument()
+  })
+
+  it('a client with a Greek landline: no SMS option on cancel, and none is asked for', async () => {
+    // No SMS can reach a landline, so the sheet never offers (or promises) one (contract 1.5 §4.5).
+    calendarApi.cancelAppointment.mockResolvedValue({
+      appointmentId: IDS.appointment,
+      status: 'cancelled',
+      fromStatus: 'booked',
+      changed: true,
+      cancelledBy: 'client',
+      cancelReason: 'client_request',
+      notify: false,
+      smsQueued: false,
+    })
+    open(
+      testAppointment({
+        client: { id: IDS.client, fullName: 'Λάμπρος Σ.', phoneE164: '+302101234567' },
+      }),
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Ακύρωση' }))
+    expect(screen.queryByRole('checkbox', { name: /Ενημέρωση με SMS/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Ακύρωση ραντεβού' }))
+
+    expect(await screen.findByText('Το ραντεβού ακυρώθηκε')).toBeInTheDocument()
+    expect(screen.queryByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeNull()
+    const [, input] = calendarApi.cancelAppointment.mock.calls[0] as [string, CancelInput]
+    expect(input).toMatchObject({ notify: false })
   })
 
   it('a walk-in without a phone: no SMS option on cancel', async () => {

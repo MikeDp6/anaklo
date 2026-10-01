@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CHECKED_VALUE_LISTS, MESSAGE_TEMPLATES } from './domain.ts'
+import {
+  CHECKED_VALUE_LISTS,
+  MESSAGE_TEMPLATES,
+  PUSH_MESSAGE_TEMPLATES,
+  SMS_MESSAGE_TEMPLATES,
+} from './domain.ts'
+import { PUSH_TEMPLATES } from './push-templates.ts'
 import { SMS_TEMPLATES } from './sms-templates.ts'
 
 const MIGRATIONS_DIR = join(process.cwd(), 'supabase', 'migrations')
@@ -44,7 +50,20 @@ describe('value lists match the database CHECK constraints', () => {
 })
 
 describe('message templates', () => {
-  it('every messages_log template has an SMS text, and every SMS text is a template', () => {
-    expect(Object.keys(SMS_TEMPLATES).sort()).toEqual([...MESSAGE_TEMPLATES].sort())
+  it('every SMS template has an SMS text, and every SMS text is a template', () => {
+    expect(Object.keys(SMS_TEMPLATES).sort()).toEqual([...SMS_MESSAGE_TEMPLATES].sort())
+  })
+
+  it('every push template has a push text, and every push text is a template', () => {
+    expect(Object.keys(PUSH_TEMPLATES).sort()).toEqual([...PUSH_MESSAGE_TEMPLATES].sort())
+  })
+
+  it('messages_log templates are exactly the SMS templates and the push templates', () => {
+    expect([...MESSAGE_TEMPLATES].sort()).toEqual(
+      [...SMS_MESSAGE_TEMPLATES, ...PUSH_MESSAGE_TEMPLATES].sort(),
+    )
+    expect(new Set(MESSAGE_TEMPLATES).size).toBe(MESSAGE_TEMPLATES.length)
+    expect(PUSH_MESSAGE_TEMPLATES.every((key) => key.startsWith('push_'))).toBe(true)
+    expect(SMS_MESSAGE_TEMPLATES.some((key) => key.startsWith('push_'))).toBe(false)
   })
 })

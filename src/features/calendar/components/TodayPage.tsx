@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActiveSheet, type OpenSheet } from '@/features/appointments/components/ActiveSheet'
 import { WalkInButton } from '@/features/appointments/components/WalkInButton'
-import { PushTestPanel } from '@/features/push/components/PushTestPanel'
-import { isPushTestEnabled } from '@/features/push/env'
 import { toLocalDate } from '@/shared/lib/dates'
 import { failureOf } from '@/shared/lib/rpcError'
 import { Button } from '@/shared/ui/Button'
@@ -49,7 +47,7 @@ export function TodayPage() {
 function TodayContent({ workspace }: { workspace: Workspace }) {
   const { t } = useTranslation('pro')
   const locale = useAppLocale()
-  const { business, businessId, membership } = workspace
+  const { business, businessId } = workspace
   const today = useBusinessToday(business.timeZone)
   const summary = useTodaySummary(businessId, today)
   const now = useNow()
@@ -132,8 +130,6 @@ function TodayContent({ workspace }: { workspace: Workspace }) {
           ))}
         </div>
       </section>
-      {/* TEMPORARY push test of step 1.1 (ADR-0010 §3); spike-push is for owners only. */}
-      {isPushTestEnabled() && <PushTestPanel isOwner={membership.role === 'owner'} />}
       <ActiveSheet
         sheet={sheet}
         workspace={workspace}

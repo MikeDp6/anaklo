@@ -1390,15 +1390,16 @@ select is(
                                (m.client_id = a.client_id)::text, (m.dedupe_key = 'appt:' || a.id || ':booking_confirmed')::text), ', ')
    from public.appointments a
    join public.messages_log m on m.business_id = a.business_id and m.appointment_id = a.id
-   where a.id = pg_temp.appt('b1')),
+   where a.id = pg_temp.appt('b1') and m.channel = 'sms' and m.template <> 'reminder'),
   'sms:booking_confirmed:transactional:queued:+306900000301:el:true:true',
-  'planner: one booking confirmation, queued to the client''s phone and language'
+  'planner: one booking confirmation, queued to the client''s phone and language (reminders: 12_messaging)'
 );
 
 select is(
   pg_temp.r('b1') -> 'message_ids',
-  (select jsonb_agg(m.id) from public.messages_log m where m.appointment_id = pg_temp.appt('b1')),
-  'book: returns the ids of the queued SMS for the function to send'
+  (select jsonb_agg(m.id order by m.created_at, m.id) from public.messages_log m
+   where m.appointment_id = pg_temp.appt('b1') and m.status = 'queued' and m.scheduled_for <= now()),
+  'book: returns the ids of the messages queued and due now for the function to send'
 );
 
 select is(
@@ -1407,6 +1408,8 @@ select is(
   'P0001 AN014',
   'book: the grant is single-use: another booking with it → AN014'
 );
+
+select set_config('t.b1_msgs', (select count(*)::text from public.messages_log where appointment_id = pg_temp.appt('b1')), true);
 
 select is(
   pg_temp.book('b1r', 'b9000000-0000-4000-8000-000000000001', '+306900000301', '2026-11-03 07:00Z', '2026-11-02 06:08Z',
@@ -1428,15 +1431,18 @@ select is(
   array[
     (select count(*) from public.appointments
      where business_id = 'b1000000-0000-4000-8000-00000000000a' and idempotency_key = 'b9000000-0000-4000-8000-000000000001'),
-    (select count(*) from public.messages_log where appointment_id = pg_temp.appt('b1')),
+    (select count(*) from public.messages_log
+     where appointment_id = pg_temp.appt('b1') and channel = 'sms' and template <> 'reminder'),
     (select count(*) from public.booking_tokens where appointment_id = pg_temp.appt('b1')),
     (select count(*) from public.client_consents where client_id = pg_temp.client_of('b1')),
     (select count(*) from public.appointment_events where appointment_id = pg_temp.appt('b1')),
     (select count(*) from public.clients
-     where business_id = 'b1000000-0000-4000-8000-00000000000a' and phone_e164 = '+306900000301')
+     where business_id = 'b1000000-0000-4000-8000-00000000000a' and phone_e164 = '+306900000301'),
+    (select count(*) from public.messages_log where appointment_id = pg_temp.appt('b1'))
+      - current_setting('t.b1_msgs')::bigint
   ],
-  array[1, 1, 2, 1, 1, 1]::bigint[],
-  'replay: no second appointment, SMS, consent, event or client; a second live manage token'
+  array[1, 1, 2, 1, 1, 1, 0]::bigint[],
+  'replay: no second appointment, SMS, consent, event or client (no new message of any kind); a second live manage token'
 );
 
 select is(
@@ -1960,7 +1966,8 @@ select is(
 select is(
   (select string_agg(m.template || ':' || m.status || ':' || (m.dedupe_key = 'appt:' || m.appointment_id || ':' || m.template)::text,
                      ',' order by m.template)
-   from public.messages_log m where m.appointment_id = pg_temp.appt('b1')),
+   from public.messages_log m
+   where m.appointment_id = pg_temp.appt('b1') and m.channel = 'sms' and m.template <> 'reminder'),
   'booking_confirmed:sent:true,cancelled_by_client:queued:true',
   'planner: a client cancel queues cancelled_by_client (deduplicated per appointment)'
 );
@@ -1982,7 +1989,8 @@ select is(
 
 select is(
   (select string_agg(m.template || ':' || m.status || ':' || coalesce(m.error, ''), ',' order by m.template)
-   from public.messages_log m where m.appointment_id = pg_temp.appt('bb')),
+   from public.messages_log m
+   where m.appointment_id = pg_temp.appt('bb') and m.channel = 'sms' and m.template <> 'reminder'),
   'booking_confirmed:cancelled:superseded,cancelled_by_client:queued:',
   'planner: a client cancel supersedes the queued confirmation'
 );
@@ -2026,8 +2034,9 @@ select is(
   (select concat_ws(' | ', ((r ->> 'appointment_id')::uuid = pg_temp.appt('br'))::text, r ->> 'staff_id',
                     to_char((r ->> 'starts_at')::timestamptz at time zone 'UTC', 'MM-DD HH24:MI'),
                     to_char((r ->> 'ends_at')::timestamptz at time zone 'UTC', 'HH24:MI'),
-                    ((r -> 'message_ids') = (select jsonb_agg(m.id) from public.messages_log m
-                                             where m.appointment_id = pg_temp.appt('br') and m.status = 'queued'))::text)
+                    ((r -> 'message_ids') = (select jsonb_agg(m.id order by m.created_at, m.id) from public.messages_log m
+                                             where m.appointment_id = pg_temp.appt('br') and m.status = 'queued'
+                                               and m.scheduled_for <= now()))::text)
    from pg_temp.r('mm1') r),
   'true | b2000000-0000-4000-8000-000000000001 | 11-04 09:00 | 09:30 | true',
   'reschedule: the same appointment id, same staff member, its own length; returns the queued SMS'
@@ -2043,10 +2052,13 @@ select is(
 
 select is(
   (select string_agg(m.template || ':' || m.status || ':' || coalesce(m.error, ''), ',' order by m.template)
-   from public.messages_log m where m.appointment_id = pg_temp.appt('br')),
+   from public.messages_log m
+   where m.appointment_id = pg_temp.appt('br') and m.channel = 'sms' and m.template <> 'reminder'),
   'booking_confirmed:cancelled:superseded,rescheduled_by_client:queued:',
   'planner: a client move supersedes the queued confirmation and queues rescheduled_by_client'
 );
+
+select set_config('t.br_msgs', (select count(*)::text from public.messages_log where appointment_id = pg_temp.appt('br')), true);
 
 select is(
   pg_temp.mmove('x', pg_temp.token('br'), '2026-11-04 09:00Z', '2026-11-02 06:52Z'),
@@ -2056,9 +2068,12 @@ select is(
 
 select is(
   array[(select count(*) from public.appointment_events e where e.appointment_id = pg_temp.appt('br') and e.event = 'rescheduled'),
-        (select count(*) from public.messages_log m where m.appointment_id = pg_temp.appt('br'))],
-  array[1, 2]::bigint[],
-  'reschedule to the same time is a no-op: no event, no message'
+        (select count(*) from public.messages_log m
+         where m.appointment_id = pg_temp.appt('br') and m.channel = 'sms' and m.template <> 'reminder'),
+        (select count(*) from public.messages_log m where m.appointment_id = pg_temp.appt('br'))
+          - current_setting('t.br_msgs')::bigint],
+  array[1, 2, 0]::bigint[],
+  'reschedule to the same time is a no-op: no event, no message of any kind'
 );
 
 select is(
@@ -2203,7 +2218,8 @@ select is(
 );
 
 -- =============================================================================================
--- Planner v1: what it does NOT plan
+-- Planner v2 (contract 1.5 §2.7; its full rules are in 12_messaging): what these calls do NOT plan.
+-- The ≥ 2 h confirmation rule of phone bookings follows the real now() (the planner's clock).
 -- =============================================================================================
 select is(
   pg_temp.staff_book('st'),
@@ -2212,9 +2228,13 @@ select is(
 );
 
 select is(
-  (select count(*) from public.messages_log m where m.appointment_id = pg_temp.appt('st')),
-  0::bigint,
-  'planner v1: a staff booking plans no message'
+  (select concat_ws(' ',
+     count(*) filter (where m.template not in ('booking_confirmed', 'reminder')),
+     count(*) filter (where m.template = 'booking_confirmed')
+       = case when timestamptz '2026-11-06 12:00Z' >= now() + interval '2 hours' then 1 else 0 end)
+   from public.messages_log m where m.appointment_id = pg_temp.appt('st')),
+  '0 t',
+  'planner v2: a staff phone booking plans no push and no notice, only the confirmation when it starts in ≥ 2 h'
 );
 
 select is(
@@ -2227,11 +2247,19 @@ select is(
 );
 
 select is(
-  (select count(*) from public.messages_log m
-   where m.appointment_id in ('b5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000002',
-                              'b5000000-0000-4000-8000-000000000011', 'b5000000-0000-4000-8000-000000000014')),
-  0::bigint,
-  'planner v1: nothing for appointments inserted directly (seed.sql), for non-online "created" or for system cancel/move'
+  concat_ws(' ',
+    (select count(*) from public.messages_log m
+     where m.appointment_id in ('b5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000002',
+                                'b5000000-0000-4000-8000-000000000014')),
+    (select count(*) from public.messages_log m
+     where m.appointment_id = 'b5000000-0000-4000-8000-000000000011'
+       and m.template not in ('booking_confirmed', 'reminder')),
+    (select count(*) from public.messages_log m
+     where m.appointment_id = 'b5000000-0000-4000-8000-000000000011' and m.template = 'booking_confirmed'
+       and m.status = 'queued')),
+  '0 0 0',
+  'planner v2: nothing for appointments inserted directly (seed.sql); a system cancel/move sends the client no notice '
+  || 'and no push, and supersedes the confirmation of the phone booking'
 );
 
 select is(

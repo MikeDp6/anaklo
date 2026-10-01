@@ -1,4 +1,5 @@
 import type { DayAppointment, StatusTarget } from '@/features/calendar/schema'
+import { canReceiveSms } from '@/shared/lib/phone'
 
 /**
  * What the appointment sheet offers. The server decides every change (AN020–AN023); these only
@@ -18,6 +19,29 @@ export function statusTargets(appointment: DayAppointment, started: boolean): St
     case 'cancelled':
       return []
   }
+}
+
+/**
+ * The note under a cancel or a move that asked for «Ενημέρωση με SMS» (contract 1.5 §4.5): the
+ * server says whether an SMS to the client was queued (`sms_queued`); nothing when not asked.
+ */
+export function smsNoteKey(result: {
+  readonly notify: boolean
+  readonly smsQueued: boolean
+}): 'notify.queued' | 'notify.notSent' | null {
+  if (!result.notify) return null
+  return result.smsQueued ? 'notify.queued' : 'notify.notSent'
+}
+
+/**
+ * Whether cancel and move offer «Ενημέρωση με SMS»: a client whose phone can receive SMS (not a
+ * Greek landline) and an appointment that has not started. A hint only: the server plans nothing
+ * for a phone it cannot text and answers `sms_queued` (contract 1.5 §4.5).
+ */
+export function canNotifyClient(appointment: DayAppointment, now: Date): boolean {
+  const phone = appointment.client?.phoneE164
+  if (!phone) return false
+  return canReceiveSms(phone) && Date.parse(appointment.startsAt) > now.getTime()
 }
 
 /** Only booked/confirmed appointments move (move_core). */

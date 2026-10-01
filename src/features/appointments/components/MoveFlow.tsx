@@ -7,7 +7,7 @@ import { toLocalDate, type LocalDate } from '@/shared/lib/dates'
 import { Button } from '@/shared/ui/Button'
 import { useAttemptKey } from '../attemptKey'
 import { useMoveAction } from '../hooks/useAppointmentActions'
-import { d8FlagOf, NO_D8_FLAGS, withD8Flag, type D8Flag, type D8Flags } from '../rules'
+import { d8FlagOf, NO_D8_FLAGS, smsNoteKey, withD8Flag, type D8Flag, type D8Flags } from '../rules'
 import { D8Confirm } from './D8Confirm'
 import styles from './forms.module.css'
 import { NotifyToggle } from './NotifyToggle'
@@ -98,7 +98,7 @@ export function MoveFlow({
           staff: staffName ?? '',
         })}
         warnings={moved.warnings}
-        smsNotSent={moved.notify && !moved.smsQueued}
+        smsNote={smsNoteKey(moved)}
         onDone={close}
       />
     )

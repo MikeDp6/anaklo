@@ -12,14 +12,14 @@ export function SaveSuccess({
   title,
   summary,
   warnings,
-  smsNotSent,
+  smsNote = null,
   onDone,
 }: {
   title: string
   summary: string
   warnings: readonly BookingWarning[]
-  /** The user asked for an SMS and none was queued (always so until 1.5). */
-  smsNotSent: boolean
+  /** After «Ενημέρωση με SMS»: whether the client gets one (`smsNoteKey`); none otherwise. */
+  smsNote?: 'notify.queued' | 'notify.notSent' | null
   onDone: () => void
 }) {
   const { t } = useTranslation('pro')
@@ -35,7 +35,7 @@ export function SaveSuccess({
           {t(`d8.warning.${warning}`)}
         </p>
       ))}
-      {smsNotSent && <p className={styles.muted}>{t('notify.notSent')}</p>}
+      {smsNote && <p className={styles.muted}>{t(smsNote)}</p>}
       <Button onClick={onDone} block>
         {t('sheet.done')}
       </Button>

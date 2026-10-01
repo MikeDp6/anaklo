@@ -193,9 +193,23 @@ describe('online booking race (local stack, service_role over HTTP)', () => {
     expect(new Set(bookings.map((booking) => booking.verified_via))).toEqual(new Set(['otp']))
     // Every retry gets its own working manage link.
     expect(new Set(bookings.map((booking) => booking.manage_token)).size).toBe(10)
-    // One confirmation SMS, returned to every retry (a replay heals a send that never ran).
-    const messages = new Set(bookings.flatMap((booking) => booking.message_ids))
-    expect(messages.size).toBe(1)
+    // One confirmation SMS (plus the staff pushes, contract 1.5 D27), the same ids returned to
+    // every retry (a replay heals a send that never ran).
+    expect(new Set(bookings.map((booking) => booking.message_ids.join(','))).size).toBe(1)
+    const messages = [...new Set(bookings.flatMap((booking) => booking.message_ids))]
+    const reader = new PsqlSession()
+    try {
+      expect(
+        await reader.query(
+          `select count(*) filter (where channel = 'sms' and template = 'booking_confirmed') || ' '
+                  || count(*) filter (where channel = 'sms' and template <> 'booking_confirmed') || ' '
+                  || count(*) filter (where channel = 'push' and template <> 'push_booking_created')
+           from public.messages_log where id = any (array[${messages.map(literal).join(', ')}]::uuid[]);`,
+        ),
+      ).toBe('1 0 0\n')
+    } finally {
+      await reader.close()
+    }
     expect(await appointmentsAt(slot, existing)).toEqual([...ids])
 
     const clients = await admin
@@ -264,11 +278,19 @@ describe('lock order: no deadlock between a manage change and a claim or a repla
 
   it('the sender claims the confirmation while the same link cancels: the claim waits for nothing', async () => {
     const { booked } = await bookOnline()
-    const confirmation = booked.message_ids[0] ?? ''
     const token = literal(booked.manage_token)
     const holder = session()
     const cancel = session()
     const claim = session()
+    // message_ids also carry the staff pushes (contract 1.5 D27): take the confirmation's id.
+    const confirmation = (
+      (await claim.query(
+        `select id from public.messages_log
+         where id = any (array[${booked.message_ids.map(literal).join(', ')}]::uuid[])
+           and template = 'booking_confirmed';`,
+      )) ?? ''
+    ).trim()
+    expect(confirmation).toMatch(/^[0-9a-f-]{36}$/)
 
     // The holder keeps one token row of the appointment: the cancel locks the appointment, then
     // stops at revoking its tokens, before its planner touches the queued confirmation.
@@ -299,7 +321,8 @@ describe('lock order: no deadlock between a manage change and a claim or a repla
     expect(
       await claim.query(
         `select string_agg(template || ':' || status || ':' || coalesce(error, ''), ',' order by template)
-         from public.messages_log where appointment_id = ${appointment};
+         from public.messages_log
+         where appointment_id = ${appointment} and channel = 'sms' and template <> 'reminder';
          select count(*) from public.booking_tokens
          where appointment_id = ${appointment} and revoked_at is null;`,
       ),

@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import {
+  LOCAL_SEED_DISPATCH_SECRET,
   LOCAL_SEED_HMAC_KEYS,
   SECRETS,
+  dispatchUrlFor,
   planSecrets,
   redact,
   toDotenv,
@@ -13,27 +15,41 @@ const PROXY = 'p'.repeat(48)
 const PUBLISHABLE = 'sb_publishable_dev_example'
 const HMAC = 'h'.repeat(43)
 const PHONE_HMAC = `p${HMAC}`
-const context = { knownLocalValues: ['local-dev-proxy-secret-change-me'] }
+const DISPATCH = 'd'.repeat(43)
+const REF = 'abcdefghijklmnopqrst'
+const DISPATCH_URL = `https://${REF}.supabase.co/functions/v1/dispatch`
+const context = { knownLocalValues: ['local-dev-proxy-secret-change-me'], projectRef: REF }
 const base = {
   PROXY_SECRET: PROXY,
   SUPABASE_DEV_PUBLISHABLE_KEY: PUBLISHABLE,
   OTP_HMAC_KEY: HMAC,
   PHONE_HMAC_KEY: PHONE_HMAC,
+  PUSH_PROVIDER: 'fake',
+  DISPATCH_SECRET: DISPATCH,
+  DISPATCH_URL,
 }
+const BASE_FUNCTIONS = [
+  { name: 'PROXY_SECRET', value: PROXY },
+  { name: 'PUSH_PROVIDER', value: 'fake' },
+  { name: 'DISPATCH_SECRET', value: DISPATCH },
+]
+const BASE_VAULT = [
+  { name: 'otp_hmac_key', value: HMAC },
+  { name: 'phone_hmac_key', value: PHONE_HMAC },
+  { name: 'dispatch_secret', value: DISPATCH },
+  { name: 'dispatch_url', value: DISPATCH_URL },
+]
 
 describe('planSecrets', () => {
   it('gives PROXY_SECRET the same value in the functions and the Worker', () => {
     const plan = planSecrets(base, context)
     expect(plan.problems).toEqual([])
-    expect(plan.functions).toEqual([{ name: 'PROXY_SECRET', value: PROXY }])
+    expect(plan.functions).toEqual(BASE_FUNCTIONS)
     expect(plan.worker).toEqual([
       { name: 'PROXY_SECRET', value: PROXY },
       { name: 'SUPABASE_PUBLISHABLE_KEY', value: PUBLISHABLE },
     ])
-    expect(plan.vault).toEqual([
-      { name: 'otp_hmac_key', value: HMAC },
-      { name: 'phone_hmac_key', value: PHONE_HMAC },
-    ])
+    expect(plan.vault).toEqual(BASE_VAULT)
     expect(plan.skipped).toEqual(['ONESIGNAL_APP_ID', 'ONESIGNAL_REST_API_KEY'])
   })
 
@@ -42,8 +58,12 @@ describe('planSecrets', () => {
     expect(plan.problems).toEqual([
       'PROXY_SECRET: missing (source: PROXY_SECRET)',
       'SUPABASE_PUBLISHABLE_KEY: missing (source: SUPABASE_DEV_PUBLISHABLE_KEY)',
+      'PUSH_PROVIDER: missing (source: PUSH_PROVIDER)',
+      'DISPATCH_SECRET: missing (source: DISPATCH_SECRET)',
       'otp_hmac_key: missing (source: OTP_HMAC_KEY)',
       'phone_hmac_key: missing (source: PHONE_HMAC_KEY)',
+      'dispatch_secret: missing (source: DISPATCH_SECRET)',
+      'dispatch_url: missing (source: DISPATCH_URL)',
     ])
   })
 
@@ -66,7 +86,7 @@ describe('planSecrets', () => {
       'otp_hmac_key: is the local seed value (supabase/seed.sql); generate a separate one for dev',
       'phone_hmac_key: is the local seed value (supabase/seed.sql); generate a separate one for dev',
     ])
-    expect(plan.vault).toEqual([])
+    expect(plan.vault.map((entry) => entry.name)).toEqual(['dispatch_secret', 'dispatch_url'])
     for (const problem of plan.problems) {
       for (const key of LOCAL_SEED_HMAC_KEYS) expect(problem).not.toContain(key)
     }
@@ -78,7 +98,8 @@ describe('planSecrets', () => {
       expect(plan.problems).toHaveLength(1)
       expect(plan.problems[0]).toMatch(/^PROXY_SECRET: /)
       expect(plan.problems[0]).not.toContain(bad)
-      expect(plan.functions).toEqual([])
+      expect(plan.functions.map((entry) => entry.name)).not.toContain('PROXY_SECRET')
+      expect(plan.worker.map((entry) => entry.name)).not.toContain('PROXY_SECRET')
     }
   })
 
@@ -102,6 +123,8 @@ describe('planSecrets', () => {
     expect(plan.problems).toEqual([])
     expect(plan.functions.map((entry) => entry.name)).toEqual([
       'PROXY_SECRET',
+      'PUSH_PROVIDER',
+      'DISPATCH_SECRET',
       'ONESIGNAL_APP_ID',
       'ONESIGNAL_REST_API_KEY',
     ])
@@ -128,11 +151,12 @@ describe('planSecrets', () => {
   it('sends the HMAC keys of step 1.3 to Vault only (plan 1.1, Day 3)', () => {
     const plan = planSecrets(base, context)
     expect(plan.problems).toEqual([])
-    expect(plan.vault).toEqual([
-      { name: 'otp_hmac_key', value: HMAC },
-      { name: 'phone_hmac_key', value: PHONE_HMAC },
+    expect(plan.vault).toEqual(BASE_VAULT)
+    expect(plan.functions.map((entry) => entry.name)).toEqual([
+      'PROXY_SECRET',
+      'PUSH_PROVIDER',
+      'DISPATCH_SECRET',
     ])
-    expect(plan.functions.map((entry) => entry.name)).toEqual(['PROXY_SECRET'])
     const weak = planSecrets({ ...base, OTP_HMAC_KEY: 'short' }, context)
     expect(weak.problems[0]).toMatch(/^otp_hmac_key: must be at least 32 characters/)
   })
@@ -146,8 +170,68 @@ describe('planSecrets', () => {
 
   it('has Vault entries only, and only with the snake_case names that SQL reads', () => {
     const vault = SECRETS.filter((spec) => spec.targets.includes('vault'))
-    expect(vault.map((spec) => spec.name)).toEqual(['otp_hmac_key', 'phone_hmac_key'])
+    expect(vault.map((spec) => spec.name)).toEqual([
+      'otp_hmac_key',
+      'phone_hmac_key',
+      'dispatch_secret',
+      'dispatch_url',
+    ])
     for (const spec of vault) expect(spec.targets).toEqual(['vault'])
+  })
+})
+
+describe('planSecrets: messaging (contract 1.5 §3.5)', () => {
+  it('gives DISPATCH_SECRET the same value in the functions and in Vault (dispatch_secret)', () => {
+    const plan = planSecrets(base, context)
+    expect(plan.functions).toContainEqual({ name: 'DISPATCH_SECRET', value: DISPATCH })
+    expect(plan.vault).toContainEqual({ name: 'dispatch_secret', value: DISPATCH })
+    expect(plan.worker.map((entry) => entry.name)).not.toContain('DISPATCH_SECRET')
+  })
+
+  it('refuses a short dispatch secret or the local seed value, without echoing it', () => {
+    for (const bad of ['short-secret', LOCAL_SEED_DISPATCH_SECRET]) {
+      const plan = planSecrets({ ...base, DISPATCH_SECRET: bad }, context)
+      expect(plan.problems).toHaveLength(2)
+      expect(plan.problems[0]).toMatch(/^DISPATCH_SECRET: /)
+      expect(plan.problems[1]).toMatch(/^dispatch_secret: /)
+      for (const problem of plan.problems) expect(problem).not.toContain(bad)
+      expect(plan.vault.map((entry) => entry.name)).not.toContain('dispatch_secret')
+    }
+  })
+
+  it("accepts only the dev project's own dispatch URL for Vault dispatch_url", () => {
+    expect(dispatchUrlFor(REF)).toBe(DISPATCH_URL)
+    for (const bad of [
+      'http://kong:8000/functions/v1/dispatch',
+      `http://${REF}.supabase.co/functions/v1/dispatch`,
+      'https://zzzzzzzzzzzzzzzzzzzz.supabase.co/functions/v1/dispatch',
+      `${DISPATCH_URL}/`,
+    ]) {
+      expect(planSecrets({ ...base, DISPATCH_URL: bad }, context).problems).toEqual([
+        'dispatch_url: must be exactly https://<SUPABASE_DEV_PROJECT_REF>.supabase.co/functions/v1/dispatch',
+      ])
+    }
+    expect(planSecrets(base, { knownLocalValues: context.knownLocalValues }).problems).toEqual([
+      'dispatch_url: cannot be checked without the dev project ref',
+    ])
+  })
+
+  it('takes PUSH_PROVIDER fake or onesignal; onesignal needs both OneSignal values', () => {
+    expect(planSecrets({ ...base, PUSH_PROVIDER: 'vapid' }, context).problems).toEqual([
+      'PUSH_PROVIDER: must be fake or onesignal',
+    ])
+    expect(planSecrets({ ...base, PUSH_PROVIDER: 'onesignal' }, context).problems).toEqual([
+      'PUSH_PROVIDER: onesignal needs ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY',
+    ])
+    const withKeys = {
+      ...base,
+      PUSH_PROVIDER: 'onesignal',
+      ONESIGNAL_APP_ID: 'app',
+      ONESIGNAL_REST_API_KEY: 'rest',
+    }
+    const plan = planSecrets(withKeys, context)
+    expect(plan.problems).toEqual([])
+    expect(plan.functions).toContainEqual({ name: 'PUSH_PROVIDER', value: 'onesignal' })
   })
 })
 

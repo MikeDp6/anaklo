@@ -85,6 +85,26 @@ describe('proxy allow-list', () => {
     }
   })
 
+  it('never reaches the dispatcher or its RPCs (1.5): only pg_net calls dispatch', () => {
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(isAllowedProxyRoute(method, '/functions/v1/dispatch'), method).toBe(false)
+    }
+    for (const rpc of [
+      'claim_due_messages',
+      'record_delivery_report',
+      'record_dispatch_run',
+      'register_push_subscription',
+      'unregister_push_subscription',
+      'request_test_push',
+    ]) {
+      expect(isAllowedProxyRoute('POST', `/rest/v1/rpc/${rpc}`), rpc).toBe(false)
+    }
+    for (const table of ['push_subscriptions', 'member_notification_prefs']) {
+      expect(isAllowedProxyRoute('GET', `/rest/v1/${table}`)).toBe(false)
+    }
+    expect(PROXY_ALLOW_LIST.some((route) => route.path.includes('dispatch'))).toBe(false)
+  })
+
   it('lists every route once', () => {
     const keys = PROXY_ALLOW_LIST.map((route) => `${route.method} ${route.path}`)
     expect(new Set(keys).size).toBe(keys.length)

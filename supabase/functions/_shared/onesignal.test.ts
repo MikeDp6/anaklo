@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appUrl,
   buildPushPayload,
   ONESIGNAL_NOTIFICATIONS_URL,
   OneSignalSubscriptionId,
@@ -11,7 +12,7 @@ import { renderPushAllLocales } from './push-templates.ts'
 const APP_ID = '5f0e0d0c-0000-4000-8000-0000000000aa'
 const DEVICE = '8b1f6a52-3c1e-4c0d-9a4e-2f7d1c9b0e11'
 const OTHER_DEVICE = '0c7e1d2a-9b4f-4e3a-8d6c-5a1b2c3d4e5f'
-const texts = renderPushAllLocales('spike_test')
+const texts = renderPushAllLocales('push_test')
 
 describe('buildPushPayload (ADR-0010 §2)', () => {
   it('targets the given subscriptions only, on the push channel, with el and en texts', () => {
@@ -120,5 +121,19 @@ describe('pushClickUrl', () => {
     [null, null],
   ] as const)('%s → %s', (origin, expected) => {
     expect(pushClickUrl(origin)).toBe(expected)
+  })
+})
+
+describe('appUrl (the tap of a server-sent push, contract 1.5 §3.2)', () => {
+  it.each([
+    ['localhost:5173', 'http://localhost:5173/app/'],
+    ['127.0.0.1:5173', 'http://127.0.0.1:5173/app/'],
+    ['localhost', 'http://localhost/app/'],
+    ['dev.anaklo.gr', 'https://dev.anaklo.gr/app/'],
+    ['anaklo.gr', 'https://anaklo.gr/app/'],
+    // a public host that only starts like a local one is still https
+    ['localhost.anaklo.gr', 'https://localhost.anaklo.gr/app/'],
+  ] as const)('%s → %s', (siteHost, expected) => {
+    expect(appUrl(siteHost)).toBe(expected)
   })
 })

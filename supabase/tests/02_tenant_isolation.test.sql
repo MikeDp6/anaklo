@@ -278,18 +278,20 @@ select set_config('anaklo.actor_type', 'system', true);
 
 -- The minimum grows with every step: 1.2 staff_available_slots, staff_book_appointment; 1.4 (0006)
 -- busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_move_appointment,
--- today_summary.
+-- today_summary; 1.5 (0007) request_test_push. register_push_subscription and
+-- unregister_push_subscription take no p_business_id (contract 1.5 D14: subscriptions belong to the
+-- user, not to a business); their isolation is tested in 12_push_subscriptions.
 select ok(
-  (select count(distinct signature) from tenant_rpc_calls) >= 8,
-  'the generic loop found at least 8 business-scoped RPCs'
+  (select count(distinct signature) from tenant_rpc_calls) >= 9,
+  'the generic loop found at least 9 business-scoped RPCs'
 );
 
 select ok(
-  array['busy_calendar', 'cancel_appointment', 'search_clients', 'set_appointment_status', 'staff_available_slots',
-        'staff_book_appointment', 'staff_move_appointment', 'today_summary']
+  array['busy_calendar', 'cancel_appointment', 'request_test_push', 'search_clients', 'set_appointment_status',
+        'staff_available_slots', 'staff_book_appointment', 'staff_move_appointment', 'today_summary']
     <@ (select array_agg(proname) from tenant_rpc_calls),
-  'the loop covers busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_available_slots, '
-  || 'staff_book_appointment, staff_move_appointment and today_summary'
+  'the loop covers busy_calendar, cancel_appointment, request_test_push, search_clients, set_appointment_status, '
+  || 'staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
 );
 
 select is(

@@ -12,7 +12,7 @@ import { failureOf, rpcFailureMessageKey } from '@/shared/lib/rpcError'
 import { Button } from '@/shared/ui/Button'
 import { Skeleton } from '@/shared/ui/Skeleton'
 import { useCancelAction, useStatusAction } from '../hooks/useAppointmentActions'
-import { canMove } from '../rules'
+import { canMove, canNotifyClient, smsNoteKey } from '../rules'
 import { AppointmentDetails } from './AppointmentDetails'
 import { CancelForm } from './CancelForm'
 import styles from './forms.module.css'
@@ -73,7 +73,7 @@ export function AppointmentSheet({
   const title = t('appointment.title')
 
   if (mode.kind === 'move') {
-    const canNotify = hasPhone(mode.appointment) && startsInFuture(mode.appointment, now)
+    const canNotify = canNotifyClient(mode.appointment, now)
     return (
       <Sheet title={t('move.title')} onClose={close}>
         <MoveFlow
@@ -92,8 +92,9 @@ export function AppointmentSheet({
     // The appointment as the day shows it NOW: after AN021 the day refetched, and the next attempt
     // must send the current status, not the one the form opened with.
     const current = appointment ?? mode.appointment
-    const canNotify = hasPhone(current) && startsInFuture(current, now)
+    const canNotify = canNotifyClient(current, now)
     const done = cancel.result
+    const smsNote = done ? smsNoteKey(done) : null
     return (
       <Sheet title={t('cancel.title')} onClose={close}>
         {done ? (
@@ -101,9 +102,7 @@ export function AppointmentSheet({
             <p className={styles.doneTitle} role="status">
               {t('cancel.done')}
             </p>
-            {done.notify && !done.smsQueued && (
-              <p className={styles.muted}>{t('notify.notSent')}</p>
-            )}
+            {smsNote && <p className={styles.muted}>{t(smsNote)}</p>}
             <Button onClick={close} block>
               {t('sheet.done')}
             </Button>
@@ -180,12 +179,4 @@ export function AppointmentSheet({
       )}
     </Sheet>
   )
-}
-
-function hasPhone(appointment: DayAppointment): boolean {
-  return Boolean(appointment.client?.phoneE164)
-}
-
-function startsInFuture(appointment: DayAppointment, now: Date): boolean {
-  return Date.parse(appointment.startsAt) > now.getTime()
 }

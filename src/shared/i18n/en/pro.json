@@ -36,24 +36,34 @@
     "note": "Signing in here, in the browser, does not carry over to the app."
   },
   "push": {
-    "title": "Notifications (test)",
+    "title": "Notifications",
+    "intro": "You will be notified of every new online booking, cancellation or change to your appointments.",
     "enable": "Turn on notifications",
-    "test": "Test push",
+    "test": "Test notification",
     "statusLoading": "Loading notifications…",
+    "statusUnavailable": "Notifications are not available yet.",
     "statusOff": "Notifications are off on this device.",
     "statusOn": "Notifications are on on this device.",
     "statusDenied": "Notifications are blocked. Change this in the device settings.",
     "statusUnsupported": "This device or browser does not support notifications.",
     "statusNeedsInstall": "Add the app to your Home Screen first.",
     "statusFailed": "Notifications did not load. Try again later.",
-    "testSent": "The test notification was sent.",
+    "statusRegisterFailed": "Notifications were not turned on. Please try again.",
+    "testSent": "Sent. It will arrive within seconds on each of your devices with notifications on.",
+    "testNotRegistered": "Turn on notifications on this device first.",
     "testFailed": "The test notification was not sent. Try again."
   },
   "saving": "Saving…",
   "nav": {
     "label": "Main navigation",
     "today": "Today",
-    "day": "Calendar"
+    "day": "Calendar",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "notifications": "Notifications",
+    "notificationsHint": "New bookings, cancellations and changes on this device."
   },
   "errors": {
     "loadTitle": "Did not load",
@@ -157,7 +167,8 @@
   "notify": {
     "label": "Notify by SMS",
     "hint": "The client gets an SMS about the change.",
-    "notSent": "No SMS was sent to the client."
+    "notSent": "No SMS was sent to the client.",
+    "queued": "The client will get an SMS."
   },
   "move": {
     "title": "Move appointment",

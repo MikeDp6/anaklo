@@ -192,11 +192,14 @@ export async function bookOnce(
   return { date, ...time, manageHref }
 }
 
-/** Books a time straight through /api (another visitor), as Κώστας with the test number. */
+/**
+ * Books a time straight through /api (another visitor), as Κώστας with the test number. Returns
+ * the appointment and its manage token (the fixture cancels it when the test ends).
+ */
 export async function bookViaApi(
   request: APIRequestContext,
   options: { staffId: string; startsAt: string },
-): Promise<void> {
+): Promise<{ appointmentId: string; manageToken: string }> {
   const headers = { 'x-anaklo-business': SHOP.id }
   const base = { business_id: SHOP.id, phone: `+30${PHONES.kostas}` }
   const url = '/api/functions/v1/public-booking'
@@ -230,6 +233,39 @@ export async function bookViaApi(
     },
   })
   expect(book.status(), await book.text()).toBe(200)
-  const { manage_token } = (await book.json()) as { manage_token: string }
+  const { appointment, manage_token } = (await book.json()) as {
+    appointment: { id: string }
+    manage_token: string
+  }
   rememberManageToken(manage_token)
+  return { appointmentId: appointment.id, manageToken: manage_token }
+}
+
+/**
+ * The last free start of `staffId` for «Κούρεμα» between `fromDays` and `fromDays + 6` days after
+ * today (shop time), read like the booking page does (`available_slots` through /api). Far from
+ * the days the other specs book, so parallel runs do not take it meanwhile.
+ */
+export async function freeStartViaApi(
+  request: APIRequestContext,
+  options: { staffId: string; fromDays: number },
+): Promise<string> {
+  const day = (offset: number) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Athens' }).format(
+      new Date(Date.now() + offset * 24 * 60 * 60 * 1000),
+    )
+  const response = await request.post('/api/rest/v1/rpc/available_slots', {
+    data: {
+      p_slug: SHOP.slug,
+      p_service_ids: [SHOP.cutId],
+      p_staff_id: options.staffId,
+      p_from: day(options.fromDays),
+      p_to: day(options.fromDays + 6),
+    },
+  })
+  expect(response.status(), await response.text()).toBe(200)
+  const slots = (await response.json()) as { starts_at: string }[]
+  const last = slots.at(-1)
+  if (!last) throw new Error(`no free time ${options.fromDays}–${options.fromDays + 6} days ahead`)
+  return last.starts_at
 }

@@ -50,6 +50,16 @@ describe('runSignOut (ADR-0009 §19, ADR-0010 §2)', () => {
     expect(calls).toEqual(['push', 'supabase:local', 'clear'])
   })
 
+  it('still signs out when the push part fails (it must never block a sign-out)', async () => {
+    const { deps, calls } = fakeDeps()
+    deps.optOutPush.mockImplementationOnce(() => {
+      calls.push('push')
+      return Promise.reject(new Error('offline'))
+    })
+    await expect(runSignOut(deps)).resolves.toEqual({ ok: true })
+    expect(calls).toEqual(['push', 'supabase:local', 'clear'])
+  })
+
   it('clears the device even when the Supabase call throws', async () => {
     const { deps, calls } = fakeDeps(new Error('boom'))
     await expect(runSignOut(deps)).rejects.toThrow('boom')

@@ -50,16 +50,26 @@ export const APPOINTMENT_EVENTS = [
 ] as const
 export const EVENT_ACTOR_TYPES = ['client', 'staff', 'system', 'import'] as const
 export const AUDIT_ACTOR_TYPES = ['staff', 'nous_support', 'system'] as const
-/** The outbox, `messages_log` (0005). Every SMS template has a text in sms-templates.ts. */
+/** The outbox, `messages_log` (0005, 0007). */
 export const MESSAGE_CHANNELS = ['sms', 'push'] as const
-export const MESSAGE_TEMPLATES = [
+/** SMS templates: exactly the keys of SMS_TEMPLATES in sms-templates.ts (domain.test.ts). */
+export const SMS_MESSAGE_TEMPLATES = [
   'otp',
   'booking_confirmed',
   'reminder',
   'cancelled_by_client',
   'cancelled_by_business',
   'rescheduled_by_client',
+  'rescheduled_by_business',
 ] as const
+/** Push templates (staff only): exactly the keys of PUSH_TEMPLATES in push-templates.ts. */
+export const PUSH_MESSAGE_TEMPLATES = [
+  'push_booking_created',
+  'push_booking_cancelled',
+  'push_booking_moved',
+  'push_test',
+] as const
+export const MESSAGE_TEMPLATES = [...SMS_MESSAGE_TEMPLATES, ...PUSH_MESSAGE_TEMPLATES] as const
 export const MESSAGE_CATEGORIES = ['otp', 'transactional', 'reminder', 'marketing'] as const
 export const MESSAGE_STATUSES = [
   'queued',
@@ -81,10 +91,16 @@ export const RATE_LIMIT_BUCKETS = [
   /** SMS other than OTP, per recipient phone / per business (claim_messages). */
   'sms_phone_day',
   'sms_business_day',
+  /** Every SMS of the platform per UTC calendar month, counted at claim (0007). */
+  'sms_platform_month',
 ] as const
+/** Staff push devices, `push_subscriptions` (ADR-0010 §2). */
+export const PUSH_PROVIDERS = ['onesignal', 'vapid'] as const
+/** When the reminder goes out (SPEC §12): 24 h before, or 18:00 local the evening before. */
+export const REMINDER_MODES = ['24h', 'evening_before'] as const
 
-/** Cron jobs that write a heartbeat to `private.job_runs` (0006; 1.5/1.9 extend the list). */
-export const JOB_NAMES = ['auto_complete'] as const
+/** Jobs that write a heartbeat to `private.job_runs` (0006, 0007; 1.9 health reads them). */
+export const JOB_NAMES = ['auto_complete', 'dispatch_sweep', 'dispatch', 'purge'] as const
 
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
@@ -104,6 +120,7 @@ export type CancelReason = z.infer<typeof CancelReason>
 export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = {
   businesses_vertical: VERTICALS,
   businesses_locale: LOCALES,
+  businesses_reminder_mode: REMINDER_MODES,
   business_members_role: MEMBER_ROLES,
   schedule_exceptions_kind: EXCEPTION_KINDS,
   time_off_reason: TIME_OFF_REASONS,
@@ -131,4 +148,5 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   suppression_list_reason: SUPPRESSION_REASONS,
   vertical_defaults_vertical: VERTICALS,
   job_runs_job: JOB_NAMES,
+  push_subscriptions_provider: PUSH_PROVIDERS,
 }

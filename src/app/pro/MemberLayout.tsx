@@ -5,8 +5,9 @@ import { cx } from '@/shared/ui/cx'
 import styles from './MemberLayout.module.css'
 
 /**
- * Frame of the signed-in area: brand + sign-out on top, the two day screens in a bottom tab bar
- * (one hand, thumb reach). The settings screens of 1.6 join the bar later.
+ * Frame of the signed-in area: brand + sign-out on top, a bottom tab bar (one hand, thumb reach)
+ * with the two day screens and «Ρυθμίσεις» (every role: notifications are per user; the 1.6
+ * screens join that list, not the bar). The settings tab stays active on its sub-screens.
  */
 export function MemberLayout() {
   const { t } = useTranslation(['pro', 'common'])
@@ -25,6 +26,9 @@ export function MemberLayout() {
         </NavLink>
         <NavLink to="/day" className={tab}>
           {t('nav.day')}
+        </NavLink>
+        <NavLink to="/settings" className={tab}>
+          {t('nav.settings')}
         </NavLink>
       </nav>
     </div>

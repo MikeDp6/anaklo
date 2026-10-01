@@ -44,6 +44,15 @@ export function isGreekMobile(e164: string): boolean {
   return /^\+3069\d{8}$/.test(e164)
 }
 
+/**
+ * Whether an SMS can reach this number: a Greek mobile or any non-Greek number; a Greek landline
+ * cannot. Only a hint for the UI (whether to offer «Ενημέρωση με SMS»): the server decides what
+ * it plans and sends (`private.sms_reachable`, 0007) and says so in `sms_queued`.
+ */
+export function canReceiveSms(e164: string): boolean {
+  return !e164.startsWith('+30') || isGreekMobile(e164)
+}
+
 /** `+30 694 123 4567`, `+30 210 123 4567`; other countries are shown as stored. */
 export function formatPhone(e164: string): string {
   const greek = /^\+30(\d{3})(\d{3})(\d{4})$/.exec(e164)

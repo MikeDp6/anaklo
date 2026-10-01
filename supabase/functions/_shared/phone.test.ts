@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatPhone, isGreekMobile, normalizePhone } from './phone.ts'
+import { canReceiveSms, formatPhone, isGreekMobile, normalizePhone } from './phone.ts'
 
 describe('normalizePhone', () => {
   it.each([
@@ -47,6 +47,16 @@ describe('isGreekMobile', () => {
     expect(isGreekMobile('+306941234567')).toBe(true)
     expect(isGreekMobile('+302101234567')).toBe(false)
     expect(isGreekMobile('+447700900123')).toBe(false)
+  })
+})
+
+describe('canReceiveSms', () => {
+  it('Greek mobiles and non-Greek numbers can; a Greek landline cannot', () => {
+    expect(canReceiveSms('+306941234567')).toBe(true)
+    expect(canReceiveSms('+12125550101')).toBe(true)
+    expect(canReceiveSms('+447700900123')).toBe(true)
+    expect(canReceiveSms('+302101234567')).toBe(false)
+    expect(canReceiveSms('+302610000000')).toBe(false)
   })
 })
 

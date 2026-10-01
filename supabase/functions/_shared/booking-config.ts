@@ -10,7 +10,7 @@
 export const ANAKLO_ENVS = ['local', 'dev', 'prod'] as const
 export type AnakloEnv = (typeof ANAKLO_ENVS)[number]
 
-/** Only the fake adapter exists until the real provider (1.5b, deployed in 1.10). */
+/** Only the fake adapter exists until the real provider (ADR-0012, step 1.10). */
 export const SMS_PROVIDER_NAMES = ['fake'] as const
 export type SmsProviderName = (typeof SMS_PROVIDER_NAMES)[number]
 

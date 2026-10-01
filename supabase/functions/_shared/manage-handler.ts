@@ -24,8 +24,9 @@ import { sendMessages } from './send.ts'
 
 /**
  * `POST /api/functions/v1/manage` (contract 1.3 §5): the manage link `/m/<token>`. `view` and
- * `slots` change nothing; `cancel` and `reschedule` act as the client and then send the SMS the
- * planner queued. Everything is POST: nothing changes on GET (link previews, prefetchers).
+ * `slots` change nothing; `cancel` and `reschedule` act as the client and then send what the
+ * planner queued for now: the SMS to the client and the push to the staff (1.5). Everything is
+ * POST: nothing changes on GET (link previews, prefetchers).
  * Pure (ADR-0002 §3): `manage/index.ts` builds the runtime and serves through `handleManage`.
  *
  * The token is the only credential; it is never logged.
@@ -86,6 +87,7 @@ async function send(ctx: Context, ids: readonly string[]): Promise<void> {
   await sendMessages({
     rpc: ctx.rpc,
     provider: ctx.provider,
+    pushProvider: ctx.pushProvider,
     config: ctx.config,
     ids,
     log: ctx.log,

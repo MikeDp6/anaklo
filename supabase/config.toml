@@ -417,6 +417,12 @@ SMS_PROVIDER = "env(SMS_PROVIDER)"
 OTP_TEST_NUMBERS = "env(OTP_TEST_NUMBERS)"
 OTP_TEST_CODE = "env(OTP_TEST_CODE)"
 SMS_ALLOWED_RECIPIENTS = "env(SMS_ALLOWED_RECIPIENTS)"
+# Step 1.5 (contract §3.5): the push sender of public-booking, manage and dispatch (`fake`
+# locally: builds the OneSignal payload, sends nothing), and the secret pg_net sends to dispatch
+# (the LOCAL value equals the seed's Vault `dispatch_secret`). Unset, all three functions answer
+# 500 not_configured. ONESIGNAL_* are not passed here: only 1.10 uses PUSH_PROVIDER=onesignal.
+PUSH_PROVIDER = "env(PUSH_PROVIDER)"
+DISPATCH_SECRET = "env(DISPATCH_SECRET)"
 
 # Edge Functions (ADR-0008 §3). Every function needs its own section: fn:check fails without an
 # explicit verify_jwt and the shared import map (the CLI only looks for a deno.json inside the
@@ -448,7 +454,16 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/deno.json"
 
-# TEMPORARY (ADR-0010 §3, at the latest until 1.5a): delete with supabase/functions/spike-push.
+# The dispatcher of messages_log (step 1.5, contract §3.1). Called only by the database through
+# pg_net (http://kong:8000/functions/v1/dispatch from the DB container) and by tests, never
+# through the /api proxy: checks the x-anaklo-dispatch-secret header in code (not a JWT).
+[functions.dispatch]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# TEMPORARY (ADR-0010 §3): unused by the pro app since 1.5; delete with
+# supabase/functions/spike-push in 1.10 (contract 1.5 D17).
 [functions.spike-push]
 enabled = true
 # Called by the pro app directly with the user's JWT; also re-checked in code.

@@ -164,9 +164,13 @@ describe('SMS templates', () => {
   const LINKS = SITE_HOSTS.flatMap((host) => [`${host}/m/${TOKEN_22}`, `${host}/r/demo01`])
   const linkCases = cases.filter(([key, locale]) => templateVariables(key, locale).includes('link'))
 
-  it('covers the new rescheduled_by_client template in both languages', () => {
-    expect(linkCases).toContainEqual(['rescheduled_by_client', 'el'])
-    expect(linkCases).toContainEqual(['rescheduled_by_client', 'en'])
+  it('covers the rescheduled_by_client (1.3) and rescheduled_by_business (1.5) templates in both languages', () => {
+    for (const key of ['rescheduled_by_client', 'rescheduled_by_business'] as const) {
+      expect(linkCases).toContainEqual([key, 'el'])
+      expect(linkCases).toContainEqual([key, 'en'])
+      expect(cases).toContainEqual([key, 'el'])
+      expect(cases).toContainEqual([key, 'en'])
+    }
     expect(TOKEN_22).toHaveLength(22)
     expect(Math.max(...LINKS.map((link) => link.length))).toBe(SMS_VARIABLE_LIMITS.link)
   })

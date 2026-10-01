@@ -51,6 +51,10 @@ jobs:
       OTP_TEST_NUMBERS: '+306900000001,+306900000002,+306900000999'
       OTP_TEST_CODE: '424242'
       SMS_ALLOWED_RECIPIENTS: ''
+      # Messaging (contract 1.5 §3.5): the fake push sender, and the dispatch secret, equal to
+      # the seed's Vault dispatch_secret (pg_net → http://kong:8000/functions/v1/dispatch).
+      PUSH_PROVIDER: fake
+      DISPATCH_SECRET: local-dev-only-dispatch-secret-not-a-secret-01
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -66,8 +70,9 @@ jobs:
         run: npx supabase test db
       # Concurrent bookings over HTTP (tests/db/**, vitest.db.config.ts). The tests read the API URL
       # and keys from `supabase status -o json` themselves (scripts/lib/cli.mjs, localhost only),
-      # so no key goes into $GITHUB_ENV. Before e2e: both sign the seed owner in.
-      - name: Booking race tests
+      # so no key goes into $GITHUB_ENV. Before e2e: both sign the seed owner in. Since 1.5 also
+      # two dispatchers at once and a dispatcher killed mid-batch (dispatch-race.test.ts).
+      - name: Booking and dispatch race tests
         run: npm run test:race
       - name: Generated DB types are up to date
         run: npm run check:types

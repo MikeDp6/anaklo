@@ -1014,10 +1014,15 @@ select is(
 
 select is(
   (select concat_ws(' ', pg_temp.l((r ->> 'appointment_id')::uuid), r ->> 'status', r ->> 'from_status', r ->> 'changed',
-                    r ->> 'cancelled_by', r ->> 'cancel_reason', r ->> 'notify', r ->> 'sms_queued')
+                    r ->> 'cancelled_by', r ->> 'cancel_reason', r ->> 'notify', r ->> 'sms_queued',
+                    (select string_agg(m.template || ':' || m.status, ',' order by m.template)
+                     from public.messages_log m
+                     where m.appointment_id = (r ->> 'appointment_id')::uuid and m.channel = 'sms'
+                       and m.template in ('cancelled_by_client', 'cancelled_by_business')))
    from pg_temp.r('c1') as r),
-  'ca1 cancelled booked true client client_request true false',
-  'cancel: client_request records the client as the canceller; notify is effective; no SMS is queued before 1.5'
+  'ca1 cancelled booked true client client_request true true cancelled_by_client:queued',
+  'cancel: client_request records the client as the canceller; notify is effective; the SMS queued is '
+  || 'cancelled_by_client (contract 1.5 D6)'
 );
 
 select is(
@@ -1200,10 +1205,15 @@ select is(
                     ((r ->> 'ends_at')::timestamptz = pg_temp.k('3 days 1 hour 30 minutes'))::text,
                     pg_temp.l((r ->> 'from_staff_id')::uuid),
                     ((r ->> 'from_starts_at')::timestamptz = pg_temp.k('3 days'))::text,
-                    r ->> 'replayed', r ->> 'notify', r ->> 'sms_queued', (r -> 'warnings')::text)
+                    r ->> 'replayed', r ->> 'notify', r ->> 'sms_queued', (r -> 'warnings')::text,
+                    (select string_agg(m.template, ',' order by m.template)
+                     from public.messages_log m
+                     where m.appointment_id = (r ->> 'appointment_id')::uuid and m.channel = 'sms'
+                       and m.template like 'rescheduled\_%'))
    from pg_temp.r('m1') as r),
-  'mv1 | SK1 | true | true | SK1 | true | false | true | false | []',
-  'move: new start and end, the values before the move, not replayed, notify effective, no SMS queued before 1.5'
+  'mv1 | SK1 | true | true | SK1 | true | false | true | true | [] | rescheduled_by_business',
+  'move: new start and end, the values before the move, not replayed, notify effective, one rescheduled_by_business '
+  || 'queued (the hand-over below supersedes it)'
 );
 
 select ok(

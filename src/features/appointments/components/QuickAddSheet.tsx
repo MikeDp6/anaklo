@@ -64,7 +64,6 @@ export function QuickAddSheet({
           title={t('quickAdd.done')}
           summary={summary}
           warnings={booked.warnings}
-          smsNotSent={false}
           onDone={close}
         />
       </Sheet>

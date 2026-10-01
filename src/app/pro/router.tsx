@@ -9,6 +9,8 @@ import {
 } from '@/features/auth/loaders'
 import { DayPage } from '@/features/calendar/components/DayPage'
 import { TodayPage } from '@/features/calendar/components/TodayPage'
+import { NotificationsPage } from '@/features/push/components/NotificationsPage'
+import { SettingsPage } from '@/features/settings/components/SettingsPage'
 import { NotFoundPage } from '../shared/NotFoundPage'
 import { LoadingPage } from './LoadingPage'
 import { MemberLayout } from './MemberLayout'
@@ -39,6 +41,8 @@ export const router = createBrowserRouter(
           children: [
             { index: true, element: <TodayPage /> },
             { path: 'day', element: <DayPage /> },
+            { path: 'settings', element: <SettingsPage /> },
+            { path: 'settings/notifications', element: <NotificationsPage /> },
           ],
         },
         { path: '*', element: <NotFoundPage /> },

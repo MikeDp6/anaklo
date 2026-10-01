@@ -33,9 +33,12 @@ const WRANGLER_CONFIG = 'edge/wrangler.jsonc'
 const HELP = `Usage: npm run secrets:dev -- --env-file <path outside the repo> [--dry-run]
 
 Sets PROXY_SECRET (functions + Worker), SUPABASE_PUBLISHABLE_KEY (Worker, from
-SUPABASE_DEV_PUBLISHABLE_KEY) and, when present, ONESIGNAL_APP_ID + ONESIGNAL_REST_API_KEY
-(functions) and OTP_HMAC_KEY + PHONE_HMAC_KEY (Vault: otp_hmac_key, phone_hmac_key; needs
-supabase link to the dev project). CLI tokens in the file
+SUPABASE_DEV_PUBLISHABLE_KEY), PUSH_PROVIDER (functions: fake | onesignal), DISPATCH_SECRET
+(functions, and Vault dispatch_secret with the same value), DISPATCH_URL (Vault dispatch_url:
+exactly https://<dev ref>.supabase.co/functions/v1/dispatch), when present
+ONESIGNAL_APP_ID + ONESIGNAL_REST_API_KEY (functions; required with PUSH_PROVIDER=onesignal),
+and OTP_HMAC_KEY + PHONE_HMAC_KEY (Vault: otp_hmac_key, phone_hmac_key). Vault needs
+supabase link to the dev project. CLI tokens in the file
 (SUPABASE_ACCESS_TOKEN, CLOUDFLARE_API_TOKEN, …) are passed to the CLIs only. Values are never
 printed.`
 
@@ -94,7 +97,7 @@ function main() {
   const publicLocal = { SUPABASE_DEV_PUBLISHABLE_KEY: readLocalEnv().SUPABASE_DEV_PUBLISHABLE_KEY }
   const plan = planSecrets(
     { ...publicLocal, ...process.env, ...envFile },
-    { knownLocalValues: knownLocalValues() },
+    { knownLocalValues: knownLocalValues(), projectRef: devRef },
     Object.keys(envFile),
   )
   const names = (/** @type {Array<{ name: string }>} */ list) =>

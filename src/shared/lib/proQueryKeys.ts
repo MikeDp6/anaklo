@@ -44,4 +44,9 @@ export const proKeys = {
     ] as const,
   clientSearch: (businessId: string, query: string) =>
     ['pro', businessId, 'clients', 'search', query.trim()] as const,
+  /**
+   * The signed-in user's own push subscriptions (contract 1.5 §4.3). Per user, not per business
+   * (ADR-0010 §2), hence `'user'` where the other keys have the business.
+   */
+  pushSubscriptions: (userId: string) => ['pro', 'user', userId, 'push-subscriptions'] as const,
 } as const

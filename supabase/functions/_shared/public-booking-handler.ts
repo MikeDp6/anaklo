@@ -157,6 +157,7 @@ async function start(ctx: Context, req: StartRequest): Promise<Response> {
   const outcomes = await sendMessages({
     rpc: ctx.rpc,
     provider: ctx.provider,
+    pushProvider: ctx.pushProvider,
     config: ctx.config,
     ids: [otp.message_id],
     extraVars: { [otp.message_id]: { code: otp.code } },
@@ -164,8 +165,10 @@ async function start(ctx: Context, req: StartRequest): Promise<Response> {
   })
   const outcome = outcomes[otp.message_id]
   // `rejected` (a number outside SMS_ALLOWED_RECIPIENTS) answers like `sent`: same response
-  // for every number. Not claimed or not sent: the page shows the business phone.
-  if (outcome !== 'sent' && outcome !== 'rejected') {
+  // for every number. `unknown` (the adapter timed out: it may have arrived) counts as sent, so
+  // the page shows the code step and resend works after the cooldown (contract 1.5 D29).
+  // Not claimed, or certainly not sent (`failed`): the page shows the business phone.
+  if (outcome === undefined || outcome === 'failed' || outcome === 'not_claimed') {
     ctx.log('otp_not_sent', { message_id: otp.message_id, outcome: outcome ?? 'not_claimed' })
     return domainErrorResponse('AN017')
   }
@@ -256,10 +259,12 @@ async function book(ctx: Context, req: BookRequest): Promise<Response> {
   if (result === null) return invalidResult(ctx.log, 'book_appointment')
 
   // The booking has committed: a failed send is recorded and logged, never an error here.
-  // A replay returns the still-queued ids again, which heals a confirmation never sent.
+  // The confirmation SMS and the staff push (1.5) go out now; the dispatch sweep catches the
+  // rest. A replay returns the still-queued ids again, which heals a message never sent.
   await sendMessages({
     rpc: ctx.rpc,
     provider: ctx.provider,
+    pushProvider: ctx.pushProvider,
     config: ctx.config,
     ids: result.message_ids,
     log: ctx.log,
