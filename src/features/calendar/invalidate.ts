@@ -31,3 +31,19 @@ export async function invalidateAppointmentChange(
     queryClient.invalidateQueries({ queryKey: proKeys.slotsAll(businessId) }),
   ])
 }
+
+/**
+ * After a change of the schedule (staff, week hours, closures, time off; contract 1.6 §3.4): every
+ * day, «Σήμερα», every free-time list and every conflict list may have changed.
+ */
+export async function invalidateScheduleChange(
+  queryClient: QueryClient,
+  businessId: string,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: proKeys.dayAll(businessId) }),
+    queryClient.invalidateQueries({ queryKey: proKeys.todayAll(businessId) }),
+    queryClient.invalidateQueries({ queryKey: proKeys.slotsAll(businessId) }),
+    queryClient.invalidateQueries({ queryKey: proKeys.conflictsAll(businessId) }),
+  ])
+}

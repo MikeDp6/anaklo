@@ -136,4 +136,31 @@ describe('useAppointmentMutation (rule 14, contract 1.4 §3.5)', () => {
     expect(result.current.locked).toBe(false)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['pro', BUSINESS, 'day', '2026-09-29'] })
   })
+
+  it('while mounted the caller hears of the classified failure (contract 1.6 §4.9)', async () => {
+    const mutationFn = vi
+      .fn<(variables: Vars) => Promise<string>>()
+      .mockRejectedValue(new RpcFailure({ kind: 'domain', code: 'AN001' }))
+    const onFailure = vi.fn()
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { networkMode: 'always', retry: 0 } },
+    })
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(
+      () =>
+        useAppointmentMutation<Vars, string>({
+          businessId: BUSINESS,
+          timeZone: ZONE,
+          mutationFn,
+          instantsOf: (variables) => [variables.startsAt],
+          onFailure,
+        }),
+      { wrapper },
+    )
+    act(() => result.current.submit(VARS))
+    await waitFor(() => expect(onFailure).toHaveBeenCalledTimes(1))
+    expect(onFailure).toHaveBeenCalledWith({ kind: 'domain', code: 'AN001' }, VARS)
+  })
 })

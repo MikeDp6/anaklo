@@ -1,15 +1,19 @@
 // Pure comparisons for provision-business.mjs: what must change so the database matches the file,
 // and what the script refuses. No I/O here (Vitest: provision-diff.test.mjs).
 
+import { toHm } from '../../supabase/functions/_shared/hours.ts'
+
 /**
- * Columns the script may change on an existing business: the list the app itself may update
- * (`grant update (…) on public.businesses to authenticated`, 0001_foundation.sql), minus
- * `settings`, which provisioning does not manage.
+ * Columns the script may change on an existing business: the profile, the booking policy, the
+ * messaging settings and the theme. The app may update the same columns except `theme`, which
+ * only this script changes (0008), and `settings`, which provisioning does not manage.
  */
 export const BUSINESS_UPDATABLE = /** @type {const} */ ([
   'name',
   'locale',
   'phone_e164',
+  'address',
+  'maps_url',
   'booking_enabled',
   'slot_step_min',
   'min_notice_min',
@@ -20,7 +24,37 @@ export const BUSINESS_UPDATABLE = /** @type {const} */ ([
   'allow_any_staff',
   'theme',
   'messaging_enabled',
+  'quiet_start',
+  'quiet_end',
+  'reminder_mode',
 ])
+
+/** `time` columns of businesses: the file writes "HH:MM", PostgreSQL returns "HH:MM:SS". */
+export const BUSINESS_TIME_COLUMNS = /** @type {const} */ (['quiet_start', 'quiet_end'])
+
+/**
+ * The columns of BUSINESS_UPDATABLE that the file would change on an existing business; `time`
+ * columns compare as "HH:MM" ("22:00" in the file = "22:00:00" stored: no change).
+ * @template {Record<string, unknown>} T
+ * @param {Record<string, unknown>} existing the database row
+ * @param {T} desired
+ * @returns {Partial<T>}
+ */
+export function businessPatch(existing, desired) {
+  /** @type {Record<string, unknown>} */
+  const current = { ...existing }
+  for (const column of BUSINESS_TIME_COLUMNS) {
+    const value = current[column]
+    if (typeof value === 'string') current[column] = toHm(value)
+  }
+  return patchFor(
+    current,
+    desired,
+    /** @type {ReadonlyArray<keyof T & string>} */ (
+      /** @type {readonly string[]} */ (BUSINESS_UPDATABLE)
+    ),
+  )
+}
 
 /**
  * Written only when the business is created (ADR-0009 §8); the slug is the lookup key. Later,

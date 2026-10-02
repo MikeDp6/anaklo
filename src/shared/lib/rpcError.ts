@@ -8,12 +8,21 @@ import { domainErrorCode, type DomainErrorCode } from '@fn-shared/errors.ts'
  *   may have been saved: the sheet locks and offers only the identical retry (same key).
  * - `domain`: an `AN0xx` code of `_shared/errors.ts`.
  * - `forbidden`: `42501` (not a member, not your appointment).
+ * - `overlap`: `23P01`, an exclusion constraint (two intervals of a day, two closures or two time
+ *   offs overlap; contract 1.6 §3.6). Screens show their own text.
+ * - `invalid`: a CHECK or a shape the database refused (`23514`, `22023`, `22P02`, `22007`,
+ *   `22008`): «Κάποια τιμή δεν είναι έγκυρη».
+ * - `gone`: an update matched no row (another device deleted it meanwhile); thrown by the
+ *   `api.ts` that asked for the updated row back, never classified from a server error.
  * - `unknown`: anything else.
  */
 export type RpcFailureInfo =
   | { readonly kind: 'offline' }
   | { readonly kind: 'domain'; readonly code: DomainErrorCode }
   | { readonly kind: 'forbidden' }
+  | { readonly kind: 'overlap' }
+  | { readonly kind: 'invalid' }
+  | { readonly kind: 'gone' }
   | { readonly kind: 'unknown' }
 
 /** What the pro `api.ts` functions throw, so TanStack Query hands the classified failure on. */
@@ -37,6 +46,16 @@ const NO_ANSWER_NAMES: ReadonlySet<string> = new Set([
 /** Gateways answer these when the database is unreachable; without a SQLSTATE nothing ran. */
 const GATEWAY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504])
 const SQLSTATE = /^[0-9A-Z]{5}$/
+/** Exclusion constraint violated (`time_off_no_overlap`, `working_hours_no_overlap`, …). */
+const OVERLAP_SQLSTATE = '23P01'
+/** check_violation, invalid_parameter_value, invalid_text_representation, datetime errors. */
+const INVALID_SQLSTATES: ReadonlySet<string> = new Set([
+  '23514',
+  '22023',
+  '22P02',
+  '22007',
+  '22008',
+])
 
 function field(error: object, name: string): unknown {
   return name in error ? (error as Record<string, unknown>)[name] : undefined
@@ -59,6 +78,8 @@ export function classifyRpcFailure(error: unknown, status?: number): RpcFailureI
 
   const code = field(error, 'code')
   if (code === '42501') return { kind: 'forbidden' }
+  if (code === OVERLAP_SQLSTATE) return { kind: 'overlap' }
+  if (typeof code === 'string' && INVALID_SQLSTATES.has(code)) return { kind: 'invalid' }
 
   const hasSqlState = typeof code === 'string' && SQLSTATE.test(code)
   if (status === 0) return { kind: 'offline' }
@@ -84,6 +105,9 @@ function hasProText(code: DomainErrorCode): code is ProDomainErrorText {
 export type RpcFailureMessageKey =
   | 'pro:errors.offline'
   | 'pro:errors.forbidden'
+  | 'pro:errors.overlap'
+  | 'pro:errors.invalid'
+  | 'pro:errors.gone'
   | `pro:errors.${ProDomainErrorText}`
   | `common:errors.${DomainErrorCode}`
   | 'common:errors.network'
@@ -106,6 +130,12 @@ export function rpcFailureMessageKey(
         : `common:errors.${failure.code}`
     case 'forbidden':
       return 'pro:errors.forbidden'
+    case 'overlap':
+      return 'pro:errors.overlap'
+    case 'invalid':
+      return 'pro:errors.invalid'
+    case 'gone':
+      return 'pro:errors.gone'
     case 'unknown':
       return 'common:errors.unknown'
   }

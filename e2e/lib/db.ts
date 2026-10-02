@@ -102,3 +102,48 @@ export async function appointmentAt(staffId: string, startsAt: string): Promise<
   if (typeof id !== 'string') throw new Error(`no active appointment at ${startsAt}`)
   return id
 }
+
+// ---------------------------------------------------------------------------------------------
+// Step 1.6 (absence flow, contract 1.6 §6.6): the appointment after a reassignment or a
+// cancellation, and the time off the flow wrote. Read-only, as above.
+// ---------------------------------------------------------------------------------------------
+
+const AppointmentState = z.object({
+  status: z.string(),
+  staff_id: z.string(),
+  starts_at: z.string(),
+  cancel_reason: z.nullable(z.string()),
+})
+export type AppointmentState = z.infer<typeof AppointmentState>
+
+/** Status, staff member, start (ISO, UTC) and cancel reason of one appointment. */
+export async function appointmentState(appointmentId: string): Promise<AppointmentState> {
+  const row = await selectJson(
+    `select coalesce((select jsonb_build_object(
+               'status', a.status, 'staff_id', a.staff_id,
+               'starts_at', to_char(a.starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+               'cancel_reason', a.cancel_reason)
+             from public.appointments a where a.id = ${literal(appointmentId)}::uuid),
+             'null'::jsonb);`,
+  )
+  return AppointmentState.parse(row)
+}
+
+const TimeOffRow = z.object({ id: z.string(), reason: z.string() })
+
+/** The time off rows of a staff member that overlap `[from, to)`. */
+export async function timeOffOverlapping(
+  staffId: string,
+  from: string,
+  to: string,
+): Promise<z.infer<typeof TimeOffRow>[]> {
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'reason', t.reason)
+                               order by t.starts_at), '[]'::jsonb)
+       from public.time_off t
+      where t.staff_id = ${literal(staffId)}::uuid
+        and tstzrange(t.starts_at, t.ends_at) && tstzrange(${literal(from)}::timestamptz,
+                                                          ${literal(to)}::timestamptz);`,
+  )
+  return z.array(TimeOffRow).parse(rows)
+}

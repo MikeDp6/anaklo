@@ -4,7 +4,7 @@
 // state), then changes only what differs, in an order that passes the constraints after every
 // single request. It never writes appointments (they go through RPCs that declare an actor).
 import {
-  BUSINESS_UPDATABLE,
+  businessPatch,
   createOnlyConflicts,
   diffMembers,
   diffStaffServices,
@@ -226,7 +226,7 @@ export async function provisionBusiness(db, desired) {
     summary.business = 'created'
   } else {
     businessId = existing.id
-    const patch = patchFor(existing, desired.business, BUSINESS_UPDATABLE)
+    const patch = businessPatch(existing, desired.business)
     if (Object.keys(patch).length > 0) {
       const { error } = await db.from('businesses').update(patch).eq('id', businessId)
       if (error) throw dbError('update business', error)

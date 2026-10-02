@@ -7,6 +7,7 @@
     "currency": "EUR",
     "locale": "el",
     "phone": "2610000001",
+    "address": "Οδός Παραδείγματος 1, Πάτρα",
     "booking_enabled": true,
     "messaging_enabled": true,
     "policy": {
@@ -16,7 +17,10 @@
       "cancel_min_notice_min": 120,
       "auto_complete_after_min": 720,
       "correction_window_days": 3,
-      "allow_any_staff": true
+      "allow_any_staff": true,
+      "quiet_start": "22:00",
+      "quiet_end": "09:00",
+      "reminder_mode": "24h"
     },
     "theme": {
       "primary": "#2F6B5E",

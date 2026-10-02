@@ -1,0 +1,76 @@
+/* A whole-row tap target with a switch drawn on a native checkbox. No transition: the thumb jumps
+   (the pro app runs the minimal motion level). */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.row[data-disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+/* Track ≥ 3:1 against the surface (control border colour), thumb in the surface colour; on: the
+   brand indicator colour. */
+.switch {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 48px;
+  height: 28px;
+  margin: 0;
+  border: 2px solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-control-border);
+  cursor: inherit;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.switch:checked {
+  border-color: var(--color-brand-line);
+  background: var(--color-brand-line);
+}
+
+.switch:checked::after {
+  transform: translateX(20px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

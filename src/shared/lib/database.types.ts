@@ -630,6 +630,9 @@ isOneToOne: false
 "manage_view":
 { Args: { "p_token": string }; Returns: Json
                            },
+"mark_absence":
+{ Args: { "p_business_id": string,"p_from": string,"p_staff_id": string,"p_to": string }; Returns: Json
+                           },
 "otp_start":
 { Args: { "p_business_id": string,"p_code"?: string,"p_ip": string,"p_locale": string,"p_phone": string,"p_service_ids": (string)[],"p_staff_id": string,"p_starts_at": string }; Returns: Json
                            },
@@ -647,6 +650,14 @@ isOneToOne: false
 "public_slug_for_code":
 { Args: { "p_code": string }; Returns: string
                            },
+"reassign_appointment":
+{ Args: { "p_appointment_id": string,"p_business_id": string,"p_expected_staff_id": string,"p_expected_starts_at": string,"p_idempotency_key": string,"p_new_staff_id": string,"p_notify": boolean }; Returns: Json
+                           },
+"reassign_candidates":
+{ Args: { "p_appointment_id": string,"p_business_id": string }; Returns: {
+              "blocker": string,"free": boolean,"staff_id": string
+            }[]
+                           },
 "record_delivery_report":
 { Args: { "p_cost_cents": number,"p_error": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number,"p_status": string }; Returns: boolean
                            },
@@ -659,8 +670,19 @@ isOneToOne: false
 "register_push_subscription":
 { Args: { "p_auth"?: string,"p_endpoint"?: string,"p_p256dh"?: string,"p_provider": string,"p_subscription_id"?: string }; Returns: Json
                            },
+"replace_week_hours":
+{ Args: { "p_business_id": string,"p_rows": Json,"p_staff_id": string }; Returns: Json
+                           },
 "request_test_push":
 { Args: { "p_business_id": string }; Returns: Json
+                           },
+"save_service":
+{ Args: { "p_business_id": string,"p_offers": Json,"p_service": Json,"p_service_id": string }; Returns: Json
+                           },
+"schedule_conflicts":
+{ Args: { "p_business_id": string,"p_from"?: string,"p_staff_id"?: string,"p_to"?: string }; Returns: {
+              "appointment_id": string,"client_id": string,"client_name": string,"client_phone_e164": string,"ends_at": string,"reasons": (string)[],"service_ids": (string)[],"source": string,"staff_id": string,"starts_at": string,"status": string
+            }[]
                            },
 "search_clients":
 { Args: { "p_business_id": string,"p_query": string }; Returns: {
@@ -669,6 +691,9 @@ isOneToOne: false
                            },
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_status": string }; Returns: Json
+                           },
+"set_staff_order":
+{ Args: { "p_business_id": string,"p_staff_ids": (string)[] }; Returns: Json
                            },
 "staff_available_slots":
 { Args: { "p_business_id": string,"p_exclude_appointment_id"?: string,"p_from": string,"p_service_ids": (string)[],"p_staff_id": string,"p_to": string }; Returns: {

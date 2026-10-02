@@ -37,6 +37,7 @@ export function useAppointmentMutation<V, R>({
   mutationFn,
   instantsOf,
   onSuccess,
+  onFailure,
 }: {
   businessId: string
   timeZone: string
@@ -49,6 +50,11 @@ export function useAppointmentMutation<V, R>({
    * by then. The cache refresh runs in any case.
    */
   onSuccess?: (result: R, variables: V) => void
+  /**
+   * The classified failure of a call, for its component (e.g. the conflict resolver refetches the
+   * free colleagues after AN001). Like `onSuccess`, only while that component is mounted.
+   */
+  onFailure?: (failure: RpcFailureInfo, variables: V) => void
 }): AppointmentMutation<V, R> {
   const queryClient = useQueryClient()
   const [unknownOutcome, setUnknownOutcome] = useState(false)
@@ -73,7 +79,13 @@ export function useAppointmentMutation<V, R>({
   const { variables, mutate } = mutation
   // Per-call callbacks: TanStack Query skips them once this component unmounted, unlike the
   // useMutation options above, which run for every mutation that settles.
-  const send = (next: V) => mutate(next, onSuccess ? { onSuccess } : undefined)
+  const send = (next: V) =>
+    mutate(next, {
+      ...(onSuccess ? { onSuccess } : {}),
+      ...(onFailure
+        ? { onError: (error: Error, sent: V) => onFailure(failureOf(error), sent) }
+        : {}),
+    })
   return {
     submit: send,
     retry: () => {

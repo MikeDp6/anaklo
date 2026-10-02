@@ -15,6 +15,15 @@ export interface SlotsQuery {
   readonly excludeAppointmentId?: string | null
 }
 
+/** `schedule_conflicts` arguments (contract 1.6 §3.2); null = the server's default. */
+export interface ConflictsKeyQuery {
+  readonly staffId: string | null
+  /** An instant (ISO); null = now. */
+  readonly from: string | null
+  /** An instant (ISO); null = the 366-day horizon. */
+  readonly to: string | null
+}
+
 export const proKeys = {
   all: (businessId: string) => ['pro', businessId] as const,
   business: (businessId: string) => ['pro', businessId, 'business'] as const,
@@ -49,4 +58,33 @@ export const proKeys = {
    * (ADR-0010 §2), hence `'user'` where the other keys have the business.
    */
   pushSubscriptions: (userId: string) => ['pro', 'user', userId, 'push-subscriptions'] as const,
+
+  // Settings (contract 1.6 §3.3).
+  /** Prefix of every day key (`day`, `dayFrame`, `staffDay`). */
+  dayAll: (businessId: string) => ['pro', businessId, 'day'] as const,
+  /** Active and inactive services with their staff terms; under `services`: one invalidation. */
+  serviceCatalogue: (businessId: string) => ['pro', businessId, 'services', 'catalogue'] as const,
+  categories: (businessId: string) => ['pro', businessId, 'categories'] as const,
+  weekHoursAll: (businessId: string) => ['pro', businessId, 'week-hours'] as const,
+  weekHours: (businessId: string, staffId: string) =>
+    ['pro', businessId, 'week-hours', staffId] as const,
+  /** Under `business`: invalidating the business refreshes the policy too. */
+  bookingPolicy: (businessId: string) => ['pro', businessId, 'business', 'policy'] as const,
+  exceptionsAll: (businessId: string) => ['pro', businessId, 'exceptions'] as const,
+  exceptions: (businessId: string, fromDate: LocalDate) =>
+    ['pro', businessId, 'exceptions', fromDate] as const,
+  timeOff: (businessId: string) => ['pro', businessId, 'time-off'] as const,
+  conflictsAll: (businessId: string) => ['pro', businessId, 'conflicts'] as const,
+  conflicts: (businessId: string, query: ConflictsKeyQuery) =>
+    [
+      'pro',
+      businessId,
+      'conflicts',
+      query.staffId ?? 'all',
+      query.from ?? 'now',
+      query.to ?? 'horizon',
+    ] as const,
+  reassignAll: (businessId: string) => ['pro', businessId, 'reassign'] as const,
+  reassign: (businessId: string, appointmentId: string) =>
+    ['pro', businessId, 'reassign', appointmentId] as const,
 } as const

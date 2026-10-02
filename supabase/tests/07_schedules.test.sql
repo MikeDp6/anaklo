@@ -1,12 +1,13 @@
--- Schedules: working hours and schedule exceptions never overlap within their scope, and time
--- off reasons stay free of health data.
+-- Schedules: working hours, schedule exceptions and (0008) time off never overlap within their
+-- scope, time off reasons stay free of health data, and (0008) a free-text note is allowed only on
+-- a shop-wide exception (every member reads every exception; GDPR art. 9).
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(12);
+select plan(21);
 
 insert into public.businesses (id, slug, name, vertical, timezone)
 values ('71000000-0000-4000-8000-000000000001', 'shop-g', 'Shop G', 'barber', 'Europe/Athens');
@@ -107,6 +108,77 @@ select lives_ok(
     values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001',
             '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'leave')$$,
   'a neutral "leave" covers any absence'
+);
+
+-- ---------------------------------------------------------------------------------------------
+-- Time off never overlaps for the same staff member (0008, time_off_no_overlap)
+-- G One already has leave 2026-11-10 00:00Z → 2026-11-11 00:00Z (above).
+-- ---------------------------------------------------------------------------------------------
+select is(
+  (select array_agg(c.conname || ':' || c.contype::text order by c.conname)
+   from pg_constraint c
+   where c.conname in ('time_off_no_overlap', 'schedule_exceptions_note_shop_only')),
+  array['schedule_exceptions_note_shop_only:c', 'time_off_no_overlap:x']::text[],
+  'time_off has the exclusion time_off_no_overlap and schedule_exceptions the CHECK schedule_exceptions_note_shop_only'
+);
+
+select throws_ok(
+  $$insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001',
+            '2026-11-10 12:00Z', '2026-11-12 00:00Z', 'vacation')$$,
+  '23P01', 'conflicting key value violates exclusion constraint "time_off_no_overlap"',
+  'an overlapping time off for the same staff member is rejected'
+);
+
+select throws_ok(
+  $$insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001',
+            '2026-11-10 06:00Z', '2026-11-10 07:00Z', 'personal')$$,
+  '23P01', 'conflicting key value violates exclusion constraint "time_off_no_overlap"',
+  'a time off inside an existing one is rejected'
+);
+
+select lives_ok(
+  $$insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001',
+            '2026-11-11 00:00Z', '2026-11-12 00:00Z', 'personal')$$,
+  'a time off that starts when the previous one ends is allowed (back-to-back)'
+);
+
+select lives_ok(
+  $$insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000002',
+            '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'leave')$$,
+  'the same time off for another staff member is allowed'
+);
+
+select throws_ok(
+  $$update public.time_off set starts_at = '2026-11-10 23:00Z'
+    where staff_id = '72000000-0000-4000-8000-000000000001' and starts_at = '2026-11-11 00:00Z'$$,
+  '23P01', 'conflicting key value violates exclusion constraint "time_off_no_overlap"',
+  'an update that makes two time off rows of the same staff member overlap is rejected'
+);
+
+-- ---------------------------------------------------------------------------------------------
+-- A note only on a shop-wide exception (0008, schedule_exceptions_note_shop_only)
+-- ---------------------------------------------------------------------------------------------
+select throws_ok(
+  $$insert into public.schedule_exceptions (business_id, staff_id, local_date, kind, note)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', '2026-12-26', 'closed', 'x')$$,
+  '23514', 'new row for relation "schedule_exceptions" violates check constraint "schedule_exceptions_note_shop_only"',
+  'a staff member''s exception cannot carry a note'
+);
+
+select lives_ok(
+  $$insert into public.schedule_exceptions (business_id, staff_id, local_date, kind, note)
+    values ('71000000-0000-4000-8000-000000000001', null, '2026-12-27', 'closed', 'Αργία')$$,
+  'a shop-wide exception may carry a note'
+);
+
+select lives_ok(
+  $$insert into public.schedule_exceptions (business_id, staff_id, local_date, kind)
+    values ('71000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000002', '2026-12-26', 'closed')$$,
+  'a staff member''s exception without a note is allowed'
 );
 
 select * from finish();

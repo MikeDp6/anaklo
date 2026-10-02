@@ -8,24 +8,27 @@
 // is not deferrable) and leave the staff member without hours.
 import { z } from 'zod/mini'
 import { isValidTimeZone } from '../../supabase/functions/_shared/dates.ts'
-import { Locale, MemberRole, Vertical } from '../../supabase/functions/_shared/domain.ts'
+import {
+  Locale,
+  MemberRole,
+  REMINDER_MODES,
+  Vertical,
+} from '../../supabase/functions/_shared/domain.ts'
+import {
+  HOUR_MINUTE,
+  WEEKDAY_KEYS,
+  WEEKDAYS,
+  findOverlaps as findIntervalOverlaps,
+  parseInterval,
+} from '../../supabase/functions/_shared/hours.ts'
 import { normalizePhone } from '../../supabase/functions/_shared/phone.ts'
 import { BusinessTheme } from '../../src/shared/lib/theme.ts'
 
-/** Keys of `hours`, mapped to working_hours.weekday (extract(dow): 0 = Sunday). */
-export const WEEKDAYS = /** @type {const} */ ({
-  mon: 1,
-  tue: 2,
-  wed: 3,
-  thu: 4,
-  fri: 5,
-  sat: 6,
-  sun: 0,
-})
+// The hours vocabulary lives in supabase/functions/_shared/hours.ts (shared with the pro app's
+// week editor, contract 1.6 §2.9); re-exported here with no change of behaviour.
+export { WEEKDAYS, parseInterval }
 
-/** @typedef {keyof typeof WEEKDAYS} WeekdayKey */
-
-const WEEKDAY_KEYS = /** @type {WeekdayKey[]} */ (Object.keys(WEEKDAYS))
+/** @typedef {import('../../supabase/functions/_shared/hours.ts').WeekdayKey} WeekdayKey */
 
 // Same patterns as the businesses_slug_format constraint and private.is_valid_timezone, so a bad
 // file fails here with a readable message; the database still enforces them (and the reserved
@@ -34,15 +37,6 @@ const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/
 const IANA_ZONE = /^[A-Z][A-Za-z_]+(\/[A-Za-z0-9_+-]+)+$/
 const INTERVAL = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/
-
-/**
- * "09:00-14:00" → { start: '09:00', end: '14:00' }. Only for strings that passed the schema.
- * @param {string} text
- */
-export function parseInterval(text) {
-  const [start = '', end = ''] = text.split('-')
-  return { start, end }
-}
 
 /** @param {string} text */
 function isValidInterval(text) {
@@ -54,22 +48,12 @@ function isValidInterval(text) {
 /**
  * Pairs [earlier, later] of intervals (indexes into `intervals`) that overlap on one day.
  * Back-to-back intervals ("09:00-14:00", "14:00-18:00") do not overlap, as in the database ('[)').
+ * The "HH:MM-HH:MM" form of hours.ts `findOverlaps` (same semantics).
  * @param {readonly string[]} intervals valid "HH:MM-HH:MM" strings
  * @returns {Array<[number, number]>}
  */
 export function findOverlaps(intervals) {
-  const sorted = intervals
-    .map((text, index) => ({ index, ...parseInterval(text) }))
-    .sort((a, b) => (a.start === b.start ? 0 : a.start < b.start ? -1 : 1))
-  /** @type {Array<[number, number]>} */
-  const overlaps = []
-  let latest = sorted[0]
-  for (const current of sorted.slice(1)) {
-    if (!latest) break
-    if (current.start < latest.end) overlaps.push([latest.index, current.index])
-    if (current.end > latest.end) latest = current
-  }
-  return overlaps
+  return findIntervalOverlaps(intervals.map(parseInterval))
 }
 
 /** @param {number} max */
@@ -178,6 +162,10 @@ const Policy = z.strictObject({
   auto_complete_after_min: z.optional(z.int()),
   correction_window_days: z.optional(z.int()),
   allow_any_staff: z.optional(z.boolean()),
+  /** Quiet hours of the SMS (local "HH:MM"; the database checks the 1–12 h window). */
+  quiet_start: z.optional(z.string().check(z.regex(HOUR_MINUTE, 'expected "HH:MM"'))),
+  quiet_end: z.optional(z.string().check(z.regex(HOUR_MINUTE, 'expected "HH:MM"'))),
+  reminder_mode: z.optional(z.enum(REMINDER_MODES)),
 })
 
 const Business = z.strictObject({
@@ -208,6 +196,16 @@ const Business = z.strictObject({
   phone: z.optional(
     z.nullable(
       z.string().check(z.refine((value) => normalizePhone(value).ok, 'not a valid phone number')),
+    ),
+  ),
+  /** Shown on the booking page; null clears it. */
+  address: z.optional(z.nullable(Name(200))),
+  /** A map link for the booking page (https only, as businesses_maps_url); null clears it. */
+  maps_url: z.optional(
+    z.nullable(
+      z
+        .string()
+        .check(z.trim(), z.regex(/^https:\/\//, 'expected an https:// link'), z.maxLength(500)),
     ),
   ),
   booking_enabled: z.optional(z.boolean()),
@@ -312,6 +310,8 @@ export const ProvisionFile = z
  * @property {string} currency
  * @property {string} locale
  * @property {string | null} [phone_e164]
+ * @property {string | null} [address]
+ * @property {string | null} [maps_url]
  * @property {boolean} [booking_enabled]
  * @property {boolean} [messaging_enabled]
  * @property {number} [slot_step_min]
@@ -321,6 +321,9 @@ export const ProvisionFile = z
  * @property {number} [auto_complete_after_min]
  * @property {number} [correction_window_days]
  * @property {boolean} [allow_any_staff]
+ * @property {string} [quiet_start] local "HH:MM"
+ * @property {string} [quiet_end] local "HH:MM"
+ * @property {'24h' | 'evening_before'} [reminder_mode]
  * @property {import('../../src/shared/lib/theme.ts').BusinessTheme} [theme]
  */
 
@@ -385,6 +388,8 @@ export function toDesired(file) {
     locale: business.locale,
     ...definedOnly({
       phone_e164: business.phone == null ? business.phone : toE164(business.phone),
+      address: business.address,
+      maps_url: business.maps_url,
       booking_enabled: business.booking_enabled,
       messaging_enabled: business.messaging_enabled,
       theme: business.theme,

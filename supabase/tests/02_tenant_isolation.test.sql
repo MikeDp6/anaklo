@@ -8,7 +8,7 @@ set local role postgres;
 set local search_path = public, extensions;
 -- Fixture appointments are written by the system (appointment writes must declare an actor).
 select set_config('anaklo.actor_type', 'system', true);
-select plan(22);
+select plan(25);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres)
@@ -110,6 +110,33 @@ select throws_ok(
   'events cannot be deleted through the API'
 );
 
+-- 1.6 (0008): the tables the settings screens still write directly (column grants) keep the
+-- tenant check of RLS.
+select throws_ok(
+  $$insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason)
+    values ('b1000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001',
+            '2026-11-12 00:00Z', '2026-11-13 00:00Z', 'leave')$$,
+  '42501',
+  null,
+  'owner A cannot record time off for staff of B'
+);
+
+select throws_ok(
+  $$insert into public.schedule_exceptions (business_id, local_date, kind)
+    values ('b1000000-0000-4000-8000-000000000001', '2026-12-24', 'closed')$$,
+  '42501',
+  null,
+  'owner A cannot close business B'
+);
+
+select throws_ok(
+  $$insert into public.staff (business_id, display_name)
+    values ('b1000000-0000-4000-8000-000000000001', 'Intruder')$$,
+  '42501',
+  null,
+  'owner A cannot add staff to B'
+);
+
 set local role postgres;
 
 -- ---------------------------------------------------------------------------------------------
@@ -130,9 +157,12 @@ select is(
   'staff cannot read a colleague''s time off (and its reason)'
 );
 
-select lives_ok(
+-- 0008: no UPDATE grant on services any more (contract 1.6 §2.7: tightened, never relaxed).
+select throws_ok(
   $$update public.services set price_cents = 0$$,
-  'staff may run a catalogue update (RLS makes it a no-op; checked below)'
+  '42501',
+  null,
+  'staff cannot update the catalogue; writes go through save_service'
 );
 
 select is(
@@ -278,20 +308,24 @@ select set_config('anaklo.actor_type', 'system', true);
 
 -- The minimum grows with every step: 1.2 staff_available_slots, staff_book_appointment; 1.4 (0006)
 -- busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_move_appointment,
--- today_summary; 1.5 (0007) request_test_push. register_push_subscription and
--- unregister_push_subscription take no p_business_id (contract 1.5 D14: subscriptions belong to the
--- user, not to a business); their isolation is tested in 12_push_subscriptions.
+-- today_summary; 1.5 (0007) request_test_push; 1.6 (0008) mark_absence, reassign_appointment,
+-- reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order. register_push_subscription
+-- and unregister_push_subscription take no p_business_id (contract 1.5 D14: subscriptions belong to
+-- the user, not to a business); their isolation is tested in 12_push_subscriptions.
 select ok(
-  (select count(distinct signature) from tenant_rpc_calls) >= 9,
-  'the generic loop found at least 9 business-scoped RPCs'
+  (select count(distinct signature) from tenant_rpc_calls) >= 16,
+  'the generic loop found at least 16 business-scoped RPCs'
 );
 
 select ok(
-  array['busy_calendar', 'cancel_appointment', 'request_test_push', 'search_clients', 'set_appointment_status',
-        'staff_available_slots', 'staff_book_appointment', 'staff_move_appointment', 'today_summary']
+  array['busy_calendar', 'cancel_appointment', 'mark_absence', 'reassign_appointment', 'reassign_candidates',
+        'replace_week_hours', 'request_test_push', 'save_service', 'schedule_conflicts', 'search_clients',
+        'set_appointment_status', 'set_staff_order', 'staff_available_slots', 'staff_book_appointment',
+        'staff_move_appointment', 'today_summary']
     <@ (select array_agg(proname) from tenant_rpc_calls),
-  'the loop covers busy_calendar, cancel_appointment, request_test_push, search_clients, set_appointment_status, '
-  || 'staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
+  'the loop covers busy_calendar, cancel_appointment, mark_absence, reassign_appointment, reassign_candidates, '
+  || 'replace_week_hours, request_test_push, save_service, schedule_conflicts, search_clients, set_appointment_status, '
+  || 'set_staff_order, staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
 );
 
 select is(

@@ -786,8 +786,9 @@ select is(
 update public.businesses set reminder_mode = 'evening_before' where id = 'e1100000-0000-4000-8000-00000000000a';
 select pg_temp.mk('A3', 'e1100000-0000-4000-8000-00000000000a', pg_temp.id('C2'), pg_temp.id('SM1'), pg_temp.lt(3, '15:00'), 'online');
 select pg_temp.quiet(set_config('t.p3', pg_temp.plan(pg_temp.id('A3'), 'created', 'client'), true));
-update public.businesses set reminder_mode = '24h' where id = 'e1100000-0000-4000-8000-00000000000a';
 
+-- Asserted before the mode is switched back: since 0008 (1.6 D6) that switch re-plans the queued
+-- reminders of the business (13_schedule_ops covers the re-plan itself).
 select is(
   (select concat_ws(' ', current_setting('t.p3'), count(*), bool_and(m.scheduled_for = pg_temp.local_at(a.starts_at, 1, '18:00')),
             string_agg(m.locale, ','))
@@ -796,6 +797,8 @@ select is(
   'ok 1 t en',
   'planner (evening_before): the reminder is at 18:00 local the day before, in the client''s language'
 );
+
+update public.businesses set reminder_mode = '24h' where id = 'e1100000-0000-4000-8000-00000000000a';
 
 select pg_temp.mk('A4', 'e1100000-0000-4000-8000-00000000000a', pg_temp.id('C1'), pg_temp.id('SM2'), pg_temp.lt(3, '08:00'), 'online');
 select pg_temp.mk('A5', 'e1100000-0000-4000-8000-00000000000a', pg_temp.id('C2'), pg_temp.id('SM2'), pg_temp.lt(3, '23:00'), 'online');
@@ -819,18 +822,24 @@ select set_config('t.a4rem', (select m.scheduled_for::text from public.messages_
 update public.businesses set quiet_start = '23:00', quiet_end = '08:00' where id = 'e1100000-0000-4000-8000-00000000000a';
 select pg_temp.mk('A6', 'e1100000-0000-4000-8000-00000000000a', pg_temp.id('C1'), pg_temp.id('SM3'), pg_temp.lt(3, '22:30'), 'online');
 select pg_temp.quiet(set_config('t.p6', pg_temp.plan(pg_temp.id('A6'), 'created', 'client'), true));
-update public.businesses set quiet_start = '22:00', quiet_end = '09:00' where id = 'e1100000-0000-4000-8000-00000000000a';
 
+-- 1.5 D8 («a queued reminder keeps its time») was replaced by 1.6 D6 (0008): a change of the quiet
+-- hours re-plans the queued reminders, so A4's moves from 21:00 two days before (old quiet hours)
+-- to 08:00 the day before (08:00 = the new quiet_end, not quiet). Asserted before the switch back.
 select is(
   concat_ws(' ', current_setting('t.p6'),
     (select m.scheduled_for = pg_temp.prev_day(a.starts_at)
      from public.messages_log m join public.appointments a on a.id = m.appointment_id
      where a.id = pg_temp.id('A6') and m.template = 'reminder'),
-    (select m.scheduled_for = current_setting('t.a4rem')::timestamptz
-     from public.messages_log m where m.appointment_id = pg_temp.id('A4') and m.template = 'reminder')),
+    (select m.scheduled_for = pg_temp.local_at(a.starts_at, 1, '08:00')
+            and m.scheduled_for <> current_setting('t.a4rem')::timestamptz
+     from public.messages_log m join public.appointments a on a.id = m.appointment_id
+     where a.id = pg_temp.id('A4') and m.template = 'reminder')),
   'ok t t',
-  'planner: the business''s own quiet hours (23:00–08:00) are used (22:30 stays); a queued reminder keeps its time (D8)'
+  'planner: the business''s own quiet hours (23:00–08:00) are used (22:30 stays); a queued reminder follows the new quiet hours (1.6 D6, replaces 1.5 D8)'
 );
+
+update public.businesses set quiet_start = '22:00', quiet_end = '09:00' where id = 'e1100000-0000-4000-8000-00000000000a';
 
 select is(
   pg_temp.push('A4', 'push_booking_created') || ' | ' || pg_temp.push('A6', 'push_booking_created'),

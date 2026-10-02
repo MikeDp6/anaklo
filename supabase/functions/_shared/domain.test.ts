@@ -3,8 +3,10 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   CHECKED_VALUE_LISTS,
+  CONFLICT_REASONS,
   MESSAGE_TEMPLATES,
   PUSH_MESSAGE_TEMPLATES,
+  REASSIGN_BLOCKERS,
   SMS_MESSAGE_TEMPLATES,
 } from './domain.ts'
 import { PUSH_TEMPLATES } from './push-templates.ts'
@@ -65,5 +67,29 @@ describe('message templates', () => {
     expect(new Set(MESSAGE_TEMPLATES).size).toBe(MESSAGE_TEMPLATES.length)
     expect(PUSH_MESSAGE_TEMPLATES.every((key) => key.startsWith('push_'))).toBe(true)
     expect(SMS_MESSAGE_TEMPLATES.some((key) => key.startsWith('push_'))).toBe(false)
+  })
+})
+
+/** The body of `create function <name>(` … `$$;` in the given SQL, or null. */
+function functionBody(sql: string, name: string): string | null {
+  const start = sql.indexOf(`create function ${name}(`)
+  if (start < 0) return null
+  const open = sql.indexOf('$$', start)
+  const close = sql.indexOf('$$;', open + 2)
+  return open < 0 || close < 0 ? null : sql.slice(open, close)
+}
+
+describe('RPC output lists match the functions that produce them (0008)', () => {
+  const sql = migrationSql()
+
+  it.each([
+    ['private.schedule_conflicts_core', CONFLICT_REASONS],
+    ['private.reassign_candidates_impl', REASSIGN_BLOCKERS],
+  ] as const)('%s names every value, in the order of the list', (name, values) => {
+    const body = functionBody(sql, name)
+    expect(body, `function ${name} not found in migrations`).not.toBeNull()
+    const positions = values.map((value) => body?.indexOf(`'${value}'`) ?? -1)
+    expect(positions.every((position) => position >= 0)).toBe(true)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
   })
 })

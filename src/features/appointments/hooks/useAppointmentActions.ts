@@ -14,6 +14,7 @@ import type {
   StatusInput,
   StatusResult,
 } from '@/features/calendar/schema'
+import type { RpcFailureInfo } from '@/shared/lib/rpcError'
 import { useAppointmentMutation } from './useAppointmentMutation'
 
 /** The start the appointment had when the sheet opened: its day is refreshed afterwards. */
@@ -46,6 +47,7 @@ export function useStatusAction(
 export function useCancelAction(
   { businessId, timeZone }: Scope,
   onSuccess?: (result: CancelResult) => void,
+  onFailure?: (failure: RpcFailureInfo) => void,
 ) {
   return useAppointmentMutation<CancelVariables, CancelResult>({
     businessId,
@@ -53,6 +55,7 @@ export function useCancelAction(
     mutationFn: (variables) => cancelAppointment(businessId, variables),
     instantsOf: (variables) => [variables.startsAt],
     onSuccess,
+    onFailure,
   })
 }
 

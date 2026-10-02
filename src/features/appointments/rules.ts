@@ -38,7 +38,14 @@ export function smsNoteKey(result: {
  * Greek landline) and an appointment that has not started. A hint only: the server plans nothing
  * for a phone it cannot text and answers `sms_queued` (contract 1.5 §4.5).
  */
-export function canNotifyClient(appointment: DayAppointment, now: Date): boolean {
+export function canNotifyClient(
+  // Any appointment-like shape: the day sheet's appointment, or a conflict row of 1.6.
+  appointment: {
+    readonly startsAt: string
+    readonly client: { readonly phoneE164: string | null } | null
+  },
+  now: Date,
+): boolean {
   const phone = appointment.client?.phoneE164
   if (!phone) return false
   return canReceiveSms(phone) && Date.parse(appointment.startsAt) > now.getTime()

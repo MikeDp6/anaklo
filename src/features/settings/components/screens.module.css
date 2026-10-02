@@ -1,0 +1,208 @@
+/* The schedule screens of the settings (closures, time off, policy, conflicts, absence). Minimal
+   motion level (ADR-0011): only `pressable` (E16) on taps and the E17 skeletons; nothing else
+   moves. Colours from the semantic tokens only. */
+.intro {
+  color: var(--color-muted);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* Also used on a form's outer <fieldset> (disabled while saving): no browser frame. */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A list item: a cream card with its text and, under it, its actions. */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+/* A whole-row button (opens a sheet), ≥ 48px. */
+.rowButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions > * {
+  flex: 1 1 140px;
+}
+
+.muted {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.status {
+  font-weight: 600;
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+/* A section of a form (a group of fields with its own heading). */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+/* Inside the section (a floated legend is laid out as its first item), not on its border. */
+.legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-weight: 700;
+}
+
+/* Two fields side by side when there is room (dates, times). */
+.pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.pair > * {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+/* An interval row: start, end, remove. */
+.interval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.interval > :not(button) {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+/* A radio choice row, whole row tappable, ≥ 48px. */
+.choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-brand-line);
+  box-shadow: inset 0 0 0 1px var(--color-brand-line);
+}
+
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.choice input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--color-brand-line);
+}
+
+/* A notice after a save with a link (conflict count). */
+.callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+/* A link styled as a secondary pill (≥ 44px). */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

@@ -162,6 +162,41 @@ describe('business', () => {
     expect(errorsOf(file)).toEqual(['business: Unrecognized key: "boking_enabled"'])
   })
 
+  it('carries the address, the map link, the quiet hours and the reminder mode (1.6 §2.9)', () => {
+    const { business } = desiredOf(example())
+    expect(business).toMatchObject({
+      address: 'Οδός Παραδείγματος 1, Πάτρα',
+      quiet_start: '22:00',
+      quiet_end: '09:00',
+      reminder_mode: '24h',
+    })
+    expect(business).not.toHaveProperty('maps_url')
+
+    const file = example()
+    file.business.address = null
+    file.business.maps_url = 'https://maps.example.test/demo'
+    expect(desiredOf(file).business).toMatchObject({
+      address: null,
+      maps_url: 'https://maps.example.test/demo',
+    })
+  })
+
+  it('rejects a non-https map link, a long address, bad quiet hours and an unknown mode', () => {
+    const file = example()
+    file.business.maps_url = 'http://maps.example.test/demo'
+    file.business.address = 'x'.repeat(201)
+    file.business.policy.quiet_start = '22:00:00'
+    file.business.policy.quiet_end = '9:00'
+    file.business.policy.reminder_mode = 'hour_before'
+    const errors = errorsOf(file)
+    expect(errors).toHaveLength(5)
+    expect(errors[0]).toMatch(/^business\.address: /)
+    expect(errors[1]).toBe('business.maps_url: expected an https:// link')
+    expect(errors[2]).toBe('business.policy.quiet_start: expected "HH:MM"')
+    expect(errors[3]).toBe('business.policy.quiet_end: expected "HH:MM"')
+    expect(errors[4]).toMatch(/^business\.policy\.reminder_mode: /)
+  })
+
   it('flattens the policy into columns', () => {
     const file = example()
     file.business.policy = { slot_step_min: 30, allow_any_staff: false }

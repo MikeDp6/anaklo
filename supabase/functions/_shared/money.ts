@@ -38,6 +38,27 @@ export function formatMoney(cents: Cents, currency: string, locale: string): str
 }
 
 /**
+ * The amount as a form field shows it, without currency or grouping, in the locale's decimal
+ * separator: 1300 → '13,00' (el) / '13.00' (en). `parseMoney` reads it back to the same cents.
+ */
+export function formatMoneyInput(cents: Cents, locale: string): string {
+  assertCents(cents)
+  const sign = cents < 0 ? '-' : ''
+  const absolute = Math.abs(cents)
+  const whole = Math.trunc(absolute / 100)
+  const fraction = String(absolute % 100).padStart(2, '0')
+  return `${sign}${whole}${decimalSeparator(locale)}${fraction}`
+}
+
+/** '.' or ',' (the two `parseMoney` reads), as the locale writes decimals. */
+function decimalSeparator(locale: string): '.' | ',' {
+  const part = new Intl.NumberFormat(locale)
+    .formatToParts(1.5)
+    .find((candidate) => candidate.type === 'decimal')
+  return part?.value === '.' ? '.' : ','
+}
+
+/**
  * Parses what a person types ("13", "13,5", "13,50", "1.300,00", "13.50 €") into cents without
  * floating point. A comma, when present, is the decimal separator (Greek usage) and dots are
  * thousands separators; otherwise a single dot followed by 1–2 digits is the decimal separator.

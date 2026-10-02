@@ -301,6 +301,26 @@ export interface MoveResult {
   readonly smsQueued: boolean
 }
 
+/**
+ * The answer of `staff_move_appointment`, also given by `reassign_appointment` (0008, the absence
+ * flow's hand-over at the same time).
+ */
+export function toMoveResult(data: unknown): MoveResult {
+  const result = MoveResponse.parse(data)
+  return {
+    appointmentId: result.appointment_id,
+    staffId: result.staff_id,
+    startsAt: result.starts_at,
+    endsAt: result.ends_at,
+    fromStaffId: result.from_staff_id,
+    fromStartsAt: result.from_starts_at,
+    warnings: result.warnings,
+    replayed: result.replayed,
+    notify: result.notify,
+    smsQueued: result.sms_queued,
+  }
+}
+
 export type BookClientInput =
   | { readonly kind: 'existing'; readonly clientId: string }
   | {

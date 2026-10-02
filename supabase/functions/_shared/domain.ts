@@ -102,12 +102,30 @@ export const REMINDER_MODES = ['24h', 'evening_before'] as const
 /** Jobs that write a heartbeat to `private.job_runs` (0006, 0007; 1.9 health reads them). */
 export const JOB_NAMES = ['auto_complete', 'dispatch_sweep', 'dispatch', 'purge'] as const
 
+/**
+ * RPC outputs, not CHECK lists (so not in CHECKED_VALUE_LISTS; domain.test.ts checks that 0008
+ * names them). Why an appointment no longer fits the schedule (`schedule_conflicts`, 0008), in
+ * the order the server lists them. Reason codes only: never the reason of a time off.
+ */
+export const CONFLICT_REASONS = [
+  'shop_closed',
+  'staff_closed',
+  'time_off',
+  'special_hours',
+  'outside_hours',
+  'staff_inactive',
+] as const
+/** Why a colleague cannot take an appointment at its time (`reassign_candidates`, 0008). */
+export const REASSIGN_BLOCKERS = ['not_offered', 'busy', 'off', 'tight'] as const
+
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
 export const MemberRole = z.enum(MEMBER_ROLES)
 export const AppointmentStatus = z.enum(APPOINTMENT_STATUSES)
 export const AppointmentSource = z.enum(APPOINTMENT_SOURCES)
 export const CancelReason = z.enum(CANCEL_REASONS)
+export const ConflictReason = z.enum(CONFLICT_REASONS)
+export const ReassignBlocker = z.enum(REASSIGN_BLOCKERS)
 
 export type Vertical = z.infer<typeof Vertical>
 export type Locale = z.infer<typeof Locale>
@@ -115,6 +133,8 @@ export type MemberRole = z.infer<typeof MemberRole>
 export type AppointmentStatus = z.infer<typeof AppointmentStatus>
 export type AppointmentSource = z.infer<typeof AppointmentSource>
 export type CancelReason = z.infer<typeof CancelReason>
+export type ConflictReason = z.infer<typeof ConflictReason>
+export type ReassignBlocker = z.infer<typeof ReassignBlocker>
 
 /** CHECK constraint name → the list above that must match it exactly (order-insensitive). */
 export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = {

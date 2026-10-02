@@ -8,7 +8,6 @@ import {
   CancelResponse,
   DayAppointmentRows,
   DayFrameResponse,
-  MoveResponse,
   SlotRows,
   StatusResponse,
   TodaySummaryResponse,
@@ -25,6 +24,7 @@ import {
   type StatusResult,
   type TodayItem,
   type TodaySummary,
+  toMoveResult,
 } from './schema'
 
 /**
@@ -39,7 +39,7 @@ type Args<Name extends keyof Functions> = Functions[Name]['Args']
 /** A write gives up after 15″: the outcome is then unknown and the sheet offers the retry. */
 export const WRITE_TIMEOUT_MS = 15_000
 
-function writeSignal(): AbortSignal {
+export function writeSignal(): AbortSignal {
   if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(WRITE_TIMEOUT_MS)
   const controller = new AbortController()
   setTimeout(
@@ -294,19 +294,7 @@ export async function moveAppointment(businessId: string, input: MoveInput): Pro
     .rpc('staff_move_appointment', args)
     .abortSignal(writeSignal())
   throwIfFailed(error, status)
-  const result = MoveResponse.parse(data)
-  return {
-    appointmentId: result.appointment_id,
-    staffId: result.staff_id,
-    startsAt: result.starts_at,
-    endsAt: result.ends_at,
-    fromStaffId: result.from_staff_id,
-    fromStartsAt: result.from_starts_at,
-    warnings: result.warnings,
-    replayed: result.replayed,
-    notify: result.notify,
-    smsQueued: result.sms_queued,
-  }
+  return toMoveResult(data)
 }
 
 /** Phone booking, staff booking or walk-in, with a new client inline: one round trip (0004). */

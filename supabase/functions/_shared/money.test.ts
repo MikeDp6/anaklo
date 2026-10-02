@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney, multiplyCents, parseMoney, sumCents } from './money.ts'
+import { formatMoney, formatMoneyInput, multiplyCents, parseMoney, sumCents } from './money.ts'
 
 describe('parseMoney', () => {
   it.each([
@@ -67,5 +67,27 @@ describe('formatMoney', () => {
 
   it('formats euros for English users', () => {
     expect(formatMoney(1350, 'EUR', 'en-IE')).toBe('€13.50')
+  })
+})
+
+describe('formatMoneyInput (contract 1.6 §4.2)', () => {
+  it('writes cents with the locale decimal separator, without currency or grouping', () => {
+    expect(formatMoneyInput(1300, 'el')).toBe('13,00')
+    expect(formatMoneyInput(1300, 'en')).toBe('13.00')
+    expect(formatMoneyInput(5, 'el')).toBe('0,05')
+    expect(formatMoneyInput(0, 'en')).toBe('0.00')
+    expect(formatMoneyInput(9999999, 'el')).toBe('99999,99')
+  })
+
+  it('reads back with parseMoney to the same cents', () => {
+    for (const cents of [0, 5, 29, 115, 750, 1300, 1350, 130050, 9999999]) {
+      for (const locale of ['el', 'en']) {
+        expect(parseMoney(formatMoneyInput(cents, locale))).toBe(cents)
+      }
+    }
+  })
+
+  it('refuses fractional cents', () => {
+    expect(() => formatMoneyInput(10.5, 'el')).toThrow(TypeError)
   })
 })

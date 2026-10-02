@@ -7,7 +7,7 @@ create extension if not exists pgtap with schema extensions;
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(38);
+select plan(43);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -56,15 +56,17 @@ select is(
     'clients:SELECT',
     'member_notification_prefs:SELECT',
     'push_subscriptions:SELECT',
-    'schedule_exceptions:DELETE', 'schedule_exceptions:INSERT', 'schedule_exceptions:SELECT', 'schedule_exceptions:UPDATE',
-    'service_categories:DELETE', 'service_categories:INSERT', 'service_categories:SELECT', 'service_categories:UPDATE',
-    'services:DELETE', 'services:INSERT', 'services:SELECT', 'services:UPDATE',
-    'staff:DELETE', 'staff:INSERT', 'staff:SELECT', 'staff:UPDATE',
-    'staff_services:DELETE', 'staff_services:INSERT', 'staff_services:SELECT', 'staff_services:UPDATE',
-    'time_off:DELETE', 'time_off:INSERT', 'time_off:SELECT', 'time_off:UPDATE',
-    'working_hours:DELETE', 'working_hours:INSERT', 'working_hours:SELECT', 'working_hours:UPDATE'
+    'schedule_exceptions:DELETE', 'schedule_exceptions:SELECT',
+    'service_categories:SELECT',
+    'services:SELECT',
+    'staff:SELECT',
+    'staff_services:SELECT',
+    'time_off:DELETE', 'time_off:SELECT',
+    'working_hours:SELECT'
   ]::text[],
-  'authenticated has exactly the intended table privileges (0007: SELECT only on member_notification_prefs and push_subscriptions)'
+  'authenticated has exactly the intended table privileges (0007: SELECT only on member_notification_prefs and '
+  || 'push_subscriptions; 0008: catalogue and weekly hours read-only, staff/exceptions/time off writes per column, '
+  || 'no DELETE on staff)'
 );
 
 select is(
@@ -88,10 +90,54 @@ select is(
   array[
     'address', 'allow_any_staff', 'auto_complete_after_min', 'booking_enabled', 'cancel_min_notice_min',
     'correction_window_days', 'locale', 'maps_url', 'max_advance_days', 'messaging_enabled', 'min_notice_min',
-    'name', 'phone_e164', 'quiet_end', 'quiet_start', 'reminder_mode', 'settings', 'slot_step_min', 'theme'
+    'name', 'phone_e164', 'quiet_end', 'quiet_start', 'reminder_mode', 'settings', 'slot_step_min'
   ]::text[],
   'the app may update only these business columns (never slug, timezone, currency, vertical, short_code, '
-  || 'sms_sender_id, sms_daily_cap, sms_monthly_budget_cents or import_reminders)'
+  || 'sms_sender_id, sms_daily_cap, sms_monthly_budget_cents, import_reminders or, since 0008, theme)'
+);
+
+-- 0008: the theme changes only by script (phase-1 plan 1.6); it exists, so its absence from the
+-- list above is not vacuous.
+select has_column('public', 'businesses', 'theme', 'businesses.theme exists');
+
+-- 0008 (contract 1.6 §2.3): the catalogue and the weekly hours are written only by RPCs
+-- (save_service, set_staff_order, replace_week_hours) or provisioning; staff, exceptions and time
+-- off are written per column, with client-generated ids. staff.sort only through set_staff_order,
+-- photo_url never; exceptions are added and deleted, never edited.
+select is(
+  (select array_agg(c.table_name || '.' || c.column_name || ':' || c.privilege_type
+                    order by c.table_name, c.column_name, c.privilege_type)
+   from information_schema.column_privileges c
+   where c.table_schema = 'public' and c.grantee = 'authenticated'
+     and c.table_name in ('schedule_exceptions', 'service_categories', 'services', 'staff', 'staff_services',
+                          'time_off', 'working_hours')
+     and c.privilege_type in ('INSERT', 'UPDATE')),
+  array[
+    'schedule_exceptions.business_id:INSERT', 'schedule_exceptions.end_time:INSERT', 'schedule_exceptions.id:INSERT',
+    'schedule_exceptions.kind:INSERT', 'schedule_exceptions.local_date:INSERT', 'schedule_exceptions.note:INSERT',
+    'schedule_exceptions.staff_id:INSERT', 'schedule_exceptions.start_time:INSERT',
+    'staff.active:INSERT', 'staff.active:UPDATE', 'staff.business_id:INSERT', 'staff.color:INSERT',
+    'staff.color:UPDATE', 'staff.display_name:INSERT', 'staff.display_name:UPDATE', 'staff.id:INSERT',
+    'staff.sort:INSERT',
+    'time_off.business_id:INSERT', 'time_off.ends_at:INSERT', 'time_off.ends_at:UPDATE', 'time_off.id:INSERT',
+    'time_off.reason:INSERT', 'time_off.reason:UPDATE', 'time_off.staff_id:INSERT', 'time_off.starts_at:INSERT',
+    'time_off.starts_at:UPDATE'
+  ]::text[],
+  'authenticated may insert/update only these columns of the catalogue and schedule tables (none of '
+  || 'service_categories, services, staff_services, working_hours)'
+);
+
+select is(
+  (select array_agg(p.tablename || ':' || p.cmd order by p.tablename, p.cmd)
+   from pg_policies p
+   where p.schemaname = 'public'
+     and p.tablename in ('schedule_exceptions', 'service_categories', 'services', 'staff', 'staff_services',
+                         'time_off', 'working_hours')),
+  array[
+    'schedule_exceptions:ALL', 'schedule_exceptions:SELECT', 'service_categories:SELECT', 'services:SELECT',
+    'staff:ALL', 'staff:SELECT', 'staff_services:SELECT', 'time_off:ALL', 'time_off:SELECT', 'working_hours:SELECT'
+  ]::text[],
+  'catalogue and schedule policies after 0008: no write policy on the RPC-only tables'
 );
 
 -- The /r/<code> link (0005): generated by the database, never updatable through the API, so the
@@ -318,21 +364,51 @@ select is(
   array[
     'private.available_slots_impl', 'private.busy_calendar_impl', 'private.cancel_appointment_impl',
     'private.has_role', 'private.is_member', 'private.is_reserved_slug',
-    'private.is_valid_timezone', 'private.my_business_ids', 'private.my_business_ids_with_role',
-    'private.my_staff_id', 'private.my_staff_ids', 'private.public_booking_catalogue_impl',
-    'private.public_business_profile_impl', 'private.public_slug_for_code_impl',
-    'private.register_push_subscription_impl', 'private.request_test_push_impl', 'private.search_clients_impl',
-    'private.set_appointment_status_impl', 'private.staff_available_slots_impl',
+    'private.is_valid_timezone', 'private.mark_absence_impl', 'private.my_business_ids',
+    'private.my_business_ids_with_role', 'private.my_staff_id', 'private.my_staff_ids',
+    'private.public_booking_catalogue_impl', 'private.public_business_profile_impl',
+    'private.public_slug_for_code_impl', 'private.reassign_appointment_impl', 'private.reassign_candidates_impl',
+    'private.register_push_subscription_impl', 'private.replace_week_hours_impl', 'private.request_test_push_impl',
+    'private.save_service_impl', 'private.schedule_conflicts_impl', 'private.search_clients_impl',
+    'private.set_appointment_status_impl', 'private.set_staff_order_impl', 'private.staff_available_slots_impl',
     'private.staff_book_appointment_impl', 'private.staff_move_appointment_impl', 'private.today_summary_impl',
     'private.unregister_push_subscription_impl',
-    'public.available_slots', 'public.busy_calendar', 'public.cancel_appointment', 'public.public_booking_catalogue',
-    'public.public_business_profile', 'public.public_slug_for_code', 'public.register_push_subscription',
-    'public.request_test_push', 'public.search_clients',
-    'public.set_appointment_status', 'public.staff_available_slots', 'public.staff_book_appointment',
-    'public.staff_move_appointment', 'public.today_summary', 'public.unregister_push_subscription'
+    'public.available_slots', 'public.busy_calendar', 'public.cancel_appointment', 'public.mark_absence',
+    'public.public_booking_catalogue', 'public.public_business_profile', 'public.public_slug_for_code',
+    'public.reassign_appointment', 'public.reassign_candidates', 'public.register_push_subscription',
+    'public.replace_week_hours',
+    'public.request_test_push', 'public.save_service', 'public.schedule_conflicts', 'public.search_clients',
+    'public.set_appointment_status', 'public.set_staff_order', 'public.staff_available_slots',
+    'public.staff_book_appointment', 'public.staff_move_appointment', 'public.today_summary',
+    'public.unregister_push_subscription'
   ]::text[],
   'authenticated may execute only the membership helpers and granted RPCs (0006: the six day-ops RPCs; '
-  || '0007: register/unregister_push_subscription, request_test_push; each with its _impl)'
+  || '0007: register/unregister_push_subscription, request_test_push; 0008: mark_absence, reassign_appointment, '
+  || 'reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order; each with its _impl)'
+);
+
+-- 1.6 (0008): the precedence helper, the conflict core, the old day windows, the re-plan and its
+-- trigger function are granted to nobody. All of them must exist, so the check is not vacuous.
+select is(
+  (select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private' and p.proname = any (array[
+     'staff_day_opening', 'staff_day_windows', 'schedule_conflicts_core', 'replan_reminders_impl',
+     'businesses_replan_reminders'])),
+  5::bigint,
+  'the 0008 internal functions exist (staff_day_opening, staff_day_windows, schedule_conflicts_core, '
+  || 'replan_reminders_impl, businesses_replan_reminders)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || p.proname order by r.role_name, p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   cross join unnest(array['anon', 'authenticated', 'service_role']) as r (role_name)
+   where n.nspname = 'private' and p.proname = any (array[
+     'staff_day_opening', 'staff_day_windows', 'schedule_conflicts_core', 'replan_reminders_impl',
+     'businesses_replan_reminders'])
+     and has_function_privilege(r.role_name, p.oid, 'execute')),
+  null::text[],
+  'no API role may execute the 0008 internal functions'
 );
 
 -- 1.5 (0007): the planner, the claim core, the time rules, the nudge, the jobs, the push helpers and

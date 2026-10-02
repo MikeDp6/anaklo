@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUSINESS_UPDATABLE,
+  businessPatch,
   createOnlyConflicts,
   diffMembers,
   diffStaffServices,
@@ -58,6 +59,55 @@ describe('patchFor', () => {
     for (const column of ['slug', 'timezone', 'currency', 'vertical', 'id', 'settings']) {
       expect(BUSINESS_UPDATABLE).not.toContain(column)
     }
+  })
+})
+
+describe('businessPatch (contract 1.6 §2.9)', () => {
+  // A business row as PostgREST returns it after a run of the committed example.
+  const stored = {
+    name: 'Demo Provision Barber',
+    address: 'Οδός Παραδείγματος 1, Πάτρα',
+    maps_url: null,
+    quiet_start: '22:00:00',
+    quiet_end: '09:00:00',
+    reminder_mode: '24h',
+    theme: { radius: 12 },
+  }
+
+  it('reports «No changes.» for the new columns on a second run ("22:00" = "22:00:00")', () => {
+    expect(
+      businessPatch(stored, {
+        name: 'Demo Provision Barber',
+        address: 'Οδός Παραδείγματος 1, Πάτρα',
+        quiet_start: '22:00',
+        quiet_end: '09:00',
+        reminder_mode: '24h',
+      }),
+    ).toEqual({})
+  })
+
+  it('writes what differs: quiet hours, reminder mode, address and map link', () => {
+    expect(
+      businessPatch(stored, {
+        address: null,
+        maps_url: 'https://maps.example.test/demo',
+        quiet_start: '23:00',
+        quiet_end: '09:00',
+        reminder_mode: 'evening_before',
+      }),
+    ).toEqual({
+      address: null,
+      maps_url: 'https://maps.example.test/demo',
+      quiet_start: '23:00',
+      reminder_mode: 'evening_before',
+    })
+  })
+
+  it('manages the new columns and still never the create-only ones', () => {
+    for (const column of ['address', 'maps_url', 'quiet_start', 'quiet_end', 'reminder_mode']) {
+      expect(BUSINESS_UPDATABLE).toContain(column)
+    }
+    expect(businessPatch({ ...stored, timezone: 'Europe/Athens' }, { timezone: 'UTC' })).toEqual({})
   })
 })
 
