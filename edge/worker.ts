@@ -72,10 +72,13 @@ async function serveShell(
   return new Response(body, { status: options.status ?? 200, headers })
 }
 
-/** A same-site redirect that no cache keeps (a code may later point elsewhere). */
-function redirect(location: string): Response {
+/**
+ * A same-site redirect that no cache keeps: a code may later point elsewhere, and a former slug
+ * (301) must never be remembered by a browser, or a later change back could loop (contract 1.7 D7).
+ */
+function redirect(location: string, status: 301 | 302 = 302): Response {
   return new Response(null, {
-    status: 302,
+    status,
     headers: { Location: location, 'Cache-Control': 'no-store' },
   })
 }
@@ -127,6 +130,8 @@ export async function handleRequest(
     }
     case 'business': {
       const lookup = await lookupBookingShell(route.slug, env, fetchImpl, url.origin)
+      // A former slug (contract 1.7 §4): links already sent keep working, at the new address.
+      if (lookup.kind === 'moved') return redirect(`/${lookup.slug}${url.search}`, 301)
       if (lookup.kind === 'not-found')
         return serveShell(request, env, BOOKING_SHELL, { status: 404 })
       // Supabase did not answer: the plain shell, and the page loads the catalogue itself.

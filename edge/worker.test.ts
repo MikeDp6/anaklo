@@ -121,6 +121,35 @@ describe('handleRequest', () => {
     },
   )
 
+  it('answers a former slug with 301 to the current one, keeping the query, uncached', async () => {
+    const fetch = supabase()
+    const response = await handleRequest(get('/old-barber?utm_source=ig&x=1'), env(), fetch)
+    expect(response.status).toBe(301)
+    expect(response.headers.get('Location')).toBe('/demo-barber?utm_source=ig&x=1')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(await response.text()).toBe('')
+    expect(fetch.mock.calls[0]?.[1].body).toBe('{"p_slug":"old-barber"}')
+  })
+
+  it('answers HEAD on a former slug with the same 301', async () => {
+    const response = await handleRequest(get('/OLD-Barber', { method: 'HEAD' }), env(), supabase())
+    expect(response.status).toBe(301)
+    expect(response.headers.get('Location')).toBe('/demo-barber')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+  })
+
+  it('serves the plain shell when a moved slug comes back malformed', async () => {
+    const business = { ...CATALOGUE.business, slug: '//evil.example' }
+    const response = await handleRequest(
+      get('/old-barber'),
+      env(),
+      supabase({ ...CATALOGUE, business }),
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Location')).toBeNull()
+    expect(await response.text()).toBe(BOOKING_SHELL)
+  })
+
   it('redirects /r/<code> to the booking page, uncached', async () => {
     const fetch = supabase('demo-barber')
     const response = await handleRequest(get('/r/DEMO01'), env(), fetch)

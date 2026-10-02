@@ -6,6 +6,7 @@ import {
   MAX_REQUEST_BODY_BYTES,
   handleApiRequest,
   isApiPath,
+  type FetchLike,
   type ProxyEnv,
 } from './edge/api-proxy.ts'
 import { lookupBookingShell, lookupShortLink } from './edge/booking-shell.ts'
@@ -177,25 +178,42 @@ function apiProxy(env: ProxyEnv): Plugin {
  *   page resolves the code itself.
  * - `/m/<token>` gets `Referrer-Policy: no-referrer` like the Worker (Vite's own HTML handler then
  *   sends `Cache-Control: no-cache` in dev; the Worker sends `no-store`).
+ * - `/<former slug>` redirects (301, no-store, query kept) to the current slug, like the Worker
+ *   (contract 1.7 §4). Every other `/<slug>` continues to the injection below (a second lookup in
+ *   dev, acceptable).
  */
 function bookingShell(env: ProxyEnv): Plugin {
+  const fetchImpl: FetchLike = (input, init) => fetch(input, init)
+  const redirect = (res: ServerResponse, status: 301 | 302, location: string) => {
+    res.statusCode = status
+    res.setHeader('Location', location)
+    res.setHeader('Cache-Control', 'no-store')
+    res.end()
+  }
   const routes: Connect.NextHandleFunction = (req, res, next) => {
-    const path = (req.url ?? '').split('?')[0] ?? ''
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    const path = url.pathname
     if (req.method !== 'GET' && req.method !== 'HEAD') return next()
     if (path.startsWith('/m/')) {
       res.setHeader('Referrer-Policy', 'no-referrer')
       return next()
     }
+    // `/app` looks like a slug: the pro app is never a booking page (the Worker routes it first).
+    if (isProAppRoute(path)) return next()
     const route = resolveBookingRoute(path)
-    if (route.kind !== 'short-link') return next()
-    lookupShortLink(route.code, env, (input, init) => fetch(input, init))
-      .then((lookup) => {
-        if (lookup.kind !== 'found') return next()
-        res.statusCode = 302
-        res.setHeader('Location', `/${lookup.slug}`)
-        res.setHeader('Cache-Control', 'no-store')
-        res.end()
-      })
+    if (route.kind === 'short-link') {
+      lookupShortLink(route.code, env, fetchImpl)
+        .then((lookup) =>
+          lookup.kind === 'found' ? redirect(res, 302, `/${lookup.slug}`) : next(),
+        )
+        .catch(next)
+      return
+    }
+    if (route.kind !== 'business') return next()
+    lookupBookingShell(route.slug, env, fetchImpl)
+      .then((lookup) =>
+        lookup.kind === 'moved' ? redirect(res, 301, `/${lookup.slug}${url.search}`) : next(),
+      )
       .catch(next)
   }
   return {
@@ -209,12 +227,7 @@ function bookingShell(env: ProxyEnv): Plugin {
       const route = resolveBookingRoute(new URL(ctx.originalUrl, 'http://localhost').pathname)
       if (route.kind !== 'business') return html
       const origin = ctx.server.resolvedUrls?.local[0]?.replace(/\/+$/, '')
-      const lookup = await lookupBookingShell(
-        route.slug,
-        env,
-        (input, init) => fetch(input, init),
-        origin,
-      )
+      const lookup = await lookupBookingShell(route.slug, env, fetchImpl, origin)
       return injectBookingShell(html, lookup.kind === 'found' ? lookup.data : null)
     },
   }

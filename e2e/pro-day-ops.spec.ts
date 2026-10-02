@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { staffFor } from './lib/booking'
 import { expect, test } from './lib/fixtures'
-import { signInWithEmailCode } from './lib/login'
+import { engineOf, ownerStatePath } from './lib/authPaths'
 import {
   chooseDayWithTimes,
   chooseTime,
@@ -14,14 +14,16 @@ import {
   quickAddNewClient,
   sheet,
 } from './lib/pro'
-import { SEED_USERS } from './lib/seedUsers'
 
 // Step 1.4, SPEC §5 flow 3: the barber's day in the pro app (mobile viewports, Chromium + WebKit).
 // Needs `npm run db:start` + `npm run db:reset` (seed: demo-barber, owner/manager/staff users) and
 // the dev server. Each browser project works on its own staff member and each test on its own
 // window of days (see e2e/lib/pro.ts), so the specs run in parallel and again without a reset.
+// Since 1.7 the owner is signed in at `aal2` by the setup project (`member: 'owner'`, contract
+// 1.7 §7.4): the engine's setup owner, an owner of demo-barber without a staff row.
 
 test.describe.configure({ timeout: 120_000 })
+test.use({ member: 'owner' })
 
 function uniqueName(prefix: string, project: string): string {
   return `${prefix} ${project.replace('mobile-', '')} ${Date.now().toString(36)}`
@@ -30,7 +32,6 @@ function uniqueName(prefix: string, project: string): string {
 test.describe('pro app: bookings of the day', () => {
   test('a phone booking takes less than 10″', async ({ page }, testInfo) => {
     const staff = staffFor(testInfo)
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
     await openToday(page)
 
     const started = Date.now()
@@ -54,7 +55,6 @@ test.describe('pro app: bookings of the day', () => {
   test('a booking is moved to a free time of the list', async ({ page }, testInfo) => {
     const staff = staffFor(testInfo)
     const name = uniqueName('Μετακίνηση', testInfo.project.name)
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
     await openToday(page)
     const booked = await quickAddNewClient(page, { name, staff, window: 4 })
 
@@ -88,13 +88,16 @@ test.describe('pro app: bookings of the day', () => {
     const staff = staffFor(testInfo)
     const name = uniqueName('Δεύτερη συσκευή', testInfo.project.name)
 
-    // Device B (the manager) keeps the day open before anything changes.
-    const other = await newDeviceContext(browser, testInfo)
+    // Device B (a second phone of the owner, same session) keeps the day open before anything
+    // changes.
+    const other = await newDeviceContext(
+      browser,
+      testInfo,
+      ownerStatePath(engineOf(testInfo.project.name)),
+    )
     const second = await other.newPage()
     try {
-      await signInWithEmailCode(second, SEED_USERS.manager.email)
-      // Device A (the owner) books on the first day with free times of window 5.
-      await signInWithEmailCode(page, SEED_USERS.owner.email)
+      // Device A books on the first day with free times of window 5.
       await openToday(page)
       const dialog = await openQuickAdd(page)
       await dialog.getByRole('button', { name: PRO_TEXT.newClient }).click()
@@ -122,7 +125,6 @@ test.describe('pro app: bookings of the day', () => {
 
 test.describe('pro app: sheets and the keyboard', () => {
   test('closing a sheet gives the focus back to the button that opened it', async ({ page }) => {
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
     await openToday(page)
     const opener = page.getByRole('button', { name: PRO_TEXT.newAppointment, exact: true })
     const dialog = sheet(page)
@@ -173,7 +175,6 @@ test.describe('pro app: walk-in and no-show', () => {
 
   test('a walk-in needs no phone and no name', async ({ page }, testInfo) => {
     const staff = staffFor(testInfo)
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
     await walkInNow(page, staff, /^Γένια\s*\d/)
 
     const item = nowItem(page, staff).first()
@@ -192,7 +193,6 @@ test.describe('pro app: walk-in and no-show', () => {
 
   test('a started appointment is marked as a no-show', async ({ page }, testInfo) => {
     const staff = staffFor(testInfo)
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
     await walkInNow(page, staff, /^Γένια\s*\d/)
 
     const item = nowItem(page, staff).first()

@@ -1,5 +1,10 @@
 -- Tenant isolation (SPEC §13): business A never reads or writes business B, and the database
 -- rejects cross-tenant references even for roles that bypass RLS.
+-- 1.7 (0009, contract 1.7 §7.2): former slugs are per business, and the generic RPC loop also
+-- covers the five business-scoped member and identity RPCs (≥ 21 signatures). Review fix: the loop
+-- also calls as the owner with an OLD authenticator code and records each error's hint, so a
+-- critical RPC that checked the fresh code before the membership would show (a step-up hint for a
+-- business the caller does not belong to).
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
@@ -8,7 +13,7 @@ set local role postgres;
 set local search_path = public, extensions;
 -- Fixture appointments are written by the system (appointment writes must declare an actor).
 select set_config('anaklo.actor_type', 'system', true);
-select plan(25);
+select plan(28);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres)
@@ -49,6 +54,15 @@ insert into public.services (id, business_id, name, duration_min, price_cents) v
 insert into public.time_off (business_id, staff_id, starts_at, ends_at, reason) values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', '2026-11-10 00:00Z', '2026-11-11 00:00Z', 'leave');
 
+-- 0009: former slugs of each business (written here as postgres; the app never writes them).
+insert into public.business_slug_aliases (slug, business_id) values
+  ('shop-a-old', 'a1000000-0000-4000-8000-000000000001'),
+  ('shop-b-old', 'b1000000-0000-4000-8000-000000000001');
+
+-- 0009: the loop below calls the critical RPCs with a code from the authenticator app that is
+-- seconds old; the window is set explicitly (the local seed uses 10 s, a remote database 300 s).
+update private.platform_settings set fresh_totp_max_age_seconds = 300 where id;
+
 -- ---------------------------------------------------------------------------------------------
 -- Owner of A
 -- ---------------------------------------------------------------------------------------------
@@ -65,6 +79,12 @@ select is(
   (select count(*) from public.clients where business_id = 'b1000000-0000-4000-8000-000000000001'),
   0::bigint,
   'owner A cannot read clients of B'
+);
+
+select results_eq(
+  'select slug from public.business_slug_aliases order by slug',
+  array['shop-a-old'],
+  'owner A reads the former slugs of A only, never those of B (0009)'
 );
 
 select is(
@@ -236,11 +256,13 @@ set local role postgres;
 -- ---------------------------------------------------------------------------------------------
 -- Generic loop over every business-scoped RPC (phase-1 plan, «Απομόνωση επιχειρήσεων στις RPCs»):
 -- each function in public that authenticated may execute and that takes p_business_id is called
--- by a member of A (the owner at aal2 with a fresh authenticator code, and a staff member) with
--- the id of B and NULL in every other argument. Membership is checked first, so every call must
--- fail with 42501, whatever else the arguments would have caused. New RPCs join automatically.
+-- by a member of A (the owner at aal2 with a fresh authenticator code, the same owner with a code
+-- an hour old, and a staff member at aal1) with the id of B and NULL in every other argument.
+-- Membership is checked first, so every call must fail with 42501 WITHOUT a hint, whatever else the
+-- arguments or the caller's code would have caused. New RPCs join automatically.
 -- ---------------------------------------------------------------------------------------------
-create temp table tenant_rpc_calls (proname text, signature text, caller text, outcome text) on commit drop;
+create temp table tenant_rpc_calls (proname text, signature text, caller text, outcome text, hint text)
+  on commit drop;
 
 -- Signed-in users declare no actor (a declared 'system' would outrank the JWT).
 select set_config('anaklo.actor_type', '', true);
@@ -250,6 +272,7 @@ declare
   v_caller record;
   v_fn record;
   v_outcome text;
+  v_hint text;
 begin
   for v_caller in
     select c.label, c.claims
@@ -257,6 +280,11 @@ begin
       ('owner (aal2)', json_build_object(
           'sub', 'a0000000-0000-4000-8000-00000000000a', 'role', 'authenticated', 'aal', 'aal2',
           'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint))
+        )::text),
+      ('owner (aal2, old code)', json_build_object(
+          'sub', 'a0000000-0000-4000-8000-00000000000a', 'role', 'authenticated', 'aal', 'aal2',
+          'amr', json_build_array(json_build_object('method', 'totp',
+                                                    'timestamp', extract(epoch from now())::bigint - 3600))
         )::text),
       ('staff', json_build_object(
           'sub', 'a0000000-0000-4000-8000-0000000000a2', 'role', 'authenticated', 'aal', 'aal1',
@@ -290,14 +318,16 @@ begin
     loop
       perform set_config('request.jwt.claims', v_caller.claims, true);
       execute 'set local role authenticated';
+      v_hint := null;
       begin
         execute format('select * from %s(%s)', v_fn.qualified, v_fn.args);
         v_outcome := 'no error';
       exception when others then
+        get stacked diagnostics v_hint = pg_exception_hint;
         v_outcome := sqlstate;
       end;
       execute 'set local role postgres';
-      insert into tenant_rpc_calls values (v_fn.proname, v_fn.signature, v_caller.label, v_outcome);
+      insert into tenant_rpc_calls values (v_fn.proname, v_fn.signature, v_caller.label, v_outcome, nullif(v_hint, ''));
     end loop;
   end loop;
   perform set_config('request.jwt.claims', '', true);
@@ -309,23 +339,28 @@ select set_config('anaklo.actor_type', 'system', true);
 -- The minimum grows with every step: 1.2 staff_available_slots, staff_book_appointment; 1.4 (0006)
 -- busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_move_appointment,
 -- today_summary; 1.5 (0007) request_test_push; 1.6 (0008) mark_absence, reassign_appointment,
--- reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order. register_push_subscription
--- and unregister_push_subscription take no p_business_id (contract 1.5 D14: subscriptions belong to
--- the user, not to a business); their isolation is tested in 12_push_subscriptions.
+-- reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order; 1.7 (0009)
+-- can_manage_members, change_business_identity, list_members, remove_member, set_member_role.
+-- register_push_subscription and unregister_push_subscription take no p_business_id (contract 1.5
+-- D14: subscriptions belong to the user, not to a business); their isolation is tested in
+-- 12_push_subscriptions. authorize_factor_change takes none either (phase-1 plan: the only
+-- exception, it concerns the caller's own factors); 14_members_identity covers it.
 select ok(
-  (select count(distinct signature) from tenant_rpc_calls) >= 16,
-  'the generic loop found at least 16 business-scoped RPCs'
+  (select count(distinct signature) from tenant_rpc_calls) >= 21,
+  'the generic loop found at least 21 business-scoped RPCs'
 );
 
 select ok(
-  array['busy_calendar', 'cancel_appointment', 'mark_absence', 'reassign_appointment', 'reassign_candidates',
+  array['busy_calendar', 'can_manage_members', 'cancel_appointment', 'change_business_identity', 'list_members',
+        'mark_absence', 'reassign_appointment', 'reassign_candidates', 'remove_member',
         'replace_week_hours', 'request_test_push', 'save_service', 'schedule_conflicts', 'search_clients',
-        'set_appointment_status', 'set_staff_order', 'staff_available_slots', 'staff_book_appointment',
-        'staff_move_appointment', 'today_summary']
+        'set_appointment_status', 'set_member_role', 'set_staff_order', 'staff_available_slots',
+        'staff_book_appointment', 'staff_move_appointment', 'today_summary']
     <@ (select array_agg(proname) from tenant_rpc_calls),
-  'the loop covers busy_calendar, cancel_appointment, mark_absence, reassign_appointment, reassign_candidates, '
-  || 'replace_week_hours, request_test_push, save_service, schedule_conflicts, search_clients, set_appointment_status, '
-  || 'set_staff_order, staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
+  'the loop covers busy_calendar, can_manage_members, cancel_appointment, change_business_identity, list_members, '
+  || 'mark_absence, reassign_appointment, reassign_candidates, remove_member, replace_week_hours, request_test_push, '
+  || 'save_service, schedule_conflicts, search_clients, set_appointment_status, set_member_role, set_staff_order, '
+  || 'staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
 );
 
 select is(
@@ -340,6 +375,22 @@ select is(
    from tenant_rpc_calls where caller = 'staff' and outcome <> '42501'),
   null::text[],
   'a staff member of A gets 42501 from every business-scoped RPC called with the id of B'
+);
+
+select is(
+  (select array_agg(signature || ' -> ' || outcome order by signature)
+   from tenant_rpc_calls where caller = 'owner (aal2, old code)' and outcome <> '42501'),
+  null::text[],
+  'the owner of A with a code an hour old also gets 42501 from every business-scoped RPC called with the id of B'
+);
+
+select is(
+  (select array_agg(caller || ': ' || signature || ' -> ' || hint order by caller, signature)
+   from tenant_rpc_calls where hint is not null),
+  null::text[],
+  'no refusal carries a hint, not even from the critical RPCs to a caller at aal1 or with an old code: membership '
+  || 'is checked before the fresh code (a step-up hint would open the code sheet for a business the caller is '
+  || 'not in)'
 );
 
 select * from finish();

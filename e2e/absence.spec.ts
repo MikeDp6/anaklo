@@ -6,9 +6,9 @@ import {
   toLocalDate,
   toLocalTime,
 } from '../supabase/functions/_shared/dates.ts'
+import { signInAal2 } from './lib/auth'
 import { appointmentState, closeDb, messagesOf, timeOffOverlapping, waitForMessage } from './lib/db'
 import { expect, test } from './lib/fixtures'
-import { signInWithEmailCode } from './lib/login'
 import { memberRest, memberRpc } from './lib/memberApi'
 import { absenceShopFile, provisionLocal, type E2eShop } from './lib/shops'
 
@@ -19,6 +19,8 @@ import { absenceShopFile, provisionLocal, type E2eShop } from './lib/shops'
 // «Γιάννης»; «Κούρεμα» 30′ by all; every day 00:00-23:59; in Athens, or in New York late in the
 // Athens evening, so the flow always has ≥ 2 h of its day left), provisioned LOCALLY. Needs
 // `npm run db:start` + `npm run db:reset` and the dev server.
+// Since 1.7 the shop's owner signs in at `aal2` through the API (`signInAal2`: enrolled on first
+// use, contract 1.7 §7.4).
 
 test.describe.configure({ mode: 'serial', timeout: 150_000 })
 
@@ -153,7 +155,7 @@ test('flow 6: one appointment to a free colleague, one cancelled with exactly on
   const absent = idOf(shop.staff, 'Απών')
   const vasilis = idOf(shop.staff, 'Βασίλης')
 
-  await signInWithEmailCode(page, shop.ownerEmail)
+  await signInAal2(page, shop.ownerEmail)
   await cleanUp(page, now)
   const first = await book(page, 'Απών', t1, `Ε2Ε Πρώτος ${project}`, phone(1))
   const second = await book(page, 'Απών', t2, `Ε2Ε Δεύτερος ${project}`, phone(2))

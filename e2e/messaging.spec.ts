@@ -1,4 +1,6 @@
 import type { Page } from '@playwright/test'
+import { userIdOf } from './lib/auth'
+import { engineOf, setupOwnerEmail } from './lib/authPaths'
 import { bookViaApi, freeStartViaApi, STAFF, staffFor } from './lib/booking'
 import { appointmentAt, closeDb, messagesOf, waitForMessage } from './lib/db'
 import { expect, test } from './lib/fixtures'
@@ -13,6 +15,8 @@ import { SEED_USERS } from './lib/seedUsers'
 // URL of `dispatch` that the database reaches through pg_net: http://kong:8000).
 // Each browser project works with its own staff member (Chromium → Νίκος = the owner's staff row,
 // WebKit → Άλεξ), on days far from the other specs.
+// Since 1.7 the pro app's owner is the engine's setup owner at `aal2` (`member: 'owner'`,
+// contract 1.7 §7.4): an owner of demo-barber without a staff row and without push devices.
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -62,55 +66,64 @@ test.describe('messages of a booking', () => {
     if (reminder) expect(reminder).toMatchObject({ status: 'cancelled', error: 'superseded' })
   })
 
-  test('staff cancel with SMS reaches the fake adapter through the database (pg_net → dispatch)', async ({
-    page,
-  }, testInfo) => {
-    const staff = staffFor(testInfo)
-    await signInWithEmailCode(page, SEED_USERS.owner.email)
-    await openToday(page)
+  test.describe('by the owner in the pro app', () => {
+    test.use({ member: 'owner' })
 
-    // A phone booking for Κώστας Μ. (seed client with a mobile number), far ahead.
-    const dialog = await openQuickAdd(page)
-    await dialog.getByLabel(PRO_TEXT.search).fill('κωστα')
-    await dialog
-      .getByRole('button', { name: /^Κώστας Μ\./ })
-      .first()
-      .click()
-    await dialog.getByRole('button', { name: /^Κούρεμα\s*\d/ }).click()
-    await dialog.getByRole('button', { name: staff, exact: true }).click()
-    const date = await chooseDayWithTimes(dialog, 7)
-    const time = await chooseTime(dialog, 'last')
-    await dialog.getByRole('button', { name: PRO_TEXT.book }).click()
-    await expect(dialog.getByRole('img', { name: PRO_TEXT.booked })).toBeVisible()
-    await dialog.getByRole('button', { name: PRO_TEXT.done }).click()
-    const appointmentId = await appointmentAt(STAFF[staff], time.startsAt)
+    test('staff cancel with SMS reaches the fake adapter through the database (pg_net → dispatch)', async ({
+      page,
+    }, testInfo) => {
+      const staff = staffFor(testInfo)
+      await openToday(page)
 
-    // From here on the pro app talks to PostgREST only: no Edge Function carries the SMS.
-    const functionCalls = recordFunctionCalls(page)
-    await page.goto(`/app/day?date=${date}`)
-    // In this staff member's column: the other project may book Κώστας at the same time label.
-    await page
-      .getByTestId('day-view')
-      .getByRole('list', { name: staff, exact: true })
-      .getByRole('button', { name: new RegExp(`^${time.label}.*Κώστας Μ\\.`) })
-      .click()
-    const cancelSheet = sheet(page)
-    await cancelSheet.getByRole('button', { name: PRO_TEXT.cancel, exact: true }).click()
-    // Not «Το ζήτησε ο πελάτης» (that one says «ακύρωσες», D6): the business cancels.
-    await cancelSheet.getByRole('radio', { name: 'Διπλό ραντεβού' }).check()
-    await expect(cancelSheet.getByRole('checkbox', { name: /Ενημέρωση με SMS/ })).toBeChecked()
-    await cancelSheet.getByRole('button', { name: PRO_TEXT.cancelSubmit }).click()
-    await expect(cancelSheet.getByText(PRO_TEXT.cancelled)).toBeVisible()
-    await expect(cancelSheet.getByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeVisible()
+      // A phone booking for Κώστας Μ. (seed client with a mobile number), far ahead.
+      const dialog = await openQuickAdd(page)
+      await dialog.getByLabel(PRO_TEXT.search).fill('κωστα')
+      await dialog
+        .getByRole('button', { name: /^Κώστας Μ\./ })
+        .first()
+        .click()
+      await dialog.getByRole('button', { name: /^Κούρεμα\s*\d/ }).click()
+      await dialog.getByRole('button', { name: staff, exact: true }).click()
+      const date = await chooseDayWithTimes(dialog, 7)
+      const time = await chooseTime(dialog, 'last')
+      await dialog.getByRole('button', { name: PRO_TEXT.book }).click()
+      await expect(dialog.getByRole('img', { name: PRO_TEXT.booked })).toBeVisible()
+      await dialog.getByRole('button', { name: PRO_TEXT.done }).click()
+      const appointmentId = await appointmentAt(STAFF[staff], time.startsAt)
 
-    const notice = await waitForMessage(appointmentId, 'cancelled_by_business')
-    expect(notice).toMatchObject({ channel: 'sms', status: 'sent', provider: 'fake' })
-    expect(functionCalls).toEqual([])
-    // The owner cancelled: no push to the one who acted (Νίκος is the owner's own staff row).
-    const rows = await messagesOf(appointmentId)
-    if (staff === 'Νίκος') {
-      expect(rows.filter((row) => row.template === 'push_booking_cancelled')).toEqual([])
-    }
+      // From here on the pro app talks to PostgREST only: no Edge Function carries the SMS.
+      const functionCalls = recordFunctionCalls(page)
+      await page.goto(`/app/day?date=${date}`)
+      // In this staff member's column: the other project may book Κώστας at the same time label.
+      await page
+        .getByTestId('day-view')
+        .getByRole('list', { name: staff, exact: true })
+        .getByRole('button', { name: new RegExp(`^${time.label}.*Κώστας Μ\\.`) })
+        .click()
+      const cancelSheet = sheet(page)
+      await cancelSheet.getByRole('button', { name: PRO_TEXT.cancel, exact: true }).click()
+      // Not «Το ζήτησε ο πελάτης» (that one says «ακύρωσες», D6): the business cancels.
+      await cancelSheet.getByRole('radio', { name: 'Διπλό ραντεβού' }).check()
+      await expect(cancelSheet.getByRole('checkbox', { name: /Ενημέρωση με SMS/ })).toBeChecked()
+      await cancelSheet.getByRole('button', { name: PRO_TEXT.cancelSubmit }).click()
+      await expect(cancelSheet.getByText(PRO_TEXT.cancelled)).toBeVisible()
+      await expect(cancelSheet.getByText('Ο πελάτης θα ενημερωθεί με SMS.')).toBeVisible()
+
+      const notice = await waitForMessage(appointmentId, 'cancelled_by_business')
+      expect(notice).toMatchObject({ channel: 'sms', status: 'sent', provider: 'fake' })
+      expect(functionCalls).toEqual([])
+      // No push to the one who acted (the setup owner). Since 1.7 the actor is no longer Νίκος's
+      // own user (…a001), so on Νίκος's column his user gets exactly one push, as staff and owner
+      // (contract 1.7 §7.4).
+      const actor = await userIdOf(setupOwnerEmail(engineOf(testInfo.project.name)))
+      const pushes = (await messagesOf(appointmentId)).filter(
+        (row) => row.template === 'push_booking_cancelled',
+      )
+      expect(pushes.filter((row) => row.recipient_user_id === actor)).toEqual([])
+      if (staff === 'Νίκος') {
+        expect(pushes.map((row) => row.recipient_user_id)).toEqual([OWNER])
+      }
+    })
   })
 })
 

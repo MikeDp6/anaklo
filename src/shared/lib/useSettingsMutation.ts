@@ -5,9 +5,16 @@ import { failureOf, type RpcFailureInfo } from './rpcError'
 /**
  * After these the lists on screen may be wrong (another device changed them, or the write was
  * refused for a reason the list does not show): refetch so the screen shows the truth. `gone`:
- * the row was deleted elsewhere, so the list must drop it.
+ * the row was deleted elsewhere, so the list must drop it. `unauthorized` (contract 1.7 §6.6):
+ * like `forbidden`. The step-up kinds (`stepUp`, `stepUpCancelled`) neither refresh nor lock:
+ * nothing was written.
  */
-const REFRESH_AFTER: ReadonlySet<RpcFailureInfo['kind']> = new Set(['overlap', 'forbidden', 'gone'])
+const REFRESH_AFTER: ReadonlySet<RpcFailureInfo['kind']> = new Set([
+  'overlap',
+  'forbidden',
+  'unauthorized',
+  'gone',
+])
 
 export interface SettingsMutation<V, R> {
   readonly submit: (variables: V) => void
@@ -38,7 +45,7 @@ export interface SettingsMutation<V, R> {
  * A write of a settings screen (contract 1.6 §3.5), with the semantics of
  * `useAppointmentMutation` (rule 14): no `onMutate`, no cache writes before the answer; the
  * success state comes from `result`; `invalidate` runs after a success (and after `overlap`,
- * `forbidden` or `gone`). New rows carry a client-generated id, so the retry of a write that did commit
+ * `forbidden`, `unauthorized` or `gone`). New rows carry a client-generated id, so the retry of a write that did commit
  * inserts nothing and still succeeds (an `upsert` that answers `[]` is a success).
  */
 export function useSettingsMutation<V, R>(o: {

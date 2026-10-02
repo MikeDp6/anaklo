@@ -1,7 +1,7 @@
 import type { APIRequestContext, Locator, Page, TestInfo } from '@playwright/test'
 import { addLocalDays, toLocalDate, weekdayOf } from '../supabase/functions/_shared/dates.ts'
+import { signInAal2 } from './lib/auth'
 import { expect, test } from './lib/fixtures'
-import { signInWithEmailCode } from './lib/login'
 import { memberRest } from './lib/memberApi'
 import { provisionLocal, settingsShopFile, type E2eShop } from './lib/shops'
 
@@ -11,6 +11,8 @@ import { provisionLocal, settingsShopFile, type E2eShop } from './lib/shops'
 // «Ε2Ε Β»; «Κούρεμα» 30′ by both; Tue–Sat 10:00-18:00), provisioned LOCALLY before the tests.
 // Needs `npm run db:start` + `npm run db:reset` and the dev server. Texts:
 // src/shared/i18n/el/pro.json.
+// Since 1.7 the shop's owner signs in at `aal2` through the API (`signInAal2`: enrolled on first
+// use, contract 1.7 §7.4).
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 })
 
@@ -133,7 +135,7 @@ test.describe('pro app: schedule settings', () => {
     const first = workingDate(3)
     const second = addLocalDays(first, 1)
 
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await clearSchedule(page)
     expect(await freeStarts(request, { from: first, to: second })).not.toEqual([])
     await page.goto('/app/settings')
@@ -177,7 +179,7 @@ test.describe('pro app: schedule settings', () => {
     const staffA = idOf(shop.staff, 'Ε2Ε Α')
     const staffB = idOf(shop.staff, 'Ε2Ε Β')
 
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await clearSchedule(page)
     expect(await freeStarts(request, { from: date, to: date, staffId: staffA })).not.toEqual([])
     await openPage(page, '/app/settings/time-off', TEXT.timeOff)
@@ -218,7 +220,7 @@ test.describe('pro app: schedule settings', () => {
   test('booking policy: the time step is saved, shown after a reload, and restored', async ({
     page,
   }) => {
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await openPage(page, '/app/settings/booking-policy', TEXT.policy)
     const step = page.getByLabel('Βήμα ωρών')
     await expect(step).toHaveValue('15')
@@ -241,7 +243,7 @@ test.describe('settings screens with reduced motion', () => {
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     const screens = [
       ['/app/settings', TEXT.settings],
       ['/app/settings/closures', TEXT.closures],

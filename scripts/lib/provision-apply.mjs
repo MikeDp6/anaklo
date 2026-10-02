@@ -3,6 +3,9 @@
 // reads everything first, refuses conflicts before the first write (checked against the final
 // state), then changes only what differs, in an order that passes the constraints after every
 // single request. It never writes appointments (they go through RPCs that declare an actor).
+// From 1.7 (contract 1.7 §5.2): a slug that is a former address (business_slug_aliases) is
+// refused, and the first write to an EXISTING business is preceded by its audit row
+// (record_support_action 'provision_update'); without a reason and a ticket nothing is written.
 import {
   businessPatch,
   createOnlyConflicts,
@@ -21,8 +24,10 @@ import {
  * @typedef {import('@supabase/supabase-js').SupabaseClient<Database>} Db
  * @typedef {import('./provision-schema.mjs').Desired} Desired
  * @typedef {{ created: number, updated: number, unchanged: number, removed: number }} Count
+ * @typedef {{ reason: string, ticket: string }} SupportInput
  * @typedef {object} Summary
  * @property {'created' | 'updated' | 'unchanged'} business
+ * @property {boolean} audited a `provision_update` audit row was written before the changes
  * @property {Record<'categories' | 'services' | 'staff' | 'staff_services' | 'working_hours' | 'auth_users' | 'members', Count>} counts
  * @property {string[]} notInFile rows in the database that the file does not mention (left as is)
  */
@@ -133,12 +138,47 @@ function required(map, key, what) {
 }
 
 /**
+ * The audit of a change to an existing business, written once, right before its first write
+ * (contract 1.7 §5.2). The plan "changes anything" exactly when a write is about to happen, so
+ * an unchanged rerun needs no reason or ticket, and a change without them is refused while
+ * nothing has been written yet. A new business needs none.
+ * @param {Db} db
+ * @param {{ id: string } | null} existing
+ * @param {SupportInput | undefined} support
+ * @param {Summary} summary
+ * @returns {() => Promise<void>}
+ */
+function writeGate(db, existing, support, summary) {
+  /** @type {Promise<void> | undefined} */
+  let opened
+  const open = async () => {
+    if (existing === null) return
+    if (support === undefined) {
+      throw new ProvisionConflict([
+        'The business exists and this file changes it: pass --reason "<why>" and --ticket <id> ' +
+          '(written to audit_log before the first change).',
+      ])
+    }
+    const { error } = await db.rpc('record_support_action', {
+      p_action: 'provision_update',
+      p_reason: support.reason,
+      p_ticket: support.ticket,
+      p_business_id: existing.id,
+    })
+    if (error) throw dbError('record the provisioning audit row', error)
+    summary.audited = true
+  }
+  return () => (opened ??= open())
+}
+
+/**
  * Makes the database match `desired`. Throws ProvisionConflict (nothing written) or Error.
  * @param {Db} db
  * @param {Desired} desired
+ * @param {SupportInput} [support] reason and ticket of a change to an existing business
  * @returns {Promise<Summary>}
  */
-export async function provisionBusiness(db, desired) {
+export async function provisionBusiness(db, desired, support) {
   // 1. Read everything.
   const found = await db
     .from('businesses')
@@ -147,6 +187,18 @@ export async function provisionBusiness(db, desired) {
     .maybeSingle()
   if (found.error) throw dbError('read business', found.error)
   const existing = found.data
+  // A former slug leads to its business forever (contract 1.7 D7); the DB guard is the backstop.
+  const alias = await db
+    .from('business_slug_aliases')
+    .select('business_id')
+    .eq('slug', desired.business.slug)
+    .maybeSingle()
+  if (alias.error) throw dbError('read business_slug_aliases', alias.error)
+  if (alias.data && alias.data.business_id !== existing?.id) {
+    throw new ProvisionConflict([
+      `"${desired.business.slug}" is a former address of another business; choose another slug.`,
+    ])
+  }
   const state = existing ? await readBusinessState(db, existing.id) : EMPTY_STATE
   const users = await usersByEmail(db)
   /** @type {Map<string, string>} */
@@ -195,6 +247,7 @@ export async function provisionBusiness(db, desired) {
   /** @type {Summary} */
   const summary = {
     business: 'unchanged',
+    audited: false,
     counts: {
       categories: count(),
       services: count(),
@@ -211,6 +264,7 @@ export async function provisionBusiness(db, desired) {
     ],
   }
   const { counts } = summary
+  const beforeWrite = writeGate(db, existing, support, summary)
 
   // 3. Business.
   /** @type {string} */
@@ -228,6 +282,7 @@ export async function provisionBusiness(db, desired) {
     businessId = existing.id
     const patch = businessPatch(existing, desired.business)
     if (Object.keys(patch).length > 0) {
+      await beforeWrite()
       const { error } = await db.from('businesses').update(patch).eq('id', businessId)
       if (error) throw dbError('update business', error)
       summary.business = 'updated'
@@ -240,6 +295,7 @@ export async function provisionBusiness(db, desired) {
   for (const category of desired.categories) {
     const current = categories.byName.get(category.name)
     if (!current) {
+      await beforeWrite()
       const { data, error } = await db
         .from('service_categories')
         .insert({ business_id: businessId, ...category })
@@ -256,6 +312,7 @@ export async function provisionBusiness(db, desired) {
       counts.categories.unchanged++
       continue
     }
+    await beforeWrite()
     const { error } = await db.from('service_categories').update(patch).eq('id', current.id)
     if (error) throw dbError(`update category "${category.name}"`, error)
     counts.categories.updated++
@@ -272,6 +329,7 @@ export async function provisionBusiness(db, desired) {
     }
     const current = services.byName.get(name)
     if (!current) {
+      await beforeWrite()
       const { data, error } = await db
         .from('services')
         .insert({ business_id: businessId, name, ...row })
@@ -288,6 +346,7 @@ export async function provisionBusiness(db, desired) {
       counts.services.unchanged++
       continue
     }
+    await beforeWrite()
     const { error } = await db.from('services').update(patch).eq('id', current.id)
     if (error) throw dbError(`update service "${name}"`, error)
     counts.services.updated++
@@ -300,6 +359,7 @@ export async function provisionBusiness(db, desired) {
     const row = { sort: person.sort, color: person.color, active: person.active }
     const current = staff.byName.get(person.display_name)
     if (!current) {
+      await beforeWrite()
       const { data, error } = await db
         .from('staff')
         .insert({ business_id: businessId, display_name: person.display_name, ...row })
@@ -316,6 +376,7 @@ export async function provisionBusiness(db, desired) {
       counts.staff.unchanged++
       continue
     }
+    await beforeWrite()
     const { error } = await db.from('staff').update(patch).eq('id', current.id)
     if (error) throw dbError(`update staff "${person.display_name}"`, error)
     counts.staff.updated++
@@ -336,6 +397,7 @@ export async function provisionBusiness(db, desired) {
     )
     const where = `staff_services of "${person.display_name}"`
     if (diff.remove.length > 0) {
+      await beforeWrite()
       const { error } = await db
         .from('staff_services')
         .delete()
@@ -345,12 +407,14 @@ export async function provisionBusiness(db, desired) {
       if (error) throw dbError(`remove ${where}`, error)
     }
     if (diff.insert.length > 0) {
+      await beforeWrite()
       const { error } = await db
         .from('staff_services')
         .insert(diff.insert.map((row) => ({ business_id: businessId, staff_id: staffId, ...row })))
       if (error) throw dbError(`add ${where}`, error)
     }
     for (const row of diff.update) {
+      await beforeWrite()
       const { error } = await db
         .from('staff_services')
         .update({
@@ -380,6 +444,7 @@ export async function provisionBusiness(db, desired) {
       continue
     }
     const where = `working hours of "${person.display_name}"`
+    await beforeWrite()
     const removed = await db
       .from('working_hours')
       .delete()
@@ -413,6 +478,7 @@ export async function provisionBusiness(db, desired) {
       counts.auth_users.unchanged++
       continue
     }
+    await beforeWrite()
     const { data, error } = await db.auth.admin.createUser({
       email: member.email,
       email_confirm: true,
@@ -434,6 +500,7 @@ export async function provisionBusiness(db, desired) {
   }))
   const members = diffMembers(state.members, wantedMembers)
   for (const write of planMemberWrites(state.members, wantedMembers)) {
+    await beforeWrite()
     if (write.kind === 'insert') {
       const { error } = await db
         .from('business_members')
@@ -467,6 +534,7 @@ export async function provisionBusiness(db, desired) {
  */
 export function formatSummary(summary) {
   const lines = [`  business        ${summary.business}`]
+  if (summary.audited) lines.push('  audit_log       provision_update recorded before the changes')
   let changes = summary.business === 'unchanged' ? 0 : 1
   for (const [name, c] of Object.entries(summary.counts)) {
     const parts = [

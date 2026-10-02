@@ -1,7 +1,7 @@
 import type { Locator, Page, TestInfo } from '@playwright/test'
 import { addLocalDays, toLocalDate, weekdayOf } from '../supabase/functions/_shared/dates.ts'
+import { signInAal2 } from './lib/auth'
 import { expect, test } from './lib/fixtures'
-import { signInWithEmailCode } from './lib/login'
 import { memberRpc } from './lib/memberApi'
 import { provisionLocal, settingsShopFile, type E2eShop } from './lib/shops'
 
@@ -10,6 +10,8 @@ import { provisionLocal, settingsShopFile, type E2eShop } from './lib/shops'
 // staff «Ε2Ε Α», «Ε2Ε Β»; «Κούρεμα» 30′ / 13,00 € by both; Tue–Sat 10:00-18:00), provisioned
 // LOCALLY before the tests (idempotent: a re-run resets hours and order to the file). Needs
 // `npm run db:start` + `npm run db:reset` and the dev server. Texts: src/shared/i18n/el/pro.json.
+// Since 1.7 the shop's owner signs in at `aal2` through the API (`signInAal2`: enrolled on first
+// use, contract 1.7 §7.4).
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 })
 
@@ -100,7 +102,7 @@ test.describe('pro app: catalogue settings', () => {
     request,
   }) => {
     const name = `Ε2Ε Ξύρισμα ${Date.now().toString(36)}`
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await openPage(page, '/app/settings/services', TEXT.services)
     await page.getByRole('button', { name: TEXT.newService }).click()
 
@@ -157,7 +159,7 @@ test.describe('pro app: catalogue settings', () => {
     page,
   }) => {
     const staffId = idOf(shop.staff, 'Ε2Ε Α')
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await openPage(page, `/app/settings/hours?staff=${staffId}`, TEXT.hoursTitle)
     await expect(page.getByRole('button', { name: 'Ε2Ε Α', exact: true })).toHaveAttribute(
       'aria-pressed',
@@ -190,7 +192,7 @@ test.describe('pro app: catalogue settings', () => {
   })
 
   test('reorder: «Ε2Ε Β» first after ▲, also after a reload', async ({ page }) => {
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await openPage(page, '/app/settings/staff', TEXT.staffTitle)
     await expect.poll(() => staffOrder(page)).toEqual(['Ε2Ε Α', 'Ε2Ε Β'])
     await page.getByRole('button', { name: 'Μετακίνηση πάνω: Ε2Ε Β' }).click()
@@ -205,7 +207,7 @@ test.describe('catalogue settings with reduced motion', () => {
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
 
     const screens = [
       {
@@ -260,7 +262,7 @@ test.describe('catalogue settings with reduced motion', () => {
       observer.observe({ type: 'layout-shift', buffered: true })
       Object.assign(window, { __shifts: shifts })
     })
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await openPage(page, '/app/settings/services', TEXT.services)
     await expect(page.getByTestId('service-list')).toBeVisible()
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)

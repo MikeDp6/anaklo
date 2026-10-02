@@ -5,26 +5,22 @@
 //   npm run provision:local                      synthetic example → local stack
 //   npm run provision:dev -- --file <path>       your file → SUPABASE_DEV_PROJECT_REF
 //   npm run provision:dev -- --file <path> --validate    check the file only, no connection
+//   npm run provision:dev -- --file <path> --reason "<why>" --ticket <id>
+//                                                a change to an EXISTING business (step 1.7)
 //
 // The secret key comes from the environment (SUPABASE_SECRET_KEY) or from --env-file <path
 // outside the repo>; never from .env.local or any file in the repository.
+// From 1.7 (contract §5.2): a slug that is a former address of a business is refused, and any
+// change to an existing business first writes an audit row (record_support_action
+// 'provision_update', `[ticket] reason`); without --reason/--ticket it is refused before any write.
+// With --local they default to "local provisioning" / LOCAL.
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
-import {
-  PROJECT_REF,
-  REPO_ROOT,
-  UsageError,
-  isInside,
-  localSupabase,
-  pick,
-  readLocalEnv,
-  readSecretEnvFile,
-  requireDevProjectRef,
-} from './lib/cli.mjs'
+import { REPO_ROOT, UsageError, isInside, resolveSupabaseTarget } from './lib/cli.mjs'
 import { ProvisionConflict, formatSummary, provisionBusiness } from './lib/provision-apply.mjs'
+import { parseProvisionArgs } from './lib/provision-args.mjs'
 import { parseProvisionFile } from './lib/provision-schema.mjs'
 
 const EXAMPLE_FILE = path.join(REPO_ROOT, 'supabase', 'provision', 'demo-barber.example.json')
@@ -40,6 +36,9 @@ const HELP = `Usage: node scripts/provision-business.mjs [options]
                         is refused unless --prod is given
   --prod                allow a project other than the dev one (requires --project-ref)
   --env-file <path>     env file OUTSIDE the repository with SUPABASE_SECRET_KEY
+  --reason "<text>"     why an EXISTING business changes (3–400 characters); required with
+  --ticket <id>         the support ticket when anything changes, written to audit_log first.
+                        With --local they default to "local provisioning" / LOCAL.
   --validate            only validate the file; connect to nothing
   --help`
 
@@ -68,66 +67,8 @@ function readJson(file) {
   }
 }
 
-/**
- * Where to write and with which key, after the dev-project guard.
- * @param {{ local: boolean, prod: boolean, 'project-ref'?: string, 'env-file'?: string }} options
- */
-function resolveTarget(options) {
-  if (options.local) {
-    if (options.prod || options['project-ref'] || options['env-file']) {
-      throw new UsageError('--local cannot be combined with --prod, --project-ref or --env-file.')
-    }
-    const { apiUrl, secretKey } = localSupabase()
-    return { label: `local (${apiUrl})`, url: apiUrl, key: secretKey }
-  }
-
-  const envFile = readSecretEnvFile(options['env-file'])
-  const devRef = requireDevProjectRef([process.env, envFile, readLocalEnv()])
-  const ref = options['project-ref'] ?? devRef
-  if (!PROJECT_REF.test(ref)) throw new UsageError(`Not a project ref: "${ref}".`)
-  if (options.prod && !options['project-ref']) {
-    throw new UsageError('--prod requires an explicit --project-ref.')
-  }
-  if (ref !== devRef && !options.prod) {
-    throw new UsageError(
-      `Refusing project "${ref}": only the dev project "${devRef}" is allowed without --prod.`,
-    )
-  }
-  // Secret: never from .env.local or anything inside the repository.
-  const key = pick('SUPABASE_SECRET_KEY', [envFile, process.env])
-  if (!key) {
-    throw new UsageError(
-      'Set SUPABASE_SECRET_KEY in the environment or pass --env-file <path outside the repo>.',
-    )
-  }
-  if (key.startsWith('sb_publishable_')) {
-    throw new UsageError('SUPABASE_SECRET_KEY holds a publishable key; use the secret key.')
-  }
-  const label = ref === devRef ? `dev project ${ref}` : `PRODUCTION project ${ref}`
-  return { label, url: `https://${ref}.supabase.co`, key }
-}
-
-function readOptions() {
-  try {
-    return parseArgs({
-      options: {
-        file: { type: 'string' },
-        local: { type: 'boolean', default: false },
-        prod: { type: 'boolean', default: false },
-        'project-ref': { type: 'string' },
-        'env-file': { type: 'string' },
-        validate: { type: 'boolean', default: false },
-        help: { type: 'boolean', default: false },
-      },
-      strict: true,
-    }).values
-  } catch (error) {
-    throw new UsageError(error instanceof Error ? error.message : String(error))
-  }
-}
-
 async function main() {
-  const options = readOptions()
+  const options = parseProvisionArgs(process.argv.slice(2))
   if (options.help) {
     console.log(HELP)
     return
@@ -150,12 +91,12 @@ async function main() {
     return
   }
 
-  const target = resolveTarget(options)
+  const target = resolveSupabaseTarget(options)
   console.log(`Provisioning "${desired.business.slug}" on ${target.label}`)
   const db = createClient(target.url, target.key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   })
-  const summary = await provisionBusiness(db, desired)
+  const summary = await provisionBusiness(db, desired, options.support)
   for (const line of formatSummary(summary)) console.log(line)
 }
 

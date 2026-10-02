@@ -1,5 +1,7 @@
-import { renderHook } from '@testing-library/react'
+import { useLayoutEffect } from 'react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { BookingFlow } from '../../flow/useBookingFlow'
 import type { Challenge, Details } from '../../flow/bookingReducer'
 import { CUT, TEST_SLOT, testCatalogue, testFlow } from '../../testFixtures'
 import { useBookingActions } from './useBookingActions'
@@ -60,5 +62,34 @@ describe('useBookingActions: back from the code to the details', () => {
     await result.current.submitDetails(DETAILS)
     expect(api.startVerification).toHaveBeenCalledTimes(1)
     expect(flow.dispatch).not.toHaveBeenCalledWith({ type: 'resumeChallenge' })
+  })
+})
+
+describe('useBookingActions: a code right after a wrong one', () => {
+  it('is checked even when it comes in the same task as the screen that allows it', async () => {
+    api.verifyCode.mockRejectedValue(new Error('wrong code'))
+    const verifying = testFlow(testCatalogue(), {
+      step: 'otp',
+      serviceId: CUT,
+      slot: TEST_SLOT,
+      details: DETAILS,
+      challenge: sentSecondsAgo(20),
+      pending: 'verify',
+    })
+    const idle: BookingFlow = { ...verifying, state: { ...verifying.state, pending: null } }
+    // The earliest moment a visitor (or the phone's code autofill) can act: the commit that
+    // emptied the field and made it editable again, before any passive effect has run.
+    const { rerender } = renderHook(
+      ({ flow }: { flow: BookingFlow }) => {
+        const actions = useBookingActions(flow)
+        useLayoutEffect(() => {
+          if (flow.state.pending === null) void actions.verify('123456')
+        }, [actions, flow.state.pending])
+      },
+      { initialProps: { flow: verifying } },
+    )
+    expect(api.verifyCode).not.toHaveBeenCalled()
+    rerender({ flow: idle })
+    await waitFor(() => expect(api.verifyCode).toHaveBeenCalledTimes(1))
   })
 })

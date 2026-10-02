@@ -15,7 +15,14 @@ import type { BookingShellData } from './inject.ts'
 export type ShellSupabaseEnv = { SUPABASE_URL: string; SUPABASE_PUBLISHABLE_KEY: string }
 
 export type BookingShellLookup =
-  { kind: 'found'; data: BookingShellData } | { kind: 'not-found' } | { kind: 'unavailable' }
+  | { kind: 'found'; data: BookingShellData }
+  /**
+   * The requested slug is a former address (an alias, contract 1.7 §4): the catalogue came back
+   * for the business's current slug, where the page now lives (301).
+   */
+  | { kind: 'moved'; slug: string }
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' }
 
 export type ShortLinkLookup =
   { kind: 'found'; slug: string } | { kind: 'not-found' } | { kind: 'unavailable' }
@@ -34,6 +41,9 @@ const CatalogueHead = z.object({
 })
 
 export type InitialBookingData = { catalogue: unknown }
+
+/** `businesses_slug_format` (0001): only such a value may become a `Location`. */
+const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/
 
 const DESCRIPTIONS: Record<string, string> = {
   el: elBooking.og.description,
@@ -86,6 +96,12 @@ export async function lookupBookingShell(
   if (!parsed.success) return { kind: 'unavailable' }
 
   const { business } = parsed.data
+  if (business.slug !== slug.toLowerCase()) {
+    // An alias resolves to the current business (0009 §2.8); anything else is not trusted.
+    return SLUG.test(business.slug)
+      ? { kind: 'moved', slug: business.slug }
+      : { kind: 'unavailable' }
+  }
   const initial: InitialBookingData = { catalogue: answer.body }
   return {
     kind: 'found',
@@ -99,8 +115,6 @@ export async function lookupBookingShell(
     },
   }
 }
-
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/
 
 /** `/r/<code>` (the SMS short link): the slug of a business with online booking, or not found. */
 export async function lookupShortLink(

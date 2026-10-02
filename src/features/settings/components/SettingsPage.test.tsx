@@ -64,7 +64,7 @@ function open(path: string, role: MemberRole = 'owner') {
   return router
 }
 
-const ALL_ENTRIES = [
+const SCHEDULE_ENTRIES = [
   ['Έκτακτη απουσία', '/settings/absence'],
   ['Υπηρεσίες', '/settings/services'],
   ['Προσωπικό', '/settings/staff'],
@@ -72,6 +72,13 @@ const ALL_ENTRIES = [
   ['Κλεισίματα και ειδικές μέρες', '/settings/closures'],
   ['Άδειες', '/settings/time-off'],
   ['Πολιτική κρατήσεων', '/settings/booking-policy'],
+]
+const OWNER_ENTRIES = [
+  ['Μέλη', '/settings/members'],
+  ['Ταυτότητα επιχείρησης', '/settings/identity'],
+]
+const EVERYONE_ENTRIES = [
+  ['Ασφάλεια', '/settings/security'],
   ['Ειδοποιήσεις', '/settings/notifications'],
 ]
 
@@ -85,7 +92,7 @@ async function entries() {
     ])
 }
 
-describe('Ρυθμίσεις (contract 1.5 §4.1, 1.6 §4.1)', () => {
+describe('Ρυθμίσεις (contract 1.5 §4.1, 1.6 §4.1, 1.7 §6.1)', () => {
   it('a third bottom tab «Ρυθμίσεις» leads to the settings list', async () => {
     open('/')
     const nav = await screen.findByRole('navigation', { name: 'Κύρια πλοήγηση' })
@@ -97,17 +104,32 @@ describe('Ρυθμίσεις (contract 1.5 §4.1, 1.6 §4.1)', () => {
     )
   })
 
-  it.each(['owner', 'manager'] as const)('%s: the eight entries in order', async (role) => {
-    open('/settings', role)
+  it('owner: the eleven entries in order', async () => {
+    open('/settings', 'owner')
     expect(await screen.findByRole('heading', { level: 1, name: 'Ρυθμίσεις' })).toBeVisible()
-    expect(await entries()).toEqual(ALL_ENTRIES)
+    expect(await entries()).toEqual([...SCHEDULE_ENTRIES, ...OWNER_ENTRIES, ...EVERYONE_ENTRIES])
+    expect(screen.getByRole('link', { name: /^Μέλη/ })).toHaveTextContent(
+      'Ποιος έχει πρόσβαση στην εφαρμογή.',
+    )
+    expect(screen.getByRole('link', { name: /^Ταυτότητα επιχείρησης/ })).toHaveTextContent(
+      'Διεύθυνση σελίδας, ζώνη ώρας, νόμισμα.',
+    )
   })
 
-  it('staff: only «Ειδοποιήσεις», with its hint', async () => {
+  it('manager: nine entries, without the owner-only ones (contract 1.7 D6)', async () => {
+    open('/settings', 'manager')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ρυθμίσεις' })).toBeVisible()
+    expect(await entries()).toEqual([...SCHEDULE_ENTRIES, ...EVERYONE_ENTRIES])
+  })
+
+  it('staff: only «Ασφάλεια» and «Ειδοποιήσεις», with their hints', async () => {
     open('/settings', 'staff')
-    expect(await entries()).toEqual([['Ειδοποιήσεις', '/settings/notifications']])
+    expect(await entries()).toEqual(EVERYONE_ENTRIES)
     expect(screen.getByRole('link', { name: /^Ειδοποιήσεις/ })).toHaveTextContent(
       'Νέες κρατήσεις, ακυρώσεις και αλλαγές σε αυτή τη συσκευή.',
+    )
+    expect(screen.getByRole('link', { name: /^Ασφάλεια/ })).toHaveTextContent(
+      'Συσκευές κωδικών και αποσυνδέσεις.',
     )
   })
 

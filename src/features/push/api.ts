@@ -67,6 +67,19 @@ export async function unregisterPushSubscription(subscriptionId: string): Promis
   return UnregisterResponse.parse(data)
 }
 
+/**
+ * «Αποσύνδεση από όλες τις συσκευές» (contract 1.7 §6.7, 1.5 D13): every row of the caller goes,
+ * also when this device never registered, before Auth ends every session.
+ */
+export async function unregisterAllPushSubscriptions(): Promise<number> {
+  const args: Args<'unregister_push_subscription'> = { p_all: true }
+  const { data, error, status } = await supabase
+    .rpc('unregister_push_subscription', args)
+    .abortSignal(timeoutSignal())
+  throwIfFailed(error, status)
+  return UnregisterResponse.parse(data)
+}
+
 /** The signed-in user's own subscriptions (RLS `user_id = auth.uid()`). */
 export async function fetchMyPushSubscriptions(
   signal?: AbortSignal,

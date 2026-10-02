@@ -1,6 +1,6 @@
 import { supabase } from '@/shared/lib/supabase'
 import { MembershipRows, type Membership } from './schema'
-import type { SignOutResult, SignOutScope } from './signOut'
+import type { AuthSignOutScope, SignOutResult } from './signOut'
 
 /**
  * Supabase Auth and membership access for the pro app. Components and hooks never import this
@@ -64,8 +64,18 @@ export async function fetchMemberships(userId: string): Promise<Membership[]> {
   }))
 }
 
-export async function signOutOfSupabase(scope: SignOutScope): Promise<SignOutResult> {
-  // supabase-js removes the local session even when the server call fails (offline).
+/**
+ * `local`: supabase-js removes the stored session even when Auth does not answer (offline, 5xx),
+ * so this device is signed out either way, but the server may not have ended the session
+ * (`ok: false`). `others`: every other session of the user; the stored session is kept, also when
+ * Auth does not confirm. Without a session supabase-js would skip the call and report success,
+ * so that case is `ok: false` here (nothing was confirmed).
+ */
+export async function signOutOfSupabase(scope: AuthSignOutScope): Promise<SignOutResult> {
+  if (scope === 'others') {
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) return { ok: false }
+  }
   const { error } = await supabase.auth.signOut({ scope })
   return { ok: error === null }
 }

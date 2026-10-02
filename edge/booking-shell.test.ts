@@ -57,6 +57,26 @@ describe('lookupBookingShell', () => {
     expect(lookup.kind === 'found' && lookup.data.url).toBeUndefined()
   })
 
+  it('reports a former slug as moved to the current one (contract 1.7 §4)', async () => {
+    const fetch = answer(CATALOGUE)
+    expect(await lookupBookingShell('old-barber', ENV, fetch)).toEqual({
+      kind: 'moved',
+      slug: 'demo-barber',
+    })
+    expect(fetch.mock.calls[0]?.[1].body).toBe('{"p_slug":"old-barber"}')
+    // The requested slug compares lower-cased.
+    expect((await lookupBookingShell('Demo-Barber', ENV, answer(CATALOGUE))).kind).toBe('found')
+  })
+
+  it.each(['//evil.example', 'Demo Barber', '', 'a'])(
+    'is unavailable when the current slug %j is not a slug',
+    async (slug) => {
+      const business = { ...CATALOGUE.business, slug }
+      const lookup = await lookupBookingShell('old-barber', ENV, answer({ ...CATALOGUE, business }))
+      expect(lookup).toEqual({ kind: 'unavailable' })
+    },
+  )
+
   it('reports an unknown slug or a business with booking off (null)', async () => {
     expect(await lookupBookingShell('nope', ENV, answer(null))).toEqual({ kind: 'not-found' })
   })

@@ -147,3 +147,144 @@ export async function timeOffOverlapping(
   )
   return z.array(TimeOffRow).parse(rows)
 }
+
+// ---------------------------------------------------------------------------------------------
+// Step 1.7 (contract 1.7 §7.4): what the security flows leave in the database. Read-only, as
+// above, except `deleteMembership` (the members spec's clean-up of an earlier run). Authenticator
+// secrets are read only for the synthetic e2e users (the enrolment spec compares the key on the
+// screen with the stored one).
+// ---------------------------------------------------------------------------------------------
+
+/** The database's clock: rows written from now on have `created_at`/`at` ≥ it. */
+export async function dbNow(): Promise<string> {
+  const now = await selectJson(`select to_json(now());`)
+  if (typeof now !== 'string') throw new Error('no now() from psql')
+  return now
+}
+
+const FactorRow = z.object({
+  id: z.string(),
+  friendly_name: z.nullable(z.string()),
+  status: z.string(),
+})
+
+/** The user's authenticator factors (any status), oldest first. */
+export async function factorsOf(userId: string): Promise<z.infer<typeof FactorRow>[]> {
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(jsonb_build_object('id', f.id, 'friendly_name', f.friendly_name,
+                                                  'status', f.status)
+                               order by f.created_at, f.id), '[]'::jsonb)
+       from auth.mfa_factors f where f.user_id = ${literal(userId)}::uuid;`,
+  )
+  return z.array(FactorRow).parse(rows)
+}
+
+/** The base32 secret Auth stored for a factor of a SYNTHETIC e2e user (null when none). */
+export async function factorSecretOf(factorId: string): Promise<string | null> {
+  const secret = await selectJson(
+    `select coalesce((select to_json(f.secret) from auth.mfa_factors f
+                       where f.id = ${literal(factorId)}::uuid), 'null'::json);`,
+  )
+  return z.nullable(z.string()).parse(secret)
+}
+
+/** How many Auth sessions the user has. */
+export async function sessionCountOf(userId: string): Promise<number> {
+  const row = await selectJson(
+    `select json_build_object('count', count(*))
+       from auth.sessions s where s.user_id = ${literal(userId)}::uuid;`,
+  )
+  return z.object({ count: z.number() }).parse(row).count
+}
+
+const GrantRow = z.object({
+  action: z.string(),
+  factor_id: z.nullable(z.string()),
+  source: z.string(),
+  minutes: z.number(),
+})
+
+/** The user's factor-change grants written at or after `since` (`minutes` = expires − created). */
+export async function grantsOf(userId: string, since: string): Promise<z.infer<typeof GrantRow>[]> {
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(jsonb_build_object(
+               'action', g.action, 'factor_id', g.factor_id, 'source', g.source,
+               'minutes', extract(epoch from g.expires_at - g.created_at) / 60)
+             order by g.created_at, g.id), '[]'::jsonb)
+       from private.factor_change_grants g
+      where g.user_id = ${literal(userId)}::uuid and g.created_at >= ${literal(since)}::timestamptz;`,
+  )
+  return z.array(GrantRow).parse(rows)
+}
+
+const AuditRow = z.object({
+  business_id: z.string(),
+  actor_type: z.string(),
+  actor_id: z.nullable(z.string()),
+  action: z.string(),
+  entity: z.string(),
+  entity_id: z.nullable(z.string()),
+  reason: z.nullable(z.string()),
+})
+export type AuditRow = z.infer<typeof AuditRow>
+
+/**
+ * `audit_log` rows of these actions at or after `since`, narrowed to one business, one entity
+ * and/or one actor (always narrow: the other browser project writes the same actions at the same
+ * time in its own business).
+ */
+export async function auditRowsOf(filter: {
+  actions: readonly string[]
+  since: string
+  businessId?: string
+  entityId?: string
+  actorId?: string
+}): Promise<AuditRow[]> {
+  const conditions = [
+    `a.action in (${filter.actions.map(literal).join(', ')})`,
+    `a.at >= ${literal(filter.since)}::timestamptz`,
+    ...(filter.businessId ? [`a.business_id = ${literal(filter.businessId)}::uuid`] : []),
+    ...(filter.entityId ? [`a.entity_id = ${literal(filter.entityId)}::uuid`] : []),
+    ...(filter.actorId ? [`a.actor_id = ${literal(filter.actorId)}::uuid`] : []),
+  ]
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(jsonb_build_object(
+               'business_id', a.business_id, 'actor_type', a.actor_type, 'actor_id', a.actor_id,
+               'action', a.action, 'entity', a.entity, 'entity_id', a.entity_id,
+               'reason', a.reason) order by a.at, a.id), '[]'::jsonb)
+       from public.audit_log a where ${conditions.join(' and ')};`,
+  )
+  return z.array(AuditRow).parse(rows)
+}
+
+/** The former slugs (aliases) of a business. */
+export async function aliasesOf(businessId: string): Promise<string[]> {
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(a.slug order by a.slug), '[]'::jsonb)
+       from public.business_slug_aliases a where a.business_id = ${literal(businessId)}::uuid;`,
+  )
+  return z.array(z.string()).parse(rows)
+}
+
+/** The business whose current slug this is (null when none). */
+export async function businessIdForSlug(slug: string): Promise<string | null> {
+  const id = await selectJson(
+    `select coalesce((select to_json(b.id) from public.businesses b
+                       where b.slug = ${literal(slug)}), 'null'::json);`,
+  )
+  return z.nullable(z.string()).parse(id)
+}
+
+/**
+ * Clean-up of an earlier run, as postgres (the provisioning path): deletes one membership; the
+ * 0009 trigger revokes the user's sessions in the same transaction. Returns the rows deleted.
+ */
+export async function deleteMembership(businessId: string, userId: string): Promise<number> {
+  const result = await selectJson(
+    `with d as (delete from public.business_members m
+                 where m.business_id = ${literal(businessId)}::uuid
+                   and m.user_id = ${literal(userId)}::uuid returning 1)
+     select json_build_object('deleted', count(*)) from d;`,
+  )
+  return z.object({ deleted: z.number() }).parse(result).deleted
+}

@@ -166,7 +166,10 @@ $$;
 -- Local e2e only: Playwright re-runs OTP starts and bookings from 127.0.0.1 with the same test
 -- numbers, so the caps and the resend cooldown are relaxed here. pgTAP sets every
 -- platform_settings column itself. A remote database needs the real values back after any reset
--- (step 1.10: defaults of 0005, sms_daily_cap = 30 on dev).
+-- (step 1.10: defaults of 0005, sms_daily_cap = 30 on dev; fresh_totp_max_age_seconds = 300).
+-- The fresh-code window is 10 s (plan 1.7), not 0: with 0 not even the retry right after the code
+-- sheet would pass. The e2e helper waits until the session's code is older than 10 s before every
+-- critical action, so the sheet always shows.
 update private.platform_settings
 set otp_per_phone_hour = 1000,
     otp_per_ip_hour = 1000,
@@ -176,6 +179,7 @@ set otp_per_phone_hour = 1000,
     sms_per_phone_day = 10000,
     sms_per_business_day = 100000,
     sms_monthly_cap = 1000000,
+    fresh_totp_max_age_seconds = 10,
     updated_at = now()
 where id;
 
@@ -186,6 +190,16 @@ where id;
 --   manager  ...a002  manager@demo-barber.test   manager, no staff row
 --   staff    ...a003  alex@demo-barber.test      staff,   staff Άλεξ
 --   none     ...a004  nomember@demo-barber.test  no membership (the "no access" screen)
+-- 1.7 (contract 1.7 §2.11): one user per e2e scenario and browser project, members of demo-barber
+-- without a staff row. No factor is seeded for anyone (D16): owners and managers enrol their
+-- authenticator on first sign-in (locally after every db:reset); the e2e enrol through the API.
+--   ...a011  owner-setup-chrome@     owner    setup project, Chromium (storageState)
+--   ...a012  owner-setup-webkit@     owner    setup project, WebKit
+--   ...a013  owner-enroll-chrome@    owner    mfa-enroll.spec, Chromium
+--   ...a014  owner-enroll-webkit@    owner    mfa-enroll.spec, WebKit
+--   ...a015  owner-devices-chrome@   owner    mfa-devices.spec, Chromium
+--   ...a016  owner-devices-webkit@   owner    mfa-devices.spec, WebKit
+--   ...a017  manager-reset@          manager  mfa-reset.spec (Chromium only)
 -- GoTrue scans the token columns as strings: they must be empty strings, not NULL, or sign-in
 -- answers 500. Members write no appointments here, so no actor is declared.
 -- ---------------------------------------------------------------------------------------------
@@ -204,7 +218,14 @@ from (values
   ('00000000-0000-4000-8000-00000000a001'::uuid, 'owner@demo-barber.test'),
   ('00000000-0000-4000-8000-00000000a002'::uuid, 'manager@demo-barber.test'),
   ('00000000-0000-4000-8000-00000000a003'::uuid, 'alex@demo-barber.test'),
-  ('00000000-0000-4000-8000-00000000a004'::uuid, 'nomember@demo-barber.test')
+  ('00000000-0000-4000-8000-00000000a004'::uuid, 'nomember@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a011'::uuid, 'owner-setup-chrome@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a012'::uuid, 'owner-setup-webkit@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a013'::uuid, 'owner-enroll-chrome@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a014'::uuid, 'owner-enroll-webkit@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a015'::uuid, 'owner-devices-chrome@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a016'::uuid, 'owner-devices-webkit@demo-barber.test'),
+  ('00000000-0000-4000-8000-00000000a017'::uuid, 'manager-reset@demo-barber.test')
 ) as s (id, email)
 on conflict do nothing;
 
@@ -220,7 +241,14 @@ on conflict do nothing;
 insert into public.business_members (business_id, user_id, role, staff_id) values
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a001', 'owner', '00000000-0000-4000-8000-000000000101'),
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a002', 'manager', null),
-  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a003', 'staff', '00000000-0000-4000-8000-000000000102')
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a003', 'staff', '00000000-0000-4000-8000-000000000102'),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a011', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a012', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a013', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a014', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a015', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a016', 'owner', null),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000a017', 'manager', null)
 on conflict do nothing;
 
 -- Synthetic push subscriptions (0007), so e2e can observe the fake pushes: nothing registers

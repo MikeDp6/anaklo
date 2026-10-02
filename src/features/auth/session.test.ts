@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   optOutPush: vi.fn(),
   retryPendingOptOut: vi.fn(),
   unregisterPushSubscription: vi.fn(),
+  unregisterAllPushSubscriptions: vi.fn(),
 }))
 
 vi.mock('./api', () => ({
@@ -35,9 +36,11 @@ vi.mock('./api', () => ({
 vi.mock('@/features/push/oneSignal', () => ({
   optOutPush: mocks.optOutPush,
   retryPendingOptOut: mocks.retryPendingOptOut,
+  SIGN_OUT_PUSH_TIMEOUT_MS: 8_000,
 }))
 vi.mock('@/features/push/api', () => ({
   unregisterPushSubscription: mocks.unregisterPushSubscription,
+  unregisterAllPushSubscriptions: mocks.unregisterAllPushSubscriptions,
 }))
 
 const DAY = 24 * 60 * 60 * 1000
@@ -46,6 +49,8 @@ const USER = { userId: '00000000-0000-4000-8000-00000000a001', email: 'owner@dem
 beforeEach(() => {
   window.localStorage.clear()
   mocks.optOutPush.mockResolvedValue(undefined)
+  mocks.unregisterAllPushSubscriptions.mockReset()
+  mocks.unregisterAllPushSubscriptions.mockResolvedValue(0)
   mocks.retryPendingOptOut.mockReset()
   mocks.retryPendingOptOut.mockResolvedValue(undefined)
   mocks.signOutOfSupabase.mockResolvedValue({ ok: true })
@@ -82,11 +87,68 @@ describe('signOut', () => {
     ])
   })
 
+  it('this device only (local) never unregisters the other devices', async () => {
+    await signOut()
+    expect(mocks.unregisterAllPushSubscriptions).not.toHaveBeenCalled()
+  })
+
+  it('«all devices»: every push row (p_all), then the other sessions, then this device', async () => {
+    // Contract 1.7 §6.7, 1.5 D13: also when this device never registered (no id to unregister).
+    const order: string[] = []
+    mocks.optOutPush.mockImplementation(() => {
+      order.push('optOut')
+      return Promise.resolve()
+    })
+    mocks.unregisterAllPushSubscriptions.mockImplementation(() => {
+      order.push('unregisterAll')
+      return Promise.resolve(2)
+    })
+    mocks.signOutOfSupabase.mockImplementation((scope: string) => {
+      order.push(`signOut:${scope}`)
+      return Promise.resolve({ ok: true })
+    })
+    await expect(signOut({ scope: 'global' })).resolves.toEqual({ ok: true })
+    expect(mocks.unregisterPushSubscription).not.toHaveBeenCalled()
+    expect(order).toEqual(['unregisterAll', 'signOut:others', 'optOut', 'signOut:local'])
+  })
+
+  it('«all devices» still signs out when the unregister of every row fails', async () => {
+    mocks.unregisterAllPushSubscriptions.mockRejectedValue(new Error('offline'))
+    await expect(signOut({ scope: 'global' })).resolves.toEqual({ ok: true })
+    expect(mocks.signOutOfSupabase).toHaveBeenCalledWith('others')
+    expect(mocks.signOutOfSupabase).toHaveBeenLastCalledWith('local')
+  })
+
+  it('«all devices» not confirmed by Auth: this device stays signed in and keeps its state', async () => {
+    // Review fix (contract 1.7 §10): never a silent success on a security action.
+    writeLastActivity(window.localStorage, new Date())
+    mocks.signOutOfSupabase.mockImplementation((scope: string) =>
+      Promise.resolve({ ok: scope !== 'others' }),
+    )
+    await expect(signOut({ scope: 'global' })).resolves.toEqual({ ok: false })
+    expect(mocks.signOutOfSupabase).toHaveBeenCalledExactlyOnceWith('others')
+    expect(mocks.optOutPush).not.toHaveBeenCalled()
+    expect(readLastActivity(window.localStorage)).not.toBeNull()
+  })
+
+  it('«all devices» never waits longer than the push bound for the unregister', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.unregisterAllPushSubscriptions.mockReturnValue(new Promise(() => undefined))
+      const done = signOut({ scope: 'global' })
+      await vi.advanceTimersByTimeAsync(8_000)
+      await expect(done).resolves.toEqual({ ok: true })
+      expect(mocks.signOutOfSupabase).toHaveBeenCalledWith('others')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('forgets the activity timestamp and a pending sign-in', async () => {
     writeLastActivity(window.localStorage, new Date())
     savePendingEmail(window.localStorage, 'owner@demo-barber.test', new Date())
     await signOut({ scope: 'global' })
-    expect(mocks.signOutOfSupabase).toHaveBeenCalledWith('global')
+    expect(mocks.signOutOfSupabase).toHaveBeenLastCalledWith('local')
     expect(readLastActivity(window.localStorage)).toBeNull()
     expect(readPendingEmail(window.localStorage, new Date())).toBeNull()
   })

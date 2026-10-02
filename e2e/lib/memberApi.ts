@@ -53,3 +53,25 @@ export async function memberRpc(page: Page, name: string, args: unknown): Promis
   expect(status, JSON.stringify(body)).toBe(200)
   return body
 }
+
+/**
+ * `POST /functions/v1/<name>` as the member (step 1.7: `invite-member`, `manage-factors` are
+ * called by the app directly with the user's JWT, never through /api). Returns the status and the
+ * parsed body (`{ code, message, hint }` on an error, contract 1.7 D12).
+ */
+export async function memberFunction(
+  page: Page,
+  name: string,
+  data: unknown,
+): Promise<{ status: number; body: unknown }> {
+  stack ??= localSupabase()
+  const response = await page.request.post(`${stack.apiUrl}/functions/v1/${name}`, {
+    headers: {
+      apikey: stack.publishableKey,
+      authorization: `Bearer ${await accessToken(page)}`,
+    },
+    data,
+  })
+  const text = await response.text()
+  return { status: response.status(), body: text ? (JSON.parse(text) as unknown) : null }
+}

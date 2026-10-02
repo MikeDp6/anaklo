@@ -66,7 +66,7 @@ export async function provisionLocal(file: unknown): Promise<{ summary: Summary;
   if (!owner) throw new Error('the e2e provisioning file has no owner login')
 
   const db = adminClient()
-  const summary = await provisionBusiness(db, desired)
+  const summary = await provisionBusiness(db, desired, { reason: 'e2e fixture', ticket: 'E2E' })
 
   const business = await db
     .from('businesses')
@@ -215,4 +215,96 @@ export function absenceShopFile(project: string, now: Date = new Date()): unknow
     ],
     members: [{ email: `owner@${slug}.test`, role: 'owner' }],
   }
+}
+
+const MEMBER_SHOP_POLICY = {
+  slot_step_min: 30,
+  min_notice_min: 60,
+  max_advance_days: 60,
+  cancel_min_notice_min: 120,
+  auto_complete_after_min: 720,
+  correction_window_days: 3,
+  allow_any_staff: true,
+  quiet_start: '22:00',
+  quiet_end: '09:00',
+  reminder_mode: '24h',
+} as const
+
+/** A small synthetic shop of the step-1.7 specs (one owner login, the given staff rows). */
+function securityShopFile(
+  slug: string,
+  name: string,
+  staff: readonly string[],
+  members: readonly { email: string; role: 'owner' | 'manager' | 'staff' }[],
+): unknown {
+  return {
+    business: {
+      slug,
+      name,
+      vertical: 'barber',
+      timezone: ZONE,
+      currency: 'EUR',
+      locale: 'el',
+      booking_enabled: true,
+      messaging_enabled: false,
+      policy: MEMBER_SHOP_POLICY,
+    },
+    services: [{ name: 'Κούρεμα', duration_min: 30, buffer_after_min: 0, price_cents: 1300 }],
+    staff: staff.map((display_name) => ({
+      display_name,
+      color: '#2F6B5E',
+      active: true,
+      services: 'all',
+      hours: {
+        tue: TUE_TO_SAT,
+        wed: TUE_TO_SAT,
+        thu: TUE_TO_SAT,
+        fri: TUE_TO_SAT,
+        sat: TUE_TO_SAT,
+      },
+    })),
+    members,
+  }
+}
+
+/**
+ * Members spec (contract 1.7 §7.4): slug `e2e-members-<project>`, owner
+ * `owner@e2e-members-<project>.test`, a staff row «Ε2Ε Μέλος» without a login (the invitee
+ * `member@e2e-members-<project>.test` gets linked to it).
+ */
+export function membersShopFile(project: string): unknown {
+  const slug = `e2e-members-${project}`
+  return securityShopFile(
+    slug,
+    `E2E Members ${project}`,
+    ['Ε2Ε Μέλος'],
+    [{ email: `owner@${slug}.test`, role: 'owner' }],
+  )
+}
+
+/**
+ * Identity spec: slug `e2e-identity-<project>` (the spec moves it to `…-b` and back), owner
+ * `owner@e2e-identity-<project>.test`, one staff row.
+ */
+export function identityShopFile(project: string): unknown {
+  const slug = `e2e-identity-${project}`
+  return securityShopFile(
+    slug,
+    `E2E Identity ${project}`,
+    ['Ε2Ε Ταυτότητα'],
+    [{ email: `owner@${slug}.test`, role: 'owner' }],
+  )
+}
+
+/**
+ * Nous-reset spec (Chromium only): a second business where the seed's `manager-reset@` is the
+ * OWNER, so the reset writes one audit row in each of its two businesses.
+ */
+export function resetShopFile(managerEmail: string): unknown {
+  return securityShopFile(
+    'e2e-reset',
+    'E2E Reset',
+    ['Ε2Ε Επαναφορά'],
+    [{ email: managerEmail, role: 'owner' }],
+  )
 }

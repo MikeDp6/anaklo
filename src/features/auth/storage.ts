@@ -17,6 +17,18 @@ export function deviceStorage(): KeyValueStorage | null {
   }
 }
 
+/**
+ * The tab's sessionStorage (or null, as above): what must survive a reload of the installed app
+ * but not outlive it, e.g. an enrolment in progress (contract 1.7 §6.4).
+ */
+export function tabStorage(): KeyValueStorage | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
 export function readItem(storage: KeyValueStorage | null, key: string): string | null {
   try {
     return storage?.getItem(key) ?? null

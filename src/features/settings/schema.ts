@@ -334,3 +334,78 @@ export interface ReassignInput {
   readonly newStaffId: string
   readonly notify: boolean
 }
+
+// ---------------------------------------------------------------------------------------------
+// Business identity (contract 1.7 §6.9): slug, time zone, currency
+// ---------------------------------------------------------------------------------------------
+
+/** The fields `change_business_identity` changes, in the order its answer lists them. */
+export const IDENTITY_FIELDS = ['slug', 'timezone', 'currency'] as const
+export const IdentityField = z.enum(IDENTITY_FIELDS)
+export type IdentityField = z.infer<typeof IdentityField>
+
+export const IdentityRow = z.object({
+  id: Id,
+  slug: z.string(),
+  timezone: z.string(),
+  currency: CurrencyCode,
+})
+
+/** Former slugs that still lead here (`business_slug_aliases`), newest first. */
+export const AliasRows = z.array(z.object({ slug: z.string() }))
+
+export interface IdentityValues {
+  readonly slug: string
+  readonly timeZone: string
+  readonly currency: string
+}
+
+export interface BusinessIdentity extends IdentityValues {
+  readonly id: string
+  readonly aliases: readonly string[]
+}
+
+export function toIdentity(
+  row: z.infer<typeof IdentityRow>,
+  aliases: z.infer<typeof AliasRows>,
+): BusinessIdentity {
+  return {
+    id: row.id,
+    slug: row.slug,
+    timeZone: row.timezone,
+    currency: row.currency,
+    aliases: aliases.map((alias) => alias.slug),
+  }
+}
+
+/** Only what changes; a field left out stays as it is (the RPC's `null`). */
+export interface IdentityChange {
+  readonly slug?: string
+  readonly timeZone?: string
+  readonly currency?: string
+}
+
+/** `change_business_identity`'s answer; `changed: false` = nothing was different (D9). */
+export const IdentityResponse = z.object({
+  business_id: Id,
+  slug: z.string(),
+  timezone: z.string(),
+  currency: CurrencyCode,
+  changed: z.boolean(),
+  changed_fields: z.array(IdentityField),
+})
+
+export interface IdentityResult {
+  /** What the server stored (the form is refilled from it). */
+  readonly stored: IdentityValues
+  readonly changed: boolean
+  readonly changedFields: readonly IdentityField[]
+}
+
+export function toIdentityResult(response: z.infer<typeof IdentityResponse>): IdentityResult {
+  return {
+    stored: { slug: response.slug, timeZone: response.timezone, currency: response.currency },
+    changed: response.changed,
+    changedFields: response.changed_fields,
+  }
+}

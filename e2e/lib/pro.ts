@@ -145,10 +145,16 @@ export async function confirmD8IfAsked(scope: Locator, success: Locator): Promis
  * A second browser context with the same device as the test's project (viewport, touch, user
  * agent, locale, zone, base URL) and, for the WebKit project, the installed-app pretence of
  * ./fixtures (`navigator.standalone`), so /app does not stop at the iOS install screen.
+ * `storageState`: start signed in (e.g. the owner state of `member: 'owner'`).
  */
-export async function newDeviceContext(browser: Browser, testInfo: TestInfo) {
+export async function newDeviceContext(
+  browser: Browser,
+  testInfo: TestInfo,
+  storageState?: BrowserContextOptions['storageState'],
+) {
   const use = testInfo.project.use as DeviceOptions & BrowserContextOptions
   const context = await browser.newContext({
+    storageState,
     baseURL: use.baseURL,
     locale: use.locale,
     timezoneId: use.timezoneId,

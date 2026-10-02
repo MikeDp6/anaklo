@@ -6,10 +6,13 @@ import { RpcFailure, throwIfFailed } from '@/shared/lib/rpcError'
 import { supabase } from '@/shared/lib/supabase'
 import {
   AbsenceResponse,
+  AliasRows,
   BookingPolicyRow,
   BusinessRow,
   ConflictRows,
   ExceptionRows,
+  IdentityResponse,
+  IdentityRow,
   POLICY_COLUMNS,
   ReassignRows,
   TimeOffRows,
@@ -19,13 +22,18 @@ import {
   toCandidates,
   toConflicts,
   toExceptions,
+  toIdentity,
+  toIdentityResult,
   toTimeOff,
   type AbsenceInput,
   type AbsenceResult,
   type BookingPolicy,
   type BookingPolicyInput,
   type Business,
+  type BusinessIdentity,
   type ConflictsQuery,
+  type IdentityChange,
+  type IdentityResult,
   type NewException,
   type ReassignCandidate,
   type ReassignInput,
@@ -330,4 +338,57 @@ export async function reassignAppointment(
     .abortSignal(writeSignal())
   throwIfFailed(error, status)
   return toMoveResult(data)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Business identity (0009, owner only; contract 1.7 §6.9)
+// ---------------------------------------------------------------------------------------------
+
+/** Slug, zone and currency of the business, and its former slugs (newest first). */
+export async function fetchIdentity(
+  businessId: string,
+  signal?: AbortSignal,
+): Promise<BusinessIdentity> {
+  let business = supabase
+    .from('businesses')
+    .select('id, slug, timezone, currency')
+    .eq('id', businessId)
+  let aliases = supabase
+    .from('business_slug_aliases')
+    .select('slug')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false })
+    .order('slug')
+    .limit(LIST_LIMIT)
+  if (signal) {
+    business = business.abortSignal(signal)
+    aliases = aliases.abortSignal(signal)
+  }
+  const [row, former] = await Promise.all([business.single(), aliases])
+  throwIfFailed(row.error, row.status)
+  throwIfFailed(former.error, former.status)
+  return toIdentity(IdentityRow.parse(row.data), AliasRows.parse(former.data))
+}
+
+/**
+ * `change_business_identity` (owner + fresh code, checked in its `_impl`): only the changed
+ * fields are sent, the others stay the RPC's default `null` = unchanged. Refusals: AN024 (slug
+ * taken, reserved or a former slug of another business), AN025 (zone or currency while future
+ * appointments exist). The UI never counts those appointments itself (rule 13).
+ */
+export async function changeBusinessIdentity(
+  businessId: string,
+  change: IdentityChange,
+): Promise<IdentityResult> {
+  const args: Args<'change_business_identity'> = {
+    p_business_id: businessId,
+    ...(change.slug !== undefined ? { p_slug: change.slug } : {}),
+    ...(change.timeZone !== undefined ? { p_timezone: change.timeZone } : {}),
+    ...(change.currency !== undefined ? { p_currency: change.currency } : {}),
+  }
+  const { data, error, status } = await supabase
+    .rpc('change_business_identity', args)
+    .abortSignal(writeSignal())
+  throwIfFailed(error, status)
+  return toIdentityResult(IdentityResponse.parse(data))
 }

@@ -229,3 +229,83 @@ export function localSupabase() {
   }
   return { apiUrl, publishableKey, secretKey }
 }
+
+/**
+ * @typedef {object} TargetOptions
+ * @property {boolean} local
+ * @property {boolean} prod
+ * @property {string} [project-ref]
+ * @property {string} [env-file]
+ */
+
+/**
+ * Where a Nous operator script writes and with which key (provisioning, mfa-reset): the local
+ * stack with `--local`, else the dev project, another project only with `--prod` and an explicit
+ * `--project-ref`. The secret key comes from the environment or `--env-file` outside the repo,
+ * never from .env.local. Usage mistakes throw a UsageError before any connection.
+ * @param {TargetOptions} options
+ * @returns {{ label: string, url: string, key: string, local: boolean }}
+ */
+export function resolveSupabaseTarget(options) {
+  if (options.local) {
+    if (options.prod || options['project-ref'] || options['env-file']) {
+      throw new UsageError('--local cannot be combined with --prod, --project-ref or --env-file.')
+    }
+    const { apiUrl, secretKey } = localSupabase()
+    return { label: `local (${apiUrl})`, url: apiUrl, key: secretKey, local: true }
+  }
+
+  const envFile = readSecretEnvFile(options['env-file'])
+  const devRef = requireDevProjectRef([process.env, envFile, readLocalEnv()])
+  const ref = options['project-ref'] ?? devRef
+  if (!PROJECT_REF.test(ref)) throw new UsageError(`Not a project ref: "${ref}".`)
+  if (options.prod && !options['project-ref']) {
+    throw new UsageError('--prod requires an explicit --project-ref.')
+  }
+  if (ref !== devRef && !options.prod) {
+    throw new UsageError(
+      `Refusing project "${ref}": only the dev project "${devRef}" is allowed without --prod.`,
+    )
+  }
+  // Secret: never from .env.local or anything inside the repository.
+  const key = pick('SUPABASE_SECRET_KEY', [envFile, process.env])
+  if (!key) {
+    throw new UsageError(
+      'Set SUPABASE_SECRET_KEY in the environment or pass --env-file <path outside the repo>.',
+    )
+  }
+  if (key.startsWith('sb_publishable_')) {
+    throw new UsageError('SUPABASE_SECRET_KEY holds a publishable key; use the secret key.')
+  }
+  const label = ref === devRef ? `dev project ${ref}` : `PRODUCTION project ${ref}`
+  return { label, url: `https://${ref}.supabase.co`, key, local: false }
+}
+
+/**
+ * A Nous support ticket id, the same pattern `record_support_action` checks in SQL (0009 §2.7).
+ * The script refuses early so that nothing connects with a value the database would refuse.
+ */
+export const SUPPORT_TICKET = /^[A-Za-z0-9][A-Za-z0-9._#/-]{0,39}$/
+export const SUPPORT_REASON_MIN = 3
+export const SUPPORT_REASON_MAX = 400
+
+/**
+ * `--reason` and `--ticket` of a Nous action, trimmed and checked (audit_log: `[ticket] reason`).
+ * @param {{ reason?: string, ticket?: string }} input
+ * @returns {{ reason: string, ticket: string }}
+ */
+export function parseSupportInput(input) {
+  const reason = input.reason?.trim() ?? ''
+  const ticket = input.ticket?.trim() ?? ''
+  if (reason.length < SUPPORT_REASON_MIN || reason.length > SUPPORT_REASON_MAX) {
+    throw new UsageError(
+      `--reason must be ${SUPPORT_REASON_MIN}–${SUPPORT_REASON_MAX} characters (why, in a few words).`,
+    )
+  }
+  if (!SUPPORT_TICKET.test(ticket)) {
+    throw new UsageError(
+      '--ticket must be 1–40 characters: letters, digits and . _ # / - (not starting with a symbol).',
+    )
+  }
+  return { reason, ticket }
+}

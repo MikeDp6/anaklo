@@ -179,6 +179,25 @@ isOneToOne: false
       referencedColumns: ["business_id","id"]
     }
                   ]
+                },"business_slug_aliases": {
+                  Row: {
+                    "business_id": string,"created_at": string,"slug": string
+                  }
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"slug": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"slug"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "business_slug_aliases_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"businesses": {
                   Row: {
                     "address": string | null,"allow_any_staff": boolean,"auto_complete_after_min": number,"booking_enabled": boolean,"cancel_min_notice_min": number,"correction_window_days": number,"created_at": string,"currency": string,"id": string,"import_reminders": boolean,"locale": string,"maps_url": string | null,"max_advance_days": number,"messaging_enabled": boolean,"min_notice_min": number,"name": string,"phone_e164": string | null,"quiet_end": string,"quiet_start": string,"reminder_mode": string,"settings": NonNullable<Json>,"short_code": string,"slot_step_min": number,"slug": string,"sms_daily_cap": number | null,"sms_monthly_budget_cents": number | null,"sms_sender_id": string | null,"theme": NonNullable<Json>,"timezone": string,"vertical": string
@@ -593,7 +612,13 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "available_slots":
+            "add_member":
+{ Args: { "p_actor_id": string,"p_business_id": string,"p_role": string,"p_staff_id": string,"p_user_id": string }; Returns: Json
+                           },
+"authorize_factor_change":
+{ Args: { "p_action": string,"p_factor_id"?: string }; Returns: Json
+                           },
+"available_slots":
 { Args: { "p_from": string,"p_service_ids": (string)[],"p_slug": string,"p_staff_id": string,"p_to": string }; Returns: {
               "local_date": string,"local_time": string,"staff_ids": (string)[],"starts_at": string
             }[]
@@ -604,8 +629,14 @@ isOneToOne: false
 "busy_calendar":
 { Args: { "p_business_id": string,"p_local_date": string }; Returns: Json
                            },
+"can_manage_members":
+{ Args: { "p_business_id": string }; Returns: boolean
+                           },
 "cancel_appointment":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_notify": boolean,"p_reason": string }; Returns: Json
+                           },
+"change_business_identity":
+{ Args: { "p_business_id": string,"p_currency"?: string,"p_slug"?: string,"p_timezone"?: string }; Returns: Json
                            },
 "claim_due_messages":
 { Args: { "p_limit": number }; Returns: Json
@@ -615,6 +646,11 @@ isOneToOne: false
                            },
 "clients_for_phone":
 { Args: { "p_business_id": string,"p_grant": string,"p_phone": string,"p_trusted_device_token": string }; Returns: Json
+                           },
+"list_members":
+{ Args: { "p_business_id": string }; Returns: {
+              "created_at": string,"email": string,"is_self": boolean,"last_sign_in_at": string,"role": string,"staff_id": string,"staff_name": string,"user_id": string
+            }[]
                            },
 "manage_cancel":
 { Args: { "p_token": string }; Returns: Json
@@ -667,14 +703,23 @@ isOneToOne: false
 "record_send_result":
 { Args: { "p_cost_cents": number,"p_error": string,"p_id": string,"p_lease_id": string,"p_outcome": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number }; Returns: boolean
                            },
+"record_support_action":
+{ Args: { "p_action": string,"p_business_id"?: string,"p_reason": string,"p_ticket": string,"p_user_id"?: string }; Returns: Json
+                           },
 "register_push_subscription":
 { Args: { "p_auth"?: string,"p_endpoint"?: string,"p_p256dh"?: string,"p_provider": string,"p_subscription_id"?: string }; Returns: Json
+                           },
+"remove_member":
+{ Args: { "p_business_id": string,"p_user_id": string }; Returns: Json
                            },
 "replace_week_hours":
 { Args: { "p_business_id": string,"p_rows": Json,"p_staff_id": string }; Returns: Json
                            },
 "request_test_push":
 { Args: { "p_business_id": string }; Returns: Json
+                           },
+"revoke_user_sessions":
+{ Args: { "p_user_id": string }; Returns: Json
                            },
 "save_service":
 { Args: { "p_business_id": string,"p_offers": Json,"p_service": Json,"p_service_id": string }; Returns: Json
@@ -691,6 +736,9 @@ isOneToOne: false
                            },
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_status": string }; Returns: Json
+                           },
+"set_member_role":
+{ Args: { "p_business_id": string,"p_role": string,"p_user_id": string }; Returns: Json
                            },
 "set_staff_order":
 { Args: { "p_business_id": string,"p_staff_ids": (string)[] }; Returns: Json
@@ -714,6 +762,9 @@ isOneToOne: false
                            },
 "unregister_push_subscription":
 { Args: { "p_all"?: boolean,"p_endpoint"?: string,"p_subscription_id"?: string }; Returns: number
+                           },
+"user_id_for_email":
+{ Args: { "p_email": string }; Returns: string
                            }
           }
           Enums: {

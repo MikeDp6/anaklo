@@ -8,6 +8,8 @@ import {
   PUSH_MESSAGE_TEMPLATES,
   REASSIGN_BLOCKERS,
   SMS_MESSAGE_TEMPLATES,
+  STEP_UP_HINTS,
+  SUPPORT_ACTIONS,
 } from './domain.ts'
 import { PUSH_TEMPLATES } from './push-templates.ts'
 import { SMS_TEMPLATES } from './sms-templates.ts'
@@ -91,5 +93,27 @@ describe('RPC output lists match the functions that produce them (0008)', () => 
     const positions = values.map((value) => body?.indexOf(`'${value}'`) ?? -1)
     expect(positions.every((position) => position >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+  })
+})
+
+describe('RPC inputs and hints match the functions that use them (0009)', () => {
+  const sql = migrationSql()
+
+  it('private.require_fresh_totp raises exactly the step-up hints', () => {
+    const body = functionBody(sql, 'private.require_fresh_totp')
+    expect(body, 'function private.require_fresh_totp not found in migrations').not.toBeNull()
+    const hints = [...(body ?? '').matchAll(/hint\s*=\s*'([a-z_0-9]+)'/g)].map((m) => m[1])
+    expect(hints).toEqual([...STEP_UP_HINTS])
+  })
+
+  it('private.record_support_action_impl accepts exactly the support actions', () => {
+    const body = functionBody(sql, 'private.record_support_action_impl')
+    expect(
+      body,
+      'function private.record_support_action_impl not found in migrations',
+    ).not.toBeNull()
+    const accepted = /p_action\s+not\s+in\s*\(([^)]*)\)/.exec(body ?? '')?.[1] ?? ''
+    const values = [...accepted.matchAll(/'([^']*)'/g)].map((m) => m[1])
+    expect(values).toEqual([...SUPPORT_ACTIONS])
   })
 })

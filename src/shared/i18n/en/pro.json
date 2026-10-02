@@ -1,6 +1,117 @@
 {
   "signOut": "Sign out",
   "signingOut": "Signing out…",
+  "mfa": {
+    "deviceName": "Device name",
+    "deviceNameHint": "To tell your devices apart, e.g. “iPhone” or “Shop tablet”.",
+    "defaultDeviceName": "Device {{n}}",
+    "codeLabel": "6-digit code",
+    "restart": "Start over",
+    "enroll": {
+      "title": "Protect your account",
+      "intro": "Besides the email code, you will also sign in with a code from an authenticator app. So nobody else gets into your account, even if they see your email.",
+      "stepOf": "Step {{step}} of 3",
+      "download": {
+        "title": "Download an authenticator app",
+        "body": "E.g. Google Authenticator or Microsoft Authenticator. On iPhone you can also use the built-in “Passwords”.",
+        "done": "I have it",
+        "preparing": "Preparing the QR code…"
+      },
+      "scan": {
+        "title": "Scan the QR code",
+        "body": "From another device, scan the code with the authenticator app. On this phone, tap “Open in the authenticator app” or copy the key.",
+        "qrAlt": "QR code for the authenticator app",
+        "noQr": "The QR code cannot be shown here. Use the key.",
+        "open": "Open in the authenticator app",
+        "copy": "Copy key",
+        "copied": "Copied",
+        "key": "Key",
+        "next": "Next"
+      },
+      "code": {
+        "title": "Enter the 6-digit code",
+        "body": "Enter the code the authenticator app shows now for Anaklo.",
+        "submit": "Confirm",
+        "verifying": "Checking…",
+        "back": "Back to the QR code"
+      }
+    },
+    "errors": {
+      "invalidCode": "The code is not correct. Enter the one the app shows now.",
+      "rateLimited": "Too many attempts. Wait a little and try again.",
+      "nameTaken": "There is already a device with this name.",
+      "codeFormat": "The code has 6 digits.",
+      "nameRequired": "Enter a name for the device.",
+      "nameTooLong": "Up to {{max}} characters.",
+      "offline": "No connection. Try again.",
+      "unknown": "Something went wrong. Try again.",
+      "copyFailed": "Copying did not work. Type the key by hand."
+    },
+    "secondDevice": {
+      "title": "Add a second device",
+      "body": "If you lose this phone, you will sign in with the code of the second device.",
+      "hint": "Put the authenticator app on a second device of yours too, e.g. a tablet or another phone, with another name.",
+      "addNow": "Add now",
+      "later": "Later",
+      "confirm": "I understand that if I lose this device I will need Nous"
+    },
+    "challenge": {
+      "title": "Code from the authenticator app",
+      "body": "Enter the 6-digit code the authenticator app shows now.",
+      "submit": "Continue",
+      "verifying": "Checking…",
+      "device": "Device",
+      "lost": "Lost your device?"
+    },
+    "lostDevice": {
+      "title": "Lost your device?",
+      "secondDevice": "Code from the second device",
+      "secondDeviceHint": "If you added a second device, sign in with its code.",
+      "contact": "Otherwise contact Nous. We will confirm that it is you: we will send a code to your email and call you on the shop’s phone.",
+      "email": "Email Nous: {{email}}",
+      "phone": "Call Nous: {{phone}}",
+      "noBypass": "The app has no other way in without the device.",
+      "back": "Back to the code"
+    }
+  },
+  "stepUp": {
+    "title": "Confirm with a code",
+    "body": "To continue, enter the 6-digit code from the authenticator app.",
+    "submit": "Continue",
+    "verifying": "Checking…",
+    "cancel": "Cancel",
+    "failed": "It did not go through. Try again.",
+    "cancelled": "The action was not done."
+  },
+  "security": {
+    "title": "Security",
+    "intro": "Your devices with the authenticator app and your sign-ins.",
+    "devices": "Authenticator devices",
+    "devicesLoading": "Loading devices…",
+    "addedOn": "Added {{date}}",
+    "unnamed": "Unnamed device",
+    "add": "Add a device",
+    "addIntro": "The new device will give codes like your others.",
+    "remove": "Remove",
+    "removeLabel": "Remove: {{name}}",
+    "removeConfirm": "Remove the device “{{name}}”?",
+    "removing": "Removing…",
+    "cancel": "Cancel",
+    "lastDevice": "Add another device first to remove this one.",
+    "singleBanner": "You have only one authenticator device. If you lose it, you will need Nous.",
+    "replaceHint": "To change devices, add the new one first, then remove the old one.",
+    "removed": "The device was removed.",
+    "added": "The device was added.",
+    "back": "Security",
+    "backLabel": "Back to security",
+    "sessions": "Sign-ins",
+    "signOutAll": "Sign out of all devices",
+    "signOutAllHint": "For when the app stayed open on a device you no longer have.",
+    "signOutAllConfirm": "Every device will need a new sign-in, this one too.",
+    "signOutAllSubmit": "Sign out everywhere",
+    "signingOutAll": "Signing out…",
+    "signOutAllFailed": "Signing out of the other devices was not confirmed. This device stays signed in; check your connection and try again."
+  },
   "loadErrorTitle": "The app did not load",
   "loadErrorBody": "Check your connection and try again.",
   "login": {
@@ -79,7 +190,86 @@
     "timeOff": "Time off",
     "timeOffHint": "Holidays and absences of the staff.",
     "policy": "Booking policy",
-    "policyHint": "Online booking, cancellations and reminders."
+    "policyHint": "Online booking, cancellations and reminders.",
+    "members": "Members",
+    "membersHint": "Who has access to the app.",
+    "identity": "Business identity",
+    "identityHint": "Page address, time zone, currency.",
+    "security": "Security",
+    "securityHint": "Code devices and sign-outs."
+  },
+  "members": {
+    "title": "Members",
+    "intro": "Who signs in to the app with their email, and with which role.",
+    "loading": "Loading members…",
+    "listLabel": "Members of the business",
+    "invite": "Invite a member",
+    "self": "you",
+    "neverSignedIn": "Has not signed in yet",
+    "staffLink": "In the calendar: {{name}}",
+    "noEmail": "No email",
+    "roles": {
+      "owner": "Owner",
+      "manager": "Manager",
+      "staff": "Staff"
+    },
+    "role": "Role",
+    "email": "Email",
+    "emailHint": "They sign in with this email: a code arrives every time.",
+    "staff": "Professional in the calendar",
+    "staffHint": "If they work in the calendar, choose who they are.",
+    "staffNone": "None",
+    "submit": "Invite",
+    "submitting": "Inviting…",
+    "added": "{{email}} was added.",
+    "alreadyMember": "Already a member.",
+    "shareIntro": "Send them this message:",
+    "shareText": "I added you to {{business}} on {{app}}. Open {{url}} on your phone, add it to your home screen and sign in with the email {{email}}: you will get a code.",
+    "share": "Share",
+    "copy": "Copy text",
+    "copied": "Copied.",
+    "copyFailed": "Not copied. Press and hold the text to copy it.",
+    "consequences": {
+      "signOut": "They will be signed out on all their devices.",
+      "dropDevices": "Their code devices will be deleted.",
+      "enroll": "At their next sign-in they will set up an authenticator app."
+    },
+    "roleChanged": "The role was changed.",
+    "roleUnchanged": "The role was already this one.",
+    "remove": "Remove from the business",
+    "removeConfirm": "Remove them from the business?",
+    "removeKeepsStaff": "The professional «{{name}}» stays in the calendar.",
+    "removeYes": "Remove",
+    "removing": "Removing…",
+    "removed": "Removed from the business.",
+    "notMember": "They were no longer a member of the business.",
+    "errors": {
+      "email": "Enter a valid email."
+    }
+  },
+  "identity": {
+    "title": "Business identity",
+    "intro": "The address of the booking page, the time zone and the currency of the business.",
+    "loading": "Loading details…",
+    "slug": "Page address",
+    "slugHint": "{{url}} · lower-case Latin letters, digits and hyphens",
+    "timezone": "Time zone",
+    "currency": "Currency",
+    "currencyOption": "{{code}} · {{name}}",
+    "aliases": "Former addresses that lead here",
+    "continue": "Continue",
+    "noChanges": "Nothing changed.",
+    "confirmTitle": "Check the changes",
+    "change": "{{from}} → {{to}}",
+    "consequences": {
+      "slug": "Links already sent keep working and lead to the new address. The old address will never be given to another business.",
+      "timezone": "Hours and closures keep the same local times. Time off keeps the same moment, so its local time changes. Not possible while there are future appointments.",
+      "currency": "Amounts will be shown in the new currency without conversion. Not possible while there are future appointments."
+    },
+    "confirm": "Confirm changes",
+    "saving": "Saving…",
+    "back": "Back",
+    "saved": "Saved."
   },
   "closures": {
     "title": "Closures and special days",

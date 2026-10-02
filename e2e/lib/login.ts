@@ -23,10 +23,20 @@ const LOCK_WAIT_MS = 90_000
  * Auth keeps ONE pending code per user: a second request (another browser project, a parallel
  * worker) replaces the first, and both would read one mailbox. So everything between "empty the
  * mailbox" and "code accepted" runs under a per-email lock shared by all workers on this machine.
+ * The API sign-ins of ./auth.ts (generateLink mints the same pending code) take it too.
  */
-export async function withEmailLock<T>(email: string, work: () => Promise<T>): Promise<T> {
+export function withEmailLock<T>(email: string, work: () => Promise<T>): Promise<T> {
+  return withFileLock(email.toLowerCase(), work)
+}
+
+/**
+ * A lock shared by every Playwright worker on this machine (an atomic mkdir), held while `work`
+ * runs (keep it under LOCK_STALE_MS). `name` is any key: an email for the sign-ins, and
+ * `totp:<email>` for the code store of ./totpStore.ts. A holder never takes its own key again.
+ */
+export async function withFileLock<T>(name: string, work: () => Promise<T>): Promise<T> {
   await mkdir(LOCK_ROOT, { recursive: true })
-  const lock = join(LOCK_ROOT, encodeURIComponent(email.toLowerCase()))
+  const lock = join(LOCK_ROOT, encodeURIComponent(name))
   const deadline = Date.now() + LOCK_WAIT_MS
   for (;;) {
     try {
@@ -40,7 +50,7 @@ export async function withEmailLock<T>(email: string, work: () => Promise<T>): P
       )
       if (since > LOCK_STALE_MS) await rm(lock, { recursive: true, force: true })
       else if (Date.now() > deadline) {
-        throw new Error(`timed out waiting for the lock of ${email}`, { cause: error })
+        throw new Error(`timed out waiting for the lock of ${name}`, { cause: error })
       } else await delay(200)
     }
   }

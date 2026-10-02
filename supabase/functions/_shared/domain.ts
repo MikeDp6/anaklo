@@ -103,6 +103,14 @@ export const REMINDER_MODES = ['24h', 'evening_before'] as const
 export const JOB_NAMES = ['auto_complete', 'dispatch_sweep', 'dispatch', 'purge'] as const
 
 /**
+ * `private.factor_change_grants` (0009): the permission for one change of a user's devices of the
+ * authenticator app. `add` has no factor id (not known yet); `remove` names the factor.
+ */
+export const FACTOR_GRANT_ACTIONS = ['add', 'remove'] as const
+/** Who allowed it: the user (fresh code), Nous (mfa-reset), a demotion/removal, the 1.9 reaction. */
+export const FACTOR_GRANT_SOURCES = ['user', 'nous_support', 'demotion', 'system'] as const
+
+/**
  * RPC outputs, not CHECK lists (so not in CHECKED_VALUE_LISTS; domain.test.ts checks that 0008
  * names them). Why an appointment no longer fits the schedule (`schedule_conflicts`, 0008), in
  * the order the server lists them. Reason codes only: never the reason of a time off.
@@ -117,6 +125,13 @@ export const CONFLICT_REASONS = [
 ] as const
 /** Why a colleague cannot take an appointment at its time (`reassign_candidates`, 0008). */
 export const REASSIGN_BLOCKERS = ['not_offered', 'busy', 'off', 'tight'] as const
+/**
+ * The two hints of `42501` from `private.require_fresh_totp()` (0009): the only ones that open
+ * the code sheet (one retry of the call). Any other `42501` is a plain refusal.
+ */
+export const STEP_UP_HINTS = ['aal2_required', 'fresh_totp_required'] as const
+/** What Nous records through `record_support_action` (0009, service_role only). */
+export const SUPPORT_ACTIONS = ['mfa_reset', 'provision_update'] as const
 
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
@@ -126,6 +141,8 @@ export const AppointmentSource = z.enum(APPOINTMENT_SOURCES)
 export const CancelReason = z.enum(CANCEL_REASONS)
 export const ConflictReason = z.enum(CONFLICT_REASONS)
 export const ReassignBlocker = z.enum(REASSIGN_BLOCKERS)
+export const StepUpHint = z.enum(STEP_UP_HINTS)
+export const SupportAction = z.enum(SUPPORT_ACTIONS)
 
 export type Vertical = z.infer<typeof Vertical>
 export type Locale = z.infer<typeof Locale>
@@ -135,6 +152,8 @@ export type AppointmentSource = z.infer<typeof AppointmentSource>
 export type CancelReason = z.infer<typeof CancelReason>
 export type ConflictReason = z.infer<typeof ConflictReason>
 export type ReassignBlocker = z.infer<typeof ReassignBlocker>
+export type StepUpHint = z.infer<typeof StepUpHint>
+export type SupportAction = z.infer<typeof SupportAction>
 
 /** CHECK constraint name → the list above that must match it exactly (order-insensitive). */
 export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = {
@@ -169,4 +188,6 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   vertical_defaults_vertical: VERTICALS,
   job_runs_job: JOB_NAMES,
   push_subscriptions_provider: PUSH_PROVIDERS,
+  factor_change_grants_action: FACTOR_GRANT_ACTIONS,
+  factor_change_grants_source: FACTOR_GRANT_SOURCES,
 }

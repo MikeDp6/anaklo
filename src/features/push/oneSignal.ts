@@ -48,7 +48,7 @@ const OPT_OUT_TIMEOUT_MS = 4_000
 const REGISTER_TIMEOUT_MS = 8_000
 
 /** Upper bound for the whole push part of a sign-out, including an enable still in progress. */
-const SIGN_OUT_PUSH_TIMEOUT_MS = 2 * OPT_OUT_TIMEOUT_MS
+export const SIGN_OUT_PUSH_TIMEOUT_MS = 2 * OPT_OUT_TIMEOUT_MS
 
 /** How long to wait for OneSignal to report this device's subscription id after opting in. */
 export const SUBSCRIPTION_ID_TIMEOUT_MS = 10_000

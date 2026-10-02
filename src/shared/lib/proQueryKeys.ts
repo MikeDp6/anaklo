@@ -87,4 +87,12 @@ export const proKeys = {
   reassignAll: (businessId: string) => ['pro', businessId, 'reassign'] as const,
   reassign: (businessId: string, appointmentId: string) =>
     ['pro', businessId, 'reassign', appointmentId] as const,
+
+  // Security and members (contract 1.7 §6.10).
+  /** The signed-in user's verified authenticator devices: per user, like `pushSubscriptions`. */
+  mfaFactors: (userId: string) => ['pro', 'user', userId, 'mfa-factors'] as const,
+  /** Members of the business with their emails (`list_members`, owner only). */
+  members: (businessId: string) => ['pro', businessId, 'members'] as const,
+  /** Slug, time zone, currency and former slugs; under `business`: one invalidation. */
+  identity: (businessId: string) => ['pro', businessId, 'business', 'identity'] as const,
 } as const

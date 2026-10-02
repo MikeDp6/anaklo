@@ -1,9 +1,10 @@
 import { test as base } from '@playwright/test'
+import { engineOf, ownerStatePath } from './authPaths'
 import { cancelBookings, collectBookings } from './cleanup'
 
 export { expect } from '@playwright/test'
 
-/** Per-project options, set in playwright.config.ts. */
+/** Per-project options, set in playwright.config.ts (and per spec with `test.use`). */
 export interface DeviceOptions {
   /**
    * Pretend the page runs as the installed Home Screen app (`navigator.standalone = true`).
@@ -11,6 +12,13 @@ export interface DeviceOptions {
    * (ADR-0009 §5); the install-screen spec turns it off with `test.use({ standalone: false })`.
    */
   standalone: boolean
+  /**
+   * `owner`: the test's context starts signed in as the engine's setup owner at `aal2`
+   * (`owner-setup-<chrome|webkit>@demo-barber.test`, written by e2e/setup/owner.setup.ts;
+   * contract 1.7 §7.4). Every worker of the engine shares that one session: a spec using it never
+   * signs out and never runs a critical action (a step-up would rotate the shared session).
+   */
+  member: 'none' | 'owner'
 }
 
 interface AutoFixtures {
@@ -25,6 +33,10 @@ interface AutoFixtures {
  */
 export const test = base.extend<DeviceOptions & AutoFixtures>({
   standalone: [false, { option: true }],
+  member: ['none', { option: true }],
+  storageState: async ({ member }, use, testInfo) => {
+    await use(member === 'owner' ? ownerStatePath(engineOf(testInfo.project.name)) : undefined)
+  },
   context: async ({ context, standalone }, use) => {
     if (standalone) {
       await context.addInitScript(() => {

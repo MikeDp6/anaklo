@@ -74,6 +74,51 @@ describe('classifyRpcFailure (contract 1.4 §3.6)', () => {
     },
   )
 
+  it('42501 with a step-up hint is a stepUp (contract 1.7 §6.6), before forbidden', () => {
+    expect(
+      classifyRpcFailure(
+        {
+          code: '42501',
+          message: 'a code from the authenticator app is required',
+          hint: 'aal2_required',
+        },
+        403,
+      ),
+    ).toEqual({ kind: 'stepUp', hint: 'aal2_required' })
+    expect(
+      classifyRpcFailure({ code: '42501', message: 'x', hint: 'fresh_totp_required' }, 403),
+    ).toEqual({ kind: 'stepUp', hint: 'fresh_totp_required' })
+  })
+
+  it('42501 without one of the two hints stays forbidden: nothing opens the sheet', () => {
+    expect(classifyRpcFailure({ code: '42501', message: 'x', hint: null }, 403)).toEqual({
+      kind: 'forbidden',
+    })
+    expect(classifyRpcFailure({ code: '42501', message: 'x', hint: '' }, 403)).toEqual({
+      kind: 'forbidden',
+    })
+    expect(classifyRpcFailure({ code: '42501', message: 'x', hint: 'aal2' }, 403)).toEqual({
+      kind: 'forbidden',
+    })
+    // A hint on another SQLSTATE is not a step-up either.
+    expect(classifyRpcFailure({ code: '22023', message: 'x', hint: 'aal2_required' }, 400)).toEqual(
+      { kind: 'invalid' },
+    )
+  })
+
+  it('401 and an invalid or expired JWT are unauthorized', () => {
+    expect(classifyRpcFailure({ code: '42501', message: 'permission denied' }, 401)).toEqual({
+      kind: 'unauthorized',
+    })
+    expect(classifyRpcFailure({ code: 'PGRST301', message: 'JWSError' }, 401)).toEqual({
+      kind: 'unauthorized',
+    })
+    expect(classifyRpcFailure({ code: 'PGRST303', message: 'JWT expired' })).toEqual({
+      kind: 'unauthorized',
+    })
+    expect(classifyRpcFailure({}, 401)).toEqual({ kind: 'unauthorized' })
+  })
+
   it('an RpcFailure keeps its classification', () => {
     const failure = new RpcFailure({ kind: 'domain', code: 'AN020' })
     expect(classifyRpcFailure(failure)).toEqual({ kind: 'domain', code: 'AN020' })
@@ -91,6 +136,14 @@ describe('rpcFailureMessageKey', () => {
     expect(rpcFailureMessageKey({ kind: 'domain', code: 'AN005' })).toBe('common:errors.AN005')
     expect(rpcFailureMessageKey({ kind: 'forbidden' })).toBe('pro:errors.forbidden')
     expect(rpcFailureMessageKey({ kind: 'unknown' })).toBe('common:errors.unknown')
+  })
+
+  it('the step-up kinds have their texts; unauthorized says forbidden', () => {
+    expect(rpcFailureMessageKey({ kind: 'stepUp', hint: 'fresh_totp_required' })).toBe(
+      'pro:stepUp.failed',
+    )
+    expect(rpcFailureMessageKey({ kind: 'stepUpCancelled' })).toBe('pro:stepUp.cancelled')
+    expect(rpcFailureMessageKey({ kind: 'unauthorized' })).toBe('pro:errors.forbidden')
   })
 
   it('overlap, invalid and gone have their pro texts', () => {
@@ -113,6 +166,11 @@ describe('pro error texts', () => {
       ] as const) {
         expect(catalogue[key]).toEqual(expect.any(String))
       }
+      expect(catalogue).toBeDefined()
+    }
+    for (const catalogue of [elPro.stepUp, enPro.stepUp]) {
+      expect(catalogue.failed).toEqual(expect.any(String))
+      expect(catalogue.cancelled).toEqual(expect.any(String))
     }
   })
 })

@@ -53,6 +53,17 @@ export const DOMAIN_ERROR_HTTP_STATUS = {
   AN021: 409,
   AN022: 422,
   AN023: 422,
+  // 0009: the members/identity RPCs (PostgREST) and the Edge Functions invite-member and
+  // manage-factors (contract 1.7 §2.9, D12). AN027 is 403: the plan's «403 without a step-up hint»
+  // for the last device.
+  AN024: 409,
+  AN025: 409,
+  AN026: 409,
+  AN027: 403,
+  AN028: 409,
+  AN029: 409,
+  AN030: 404,
+  AN031: 409,
 } as const satisfies Record<DomainErrorCode, number>
 
 /** `{ error: { code: 'AN0xx', message: <name> } }` with the status of §2.1. */

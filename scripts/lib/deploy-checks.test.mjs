@@ -8,6 +8,7 @@ import {
   listFiles,
   parseJsonc,
   removeSourceMaps,
+  supportContactProblems,
   workerSupabaseUrl,
   workerTargetProblem,
 } from './deploy-checks.mjs'
@@ -114,5 +115,27 @@ describe('the build output', () => {
       'assets/pro.js points at the local Supabase stack.',
       `No bundle references ${DEV_URL}.`,
     ])
+  })
+})
+
+describe('the Nous support contact of the build (contract 1.7 D19)', () => {
+  it('accepts real-looking values and empty ones', () => {
+    expect(supportContactProblems({ email: 'support@nous.gr', phone: '+302610123456' })).toEqual([])
+    expect(supportContactProblems({ email: '', phone: '' })).toEqual([])
+  })
+
+  it.each([
+    ['support@example.com', '+302100000000'],
+    ['help@nous.example', ''],
+    ['x@shop.test', ''],
+    ['x@y.invalid', ''],
+  ])('refuses the placeholder address %s', (email, phone) => {
+    expect(supportContactProblems({ email, phone })).toEqual([
+      expect.stringContaining('placeholder'),
+    ])
+  })
+
+  it('refuses malformed values', () => {
+    expect(supportContactProblems({ email: 'nous', phone: '2610123456' })).toHaveLength(2)
   })
 })

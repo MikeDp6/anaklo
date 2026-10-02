@@ -462,6 +462,22 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+# Step 1.7 (contract 1.7 §3.2): an owner adds a manager or staff member. Called by the pro app
+# directly with the user's JWT (ADR-0008 §10), never through the /api proxy (no proxy secret).
+# can_manage_members runs AS the user (owner + fresh code) before the service-role client exists.
+[functions.invite-member]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+
+# Step 1.7 (contract 1.7 §3.3): removes one of the caller's own verified authenticator devices,
+# the only way the app does so. Directly with the user's JWT, never through the /api proxy.
+# authorize_factor_change runs AS the user before the service-role client exists.
+[functions.manage-factors]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+
 # TEMPORARY (ADR-0010 §3): unused by the pro app since 1.5; delete with
 # supabase/functions/spike-push in 1.10 (contract 1.5 D17).
 [functions.spike-push]

@@ -1,3 +1,4 @@
+import { StepUpHint } from '@fn-shared/domain.ts'
 import { domainErrorCode, type DomainErrorCode } from '@fn-shared/errors.ts'
 
 /**
@@ -7,7 +8,15 @@ import { domainErrorCode, type DomainErrorCode } from '@fn-shared/errors.ts'
  * - `offline`: the outcome is unknown (no answer, timeout, gateway without a SQLSTATE). A write
  *   may have been saved: the sheet locks and offers only the identical retry (same key).
  * - `domain`: an `AN0xx` code of `_shared/errors.ts`.
- * - `forbidden`: `42501` (not a member, not your appointment).
+ * - `stepUp`: `42501` with the hint `aal2_required` or `fresh_totp_required` (contract 1.7 §6.6):
+ *   a critical action needs a fresh code from the authenticator app. Only `withStepUp` acts on it
+ *   (the code sheet, then exactly one retry); the server alone decides when (rule 13).
+ * - `stepUpCancelled`: the user closed that sheet; thrown by `withStepUp`, never classified from
+ *   a server error. Nothing was done.
+ * - `unauthorized`: HTTP 401 or PostgREST `PGRST301`/`PGRST303`: no valid session. The route
+ *   guards decide again (`decideAuthRoute`).
+ * - `forbidden`: `42501` without a step-up hint (not a member, not your appointment, a role that
+ *   may not do this, or an enrolled owner/manager whose session is not `aal2`).
  * - `overlap`: `23P01`, an exclusion constraint (two intervals of a day, two closures or two time
  *   offs overlap; contract 1.6 §3.6). Screens show their own text.
  * - `invalid`: a CHECK or a shape the database refused (`23514`, `22023`, `22P02`, `22007`,
@@ -19,6 +28,9 @@ import { domainErrorCode, type DomainErrorCode } from '@fn-shared/errors.ts'
 export type RpcFailureInfo =
   | { readonly kind: 'offline' }
   | { readonly kind: 'domain'; readonly code: DomainErrorCode }
+  | { readonly kind: 'stepUp'; readonly hint: StepUpHint }
+  | { readonly kind: 'stepUpCancelled' }
+  | { readonly kind: 'unauthorized' }
   | { readonly kind: 'forbidden' }
   | { readonly kind: 'overlap' }
   | { readonly kind: 'invalid' }
@@ -46,6 +58,8 @@ const NO_ANSWER_NAMES: ReadonlySet<string> = new Set([
 /** Gateways answer these when the database is unreachable; without a SQLSTATE nothing ran. */
 const GATEWAY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504])
 const SQLSTATE = /^[0-9A-Z]{5}$/
+/** PostgREST: the JWT is invalid (`PGRST301`) or expired (`PGRST303`). */
+const NO_SESSION_CODES: ReadonlySet<string> = new Set(['PGRST301', 'PGRST303'])
 /** Exclusion constraint violated (`time_off_no_overlap`, `working_hours_no_overlap`, …). */
 const OVERLAP_SQLSTATE = '23P01'
 /** check_violation, invalid_parameter_value, invalid_text_representation, datetime errors. */
@@ -77,7 +91,14 @@ export function classifyRpcFailure(error: unknown, status?: number): RpcFailureI
   if (domain) return { kind: 'domain', code: domain }
 
   const code = field(error, 'code')
-  if (code === '42501') return { kind: 'forbidden' }
+  if (status === 401 || (typeof code === 'string' && NO_SESSION_CODES.has(code))) {
+    return { kind: 'unauthorized' }
+  }
+  if (code === '42501') {
+    // Only the server's own hint opens the code sheet (contract 1.7 D18, rule 13).
+    const hint = StepUpHint.safeParse(field(error, 'hint'))
+    return hint.success ? { kind: 'stepUp', hint: hint.data } : { kind: 'forbidden' }
+  }
   if (code === OVERLAP_SQLSTATE) return { kind: 'overlap' }
   if (typeof code === 'string' && INVALID_SQLSTATES.has(code)) return { kind: 'invalid' }
 
@@ -108,6 +129,8 @@ export type RpcFailureMessageKey =
   | 'pro:errors.overlap'
   | 'pro:errors.invalid'
   | 'pro:errors.gone'
+  | 'pro:stepUp.failed'
+  | 'pro:stepUp.cancelled'
   | `pro:errors.${ProDomainErrorText}`
   | `common:errors.${DomainErrorCode}`
   | 'common:errors.network'
@@ -128,6 +151,12 @@ export function rpcFailureMessageKey(
       return hasProText(failure.code)
         ? `pro:errors.${failure.code}`
         : `common:errors.${failure.code}`
+    case 'stepUp':
+      // A step-up failure that reached the screen: the retry after the code was refused again.
+      return 'pro:stepUp.failed'
+    case 'stepUpCancelled':
+      return 'pro:stepUp.cancelled'
+    case 'unauthorized':
     case 'forbidden':
       return 'pro:errors.forbidden'
     case 'overlap':

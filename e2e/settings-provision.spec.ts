@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import type { Locator, Page } from '@playwright/test'
 import { formatSummary, type Summary } from '../scripts/lib/provision-apply.mjs'
+import { signInAal2 } from './lib/auth'
 import { expect, test } from './lib/fixtures'
-import { signInWithEmailCode } from './lib/login'
 import { PROVISION_EXAMPLE_FILE, provisionLocal, type E2eShop } from './lib/shops'
 
 // Exit criterion of step 1.6 (contract 1.6 §5.2): «the provisioning JSON and the screens describe
@@ -10,6 +10,8 @@ import { PROVISION_EXAMPLE_FILE, provisionLocal, type E2eShop } from './lib/shop
 // screens show its values, a round of edits made and reverted in the screens leaves the script
 // with «No changes.», and a change made in a screen is the one change the script then writes
 // back. Chromium only (one shop, one sequence). Needs `npm run db:start` + `npm run db:reset`.
+// Since 1.7 the shop's owner signs in at `aal2` through the API (`signInAal2`: enrolled on first
+// use, contract 1.7 §7.4).
 
 test.describe.configure({ mode: 'serial', timeout: 150_000 })
 
@@ -80,7 +82,7 @@ async function setSlotStep(page: Page, step: string): Promise<void> {
 
 test.describe('provisioning JSON ⇄ settings screens', () => {
   test('the screens show every value of the file', async ({ page }) => {
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
 
     // Services, in file order, with their terms; «Χρώμα γενιών» only in the shop.
     await openPage(page, '/app/settings/services', 'Υπηρεσίες')
@@ -164,7 +166,7 @@ test.describe('provisioning JSON ⇄ settings screens', () => {
   test('edits made and reverted in the screens leave the script with «No changes.»', async ({
     page,
   }) => {
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await setHelperSaturdayEnd(page, '15:00')
     await setHelperSaturdayEnd(page, '14:00')
     await setPrice(page, 'Γένια', '7,50')
@@ -191,7 +193,7 @@ test.describe('provisioning JSON ⇄ settings screens', () => {
   })
 
   test('a change made in a screen is the one change the script writes back', async ({ page }) => {
-    await signInWithEmailCode(page, shop.ownerEmail)
+    await signInAal2(page, shop.ownerEmail)
     await setHelperSaturdayEnd(page, '15:00')
 
     const summary: Summary = (await provisionLocal(EXAMPLE)).summary

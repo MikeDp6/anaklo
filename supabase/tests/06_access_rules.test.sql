@@ -131,13 +131,19 @@ select is(
 
 set local request.jwt.claims to '{"sub": "f0000000-0000-4000-8000-00000000000a", "role": "authenticated", "aal": "aal2"}';
 
-select lives_ok(
+select throws_ok(
   $$insert into public.business_members (business_id, user_id, role, staff_id)
     values ('f1000000-0000-4000-8000-00000000000a', 'f0000000-0000-4000-8000-0000000000e1', 'staff', null)$$,
-  'an owner with MFA (aal2) can add a member'
+  '42501', null,
+  'not even an owner at aal2 writes business_members directly; members change through RPCs since 0009'
 );
 
 set local role postgres;
+
+-- The member the owner could add directly until 0009 is inserted as postgres (provisioning path),
+-- so the hand-over checks below run unchanged.
+insert into public.business_members (business_id, user_id, role, staff_id)
+values ('f1000000-0000-4000-8000-00000000000a', 'f0000000-0000-4000-8000-0000000000e1', 'staff', null);
 
 set constraints all immediate;
 

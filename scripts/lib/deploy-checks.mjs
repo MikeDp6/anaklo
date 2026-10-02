@@ -138,3 +138,33 @@ export function buildTargetProblems(dir, devUrl) {
   if (!mentionsDev) problems.push(`No bundle references ${devUrl}.`)
   return problems
 }
+
+/** RFC 2606/6761 names that never receive mail: the synthetic placeholders of `.env.example`. */
+const PLACEHOLDER_EMAIL_DOMAIN = /(^|\.)(example(\.(com|net|org))?|test|invalid|localhost)$/i
+const SUPPORT_EMAIL = /^[^\s@]+@([^\s@]+\.[^\s@]+)$/
+const E164 = /^\+[1-9]\d{6,14}$/
+
+/**
+ * Problems with the Nous contact shown on «Χάσατε τη συσκευή σας;» (contract 1.7 D19), as the
+ * deploy will build it. Empty values are allowed (the screen hides a missing one; deploy-dev warns),
+ * a placeholder or malformed one is not: users would be sent to an address nobody reads.
+ * @param {{ email: string, phone: string }} contact
+ * @returns {string[]}
+ */
+export function supportContactProblems(contact) {
+  /** @type {string[]} */
+  const problems = []
+  if (contact.email) {
+    const domain = SUPPORT_EMAIL.exec(contact.email)?.[1]
+    if (!domain) problems.push(`VITE_SUPPORT_EMAIL is not an email address: "${contact.email}".`)
+    else if (PLACEHOLDER_EMAIL_DOMAIN.test(domain)) {
+      problems.push(
+        `VITE_SUPPORT_EMAIL is a placeholder (${contact.email}); set Nous's real address.`,
+      )
+    }
+  }
+  if (contact.phone && !E164.test(contact.phone)) {
+    problems.push(`VITE_SUPPORT_PHONE must be in E.164 (+30…): "${contact.phone}".`)
+  }
+  return problems
+}

@@ -5,10 +5,10 @@
 -- Written from the plan and the contract only (independent author).
 --   · A row is written only for auth.uid(): no argument names a user.
 --   · The same device registered by another member moves to the caller (moved: true, same id).
---   · remove_member / set_member_role do not exist until 1.7, so the deletion paths are exercised as
---     postgres (DELETE of the membership row, UPDATE of its role) and, while 0001 still lets an owner
---     in aal2 write business_members, through the API. 14_members_identity (1.7) must repeat both
---     through the RPCs, and drop the API case below when the table grant goes (0009).
+--   · The deletion paths are exercised as postgres (DELETE of the membership row, UPDATE of its role)
+--     and, since 0009 (1.7) took the table grant away, through remove_member_impl as an owner with a
+--     fresh code; the direct API delete is now refused (42501). 14_members_identity repeats the
+--     push-deletion checks through set_member_role and remove_member.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
@@ -577,15 +577,29 @@ select is(
       where business_id = 'c7100000-0000-4000-8000-000000000001' and user_id = 'c7000000-0000-4000-8000-000000000007'
       returning user_id::text$$,
     pg_temp.jwt('c7000000-0000-4000-8000-000000000001', 'aal2')),
-  'c7000000-0000-4000-8000-000000000007',
-  'deletion: the owner (aal2) removes a staff member through the API (possible until 0009)'
+  '42501',
+  'deletion: not even the owner (aal2) deletes a membership through the table API since 0009 (members change through RPCs)'
 );
 
+-- The removal goes through remove_member_impl as that owner with a fresh code (the window is set
+-- explicitly; the seed's 10 s must not decide this file). U1 has no factor row, so D2 of 1.7 does
+-- not hide the membership.
+update private.platform_settings set fresh_totp_max_age_seconds = 300 where id;
+
+select set_config('t.rm7', pg_temp.as_role('authenticated',
+    $$select (private.remove_member_impl(p_business_id => 'c7100000-0000-4000-8000-000000000001',
+                                         p_user_id => 'c7000000-0000-4000-8000-000000000007')->>'removed')$$,
+    json_build_object('sub', 'c7000000-0000-4000-8000-000000000001', 'role', 'authenticated', 'aal', 'aal2',
+                      'amr', json_build_array(
+                        json_build_object('method', 'otp', 'timestamp', floor(extract(epoch from now()))::bigint - 120),
+                        json_build_object('method', 'totp', 'timestamp', floor(extract(epoch from now()))::bigint - 60)))::text),
+  true);
+
 select is(
-  concat_ws(' ', pg_temp.rows_of('c7000000-0000-4000-8000-000000000007'),
+  concat_ws(' ', current_setting('t.rm7'), pg_temp.rows_of('c7000000-0000-4000-8000-000000000007'),
             pg_temp.others('c7000000-0000-4000-8000-000000000007') = current_setting('t.o7')),
-  '- t',
-  'deletion: an API delete of the membership deletes the removed user''s devices too (DB-level guarantee)'
+  'true - t',
+  'deletion: remove_member (owner with a fresh code) deletes the removed user''s devices too, nobody else''s (DB-level guarantee)'
 );
 
 select set_config('t.o4', pg_temp.others('c7000000-0000-4000-8000-000000000004'), true);

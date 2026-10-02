@@ -14,6 +14,9 @@
 // Build values (public by design): SUPABASE_DEV_PUBLISHABLE_KEY and, optionally,
 // VITE_ONESIGNAL_APP_ID, from the environment, --env-file or .env.local. The Supabase URL of the
 // build is derived from the dev ref, so .env.local's LOCAL values never reach the dev bundle.
+// The Nous contact of «Χάσατε τη συσκευή σας;» (VITE_SUPPORT_EMAIL, VITE_SUPPORT_PHONE, step 1.7)
+// comes only from the environment or --env-file, never from .env.local (whose values are the
+// synthetic placeholders of .env.example); a placeholder or malformed value stops the deploy.
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import {
@@ -28,7 +31,12 @@ import {
   runTool,
   withToolTokens,
 } from './lib/cli.mjs'
-import { buildTargetProblems, removeSourceMaps, workerTargetProblem } from './lib/deploy-checks.mjs'
+import {
+  buildTargetProblems,
+  removeSourceMaps,
+  supportContactProblems,
+  workerTargetProblem,
+} from './lib/deploy-checks.mjs'
 
 const WRANGLER_CONFIG = 'edge/wrangler.jsonc'
 const DIST = path.join(REPO_ROOT, 'dist')
@@ -88,6 +96,17 @@ function main() {
 
   const toolEnv = withToolTokens(envFile)
   const oneSignalAppId = pick('VITE_ONESIGNAL_APP_ID', [process.env, envFile])
+  const support = {
+    email: pick('VITE_SUPPORT_EMAIL', [process.env, envFile]) ?? '',
+    phone: pick('VITE_SUPPORT_PHONE', [process.env, envFile]) ?? '',
+  }
+  const supportProblems = supportContactProblems(support)
+  if (supportProblems.length > 0) throw new UsageError(supportProblems.join(' '))
+  if (!support.email || !support.phone) {
+    console.warn(
+      'VITE_SUPPORT_EMAIL / VITE_SUPPORT_PHONE not set: «Χάσατε τη συσκευή σας;» hides the missing contact.',
+    )
+  }
   /** @type {NodeJS.ProcessEnv} */
   const buildEnv = {
     ...toolEnv,
@@ -98,6 +117,9 @@ function main() {
     // Always set (empty hides the push test), so a LOCAL OneSignal app id in .env.local never
     // ends up in the dev bundle: OneSignal apps are bound to one origin.
     VITE_ONESIGNAL_APP_ID: oneSignalAppId ?? '',
+    // Always set (empty hides it), so .env.local's placeholders never reach the dev bundle.
+    VITE_SUPPORT_EMAIL: support.email,
+    VITE_SUPPORT_PHONE: support.phone,
   }
 
   const pushArgs = ['db', 'push', '--linked', ...(options.yes ? ['--yes'] : [])]
@@ -108,6 +130,7 @@ function main() {
         `  1. supabase ${pushArgs.join(' ')}`,
         '  2. npm run fn:deploy:dev',
         `  3. npm run build   (VITE_SUPABASE_URL=${devUrl}, dev publishable key)`,
+        `     Nous contact: ${support.email || '(none)'}, ${support.phone || '(none)'}`,
         '  4. delete dist/**/*.map, fail if any remains; check the bundle targets',
         `  5. wrangler deploy --config ${WRANGLER_CONFIG}`,
         'Dry run: nothing was run.',

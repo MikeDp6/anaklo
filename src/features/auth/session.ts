@@ -1,5 +1,5 @@
-import { unregisterPushSubscription } from '@/features/push/api'
-import { optOutPush, retryPendingOptOut } from '@/features/push/oneSignal'
+import { unregisterAllPushSubscriptions, unregisterPushSubscription } from '@/features/push/api'
+import { optOutPush, retryPendingOptOut, SIGN_OUT_PUSH_TIMEOUT_MS } from '@/features/push/oneSignal'
 import {
   getSessionUser,
   sendEmailCode,
@@ -29,18 +29,55 @@ import { deviceStorage } from './storage'
 /**
  * The sign-out while the session still exists (ADR-0009 §19, ADR-0010 §7): this device opts out
  * of push AND its `push_subscriptions` row is unregistered, before Auth forgets the session.
- * (1.7: «all devices», `scope: 'global'`, unregisters every row with `p_all => true` first,
- * contract 1.5 D13.)
+ * «All devices» (`scope: 'global'`, contract 1.7 §6.7, 1.5 D13) first unregisters every row of
+ * the user with `p_all => true` (same bound), then Auth ends every OTHER session, and only when it
+ * confirms does this device sign out as above (`runSignOut`); otherwise `{ ok: false }` and this
+ * device stays signed in.
  */
 export function signOut(options?: SignOutOptions): Promise<SignOutResult> {
   return runSignOut(
     {
       optOutPush: () => optOutPush({ unregister: unregisterPushSubscription }),
+      unregisterAllPush: () =>
+        bounded(unregisterAllPushSubscriptions(), SIGN_OUT_PUSH_TIMEOUT_MS).then(
+          () => undefined,
+          () => undefined,
+        ),
       signOutOfSupabase,
       clearDeviceState,
     },
     options,
   )
+}
+
+/**
+ * The server no longer knows this session (revoked: a role change, «all devices» elsewhere, a
+ * reset by Nous). Nothing can be unregistered with it (the revocation dropped the push rows), so
+ * only this device is cleaned up and the stored session dropped (contract 1.7 §6.2).
+ */
+export async function signOutRevoked(): Promise<void> {
+  await cleanUpDevice()
+  try {
+    await signOutOfSupabase('local')
+  } finally {
+    clearDeviceState()
+  }
+}
+
+function bounded<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(undefined), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timer)
+        reject(error instanceof Error ? error : new Error('failed'))
+      },
+    )
+  })
 }
 
 /**

@@ -106,6 +106,31 @@ describe('useSettingsMutation (rule 14, contract 1.6 §3.5)', () => {
     expect(invalidate).toHaveBeenCalledTimes(1)
   })
 
+  it('unauthorized refreshes like forbidden; the step-up kinds neither lock nor refresh', async () => {
+    // Contract 1.7 §6.6: a closed code sheet or a second refusal wrote nothing.
+    const mutationFn = vi
+      .fn<(variables: Vars) => Promise<string>>()
+      .mockRejectedValueOnce(new RpcFailure({ kind: 'unauthorized' }))
+      .mockRejectedValueOnce(new RpcFailure({ kind: 'stepUpCancelled' }))
+      .mockRejectedValueOnce(new RpcFailure({ kind: 'stepUp', hint: 'fresh_totp_required' }))
+    const { result, invalidate } = setup(mutationFn)
+    act(() => result.current.submit(VARS))
+    await waitFor(() => expect(result.current.failure).toEqual({ kind: 'unauthorized' }))
+    expect(result.current.locked).toBe(false)
+    expect(invalidate).toHaveBeenCalledTimes(1)
+
+    act(() => result.current.submit(VARS))
+    await waitFor(() => expect(result.current.failure).toEqual({ kind: 'stepUpCancelled' }))
+    expect(result.current.locked).toBe(false)
+
+    act(() => result.current.submit(VARS))
+    await waitFor(() =>
+      expect(result.current.failure).toEqual({ kind: 'stepUp', hint: 'fresh_totp_required' }),
+    )
+    expect(result.current.locked).toBe(false)
+    expect(invalidate).toHaveBeenCalledTimes(1)
+  })
+
   it('closing a locked form (`reset`) refetches what the write touches', async () => {
     const mutationFn = vi
       .fn<(variables: Vars) => Promise<string>>()

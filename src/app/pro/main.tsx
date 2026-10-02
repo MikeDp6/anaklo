@@ -9,8 +9,11 @@ import { createQueryClient } from '../shared/queryClient'
 import { mount } from '../shared/mount'
 import { router } from './router'
 
+// A request refused for the session or the role runs the route guards again (contract 1.7 §6.2).
+const queryClient = createQueryClient({ onAuthFailure: () => void router.revalidate() })
+
 await mount(
-  <QueryClientProvider client={createQueryClient()}>
+  <QueryClientProvider client={queryClient}>
     <RouterProvider router={router} />
   </QueryClientProvider>,
   proCatalogues,

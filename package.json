@@ -35,6 +35,7 @@
     "fn:deploy:dev": "node scripts/fn-deploy-dev.mjs",
     "provision:dev": "node scripts/provision-business.mjs",
     "provision:local": "node scripts/provision-business.mjs --local",
+    "mfa-reset": "node scripts/mfa-reset.mjs",
     "deploy:dev": "node scripts/deploy-dev.mjs",
     "secrets:dev": "node scripts/secrets-dev.mjs",
     "gen:types": "node scripts/gen-types.mjs",

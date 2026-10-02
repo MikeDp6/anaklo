@@ -30,6 +30,14 @@
     "AN021": "This appointment changed in the meantime. Check its current state and try again.",
     "AN022": "The time for corrections has passed. Ask the owner to change it.",
     "AN023": "This appointment has not started yet.",
+    "AN024": "This address is not available. Try another one.",
+    "AN025": "There are upcoming appointments. The time zone and the currency change only when there are none.",
+    "AN026": "The business must always have at least one owner.",
+    "AN027": "This is your only device for codes. Add another one first.",
+    "AN028": "Already a member of the business.",
+    "AN029": "This professional already has their own sign-in.",
+    "AN030": "No longer a member of the business.",
+    "AN031": "This email cannot be added from here. Contact Nous.",
     "network": "You are offline. Try again.",
     "unknown": "Something went wrong. Try again."
   }

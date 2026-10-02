@@ -34,6 +34,15 @@ export const DOMAIN_ERRORS = {
   AN021: 'appointment_changed',
   AN022: 'correction_closed',
   AN023: 'not_started',
+  // 0009 (security and members)
+  AN024: 'slug_unavailable',
+  AN025: 'future_appointments',
+  AN026: 'last_owner',
+  AN027: 'last_factor',
+  AN028: 'already_member',
+  AN029: 'staff_has_login',
+  AN030: 'not_a_member',
+  AN031: 'member_elsewhere',
 } as const
 
 export type DomainErrorCode = keyof typeof DOMAIN_ERRORS

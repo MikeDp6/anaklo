@@ -16,6 +16,8 @@ export default defineConfig((configEnv) =>
           'supabase/functions/_shared/**/*.test.ts',
           'edge/**/*.test.ts',
           'scripts/**/*.test.mjs',
+          // Unit tests of the e2e helpers (the TOTP generator); Playwright runs only *.spec.ts.
+          'e2e/lib/**/*.test.ts',
         ],
         setupFiles: ['src/test/setup.ts'],
         env: { TZ: 'UTC' },

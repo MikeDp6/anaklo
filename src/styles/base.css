@@ -12,6 +12,10 @@ html {
 
 body {
   margin: 0;
+  /* The root's clip goes to the viewport, which still lets mobile Chromium widen the layout
+     viewport for content past the edge (e.g. an E14 step entering 28px from the right): the
+     page then pans sideways and fixed elements stretch. The body clips it itself. */
+  overflow-x: clip;
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-ink);

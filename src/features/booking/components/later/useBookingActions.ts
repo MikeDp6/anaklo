@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { BookClient } from '@fn-shared/booking-schemas.ts'
 import { apiErrorCode } from '@/shared/lib/publicApi'
 import { forgetSlots } from '../../api'
@@ -39,7 +39,11 @@ export function useBookingActions({ catalogue, state, dispatch, locale }: Bookin
   const businessId = catalogue.business.id
   const latest = useRef(state)
   const busy = useRef(false)
-  useEffect(() => {
+  // A layout effect, not a passive one: it runs in the same task as the commit, so no input can
+  // arrive between the screen showing the new state (e.g. the code field emptied and editable
+  // after a wrong code) and `once` seeing it. With useEffect, a code typed or autofilled in that
+  // gap was silently dropped (`pending` still 'verify'): 6 digits in the field, no check.
+  useLayoutEffect(() => {
     latest.current = state
   }, [state])
 
