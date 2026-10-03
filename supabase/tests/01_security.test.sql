@@ -9,13 +9,19 @@
 -- client-generated id, otp_challenges.phone_hmac is nullable (the erase wipes it), the guard triggers of
 -- notes and consents, the eight authenticated functions (client_card, set_client_consent, merge_clients,
 -- erase_client and their _impl) and the seven internal functions nobody executes.
+-- 1.9 (0011, contract docs/plans/contracts/1.9-health-detection.md §2.3, §2.8, §5.2, §8 «Review fixes»): the
+-- four private tables (health_jobs, mfa_factor_snapshot, security_events, mfa_factor_accounted) are closed to
+-- every API role, the six service_role functions (health, claim_security_events, record_security_event_result
+-- and their _impl), and the four internal functions nobody executes (detect_factor_changes_impl,
+-- queue_security_notifications, match_add_grants, unvetted_factors; has_fresh_totp is replaced and stays in
+-- the 0009 list). authenticated and anon gain nothing.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(66);
+select plan(71);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -362,6 +368,38 @@ select is(
   'no API role and not PUBLIC holds any table or column privilege on private.factor_change_grants'
 );
 
+-- 0011 (1.9): what health watches, the detector's snapshot of the owner/manager factors, the factors it
+-- accounted for (review fixes) and the security events are private bookkeeping: RLS on, no policy, and no privilege of any kind for any API role or
+-- PUBLIC. Only the definer functions and the cron job read or write them.
+select is(
+  (select count(*) from pg_class c
+   where c.oid = any (array['private.health_jobs', 'private.mfa_factor_snapshot', 'private.security_events',
+                            'private.mfa_factor_accounted']::regclass[])
+     and c.relrowsecurity),
+  4::bigint,
+  'the 0011 tables (private.health_jobs, private.mfa_factor_snapshot, private.security_events, '
+  || 'private.mfa_factor_accounted) have row level security enabled'
+);
+
+select is(
+  (select count(*) from pg_policies p
+   where p.schemaname = 'private'
+     and p.tablename in ('health_jobs', 'mfa_factor_snapshot', 'security_events', 'mfa_factor_accounted')),
+  0::bigint,
+  'the 0011 tables have no RLS policy (no API role reads them directly)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || t.table_name order by r.role_name, t.table_name)
+   from unnest(array['private.health_jobs', 'private.mfa_factor_snapshot', 'private.security_events',
+                     'private.mfa_factor_accounted']) as t (table_name)
+   cross join unnest(array['anon', 'authenticated', 'service_role', 'public']) as r (role_name)
+   where has_table_privilege(r.role_name, t.table_name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      or has_any_column_privilege(r.role_name, t.table_name, 'SELECT,INSERT,UPDATE,REFERENCES')),
+  null::text[],
+  'no API role and not PUBLIC holds any table or column privilege on the 0011 tables'
+);
+
 -- The freshness window (C6) lives in the private settings singleton (0009); 14_members_identity
 -- checks its CHECK and default.
 select has_column('private', 'platform_settings', 'fresh_totp_max_age_seconds',
@@ -527,7 +565,32 @@ select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'private') and has_function_privilege('authenticated', p.oid, 'execute')),
   72::bigint,
-  'authenticated may execute exactly 72 functions in public/private (64 until 0009, eight more in 0010)'
+  'authenticated may execute exactly 72 functions in public/private (64 until 0009, eight more in 0010, none in 0011)'
+);
+
+-- 1.9 (0011): the detector (pg_cron runs it as postgres), the notification helper (called only by
+-- record_security_event_result_impl) and the add-grant rule and vetted-factor helper of the review fixes
+-- (called only by definer code) are granted to nobody. All must exist, so the check is not vacuous.
+select is(
+  (select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private'
+     and p.proname = any (array['detect_factor_changes_impl', 'queue_security_notifications', 'match_add_grants',
+                                'unvetted_factors'])),
+  4::bigint,
+  'the 0011 internal functions exist (detect_factor_changes_impl, queue_security_notifications, match_add_grants, '
+  || 'unvetted_factors)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || p.proname order by r.role_name, p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   cross join unnest(array['anon', 'authenticated', 'service_role']) as r (role_name)
+   where n.nspname = 'private'
+     and p.proname = any (array['detect_factor_changes_impl', 'queue_security_notifications', 'match_add_grants',
+                                'unvetted_factors'])
+     and has_function_privilege(r.role_name, p.oid, 'execute')),
+  null::text[],
+  'no API role may execute the 0011 internal functions (the detector runs only from pg_cron, as postgres)'
 );
 
 -- 1.8 (0010): the family helpers, the consent rule, the booking box, the merge core (Phase 3 importer)
@@ -643,35 +706,40 @@ select is(
   array[
     'private.add_member_impl',
     'private.available_slots_impl', 'private.book_appointment_impl', 'private.claim_due_messages_impl',
-    'private.claim_messages_impl',
-    'private.clients_for_phone_impl', 'private.has_role', 'private.is_member', 'private.is_reserved_slug',
+    'private.claim_messages_impl', 'private.claim_security_events_impl',
+    'private.clients_for_phone_impl', 'private.has_role', 'private.health_impl', 'private.is_member',
+    'private.is_reserved_slug',
     'private.is_valid_timezone', 'private.manage_cancel_impl', 'private.manage_reschedule_impl',
     'private.manage_slots_impl', 'private.manage_view_impl', 'private.my_business_ids',
     'private.my_business_ids_with_role', 'private.my_staff_id', 'private.my_staff_ids', 'private.otp_start_impl',
     'private.otp_verify_impl', 'private.public_booking_catalogue_impl', 'private.public_business_profile_impl',
     'private.public_slug_for_code_impl', 'private.record_delivery_report_impl', 'private.record_dispatch_run_impl',
+    'private.record_security_event_result_impl',
     'private.record_send_result_impl', 'private.record_support_action_impl', 'private.revoke_user_sessions_impl',
     'private.trusted_device_revoke_impl', 'private.user_id_for_email_impl',
     'public.add_member',
     'public.available_slots', 'public.book_appointment', 'public.claim_due_messages', 'public.claim_messages',
-    'public.clients_for_phone',
+    'public.claim_security_events',
+    'public.clients_for_phone', 'public.health',
     'public.manage_cancel', 'public.manage_reschedule', 'public.manage_slots', 'public.manage_view',
     'public.otp_start', 'public.otp_verify', 'public.public_booking_catalogue', 'public.public_business_profile',
     'public.public_slug_for_code', 'public.record_delivery_report', 'public.record_dispatch_run',
+    'public.record_security_event_result',
     'public.record_send_result', 'public.record_support_action', 'public.revoke_user_sessions',
     'public.trusted_device_revoke', 'public.user_id_for_email'
   ]::text[],
   'service_role may execute only the helpers and RPCs granted to it (0007: claim_due_messages, '
   || 'record_delivery_report, record_dispatch_run and their _impl; none of the push subscription RPCs; 0009: '
   || 'add_member, record_support_action, revoke_user_sessions, user_id_for_email and their _impl, none of the '
-  || 'member RPCs of authenticated)'
+  || 'member RPCs of authenticated; 0011: health, claim_security_events, record_security_event_result and their '
+  || '_impl, never the detector)'
 );
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'private') and has_function_privilege('service_role', p.oid, 'execute')),
-  52::bigint,
-  'service_role may execute exactly 52 functions in public/private (44 until 0008, eight more in 0009)'
+  58::bigint,
+  'service_role may execute exactly 58 functions in public/private (52 until 0010, six more in 0011)'
 );
 
 -- p_now exists only on private _impl functions, for tests. Every exposed wrapper passes now().

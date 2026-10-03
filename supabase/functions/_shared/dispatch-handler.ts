@@ -2,6 +2,7 @@ import { z } from 'zod/mini'
 import type { LogValue } from './booking-rpc.ts'
 import type { DispatchRuntime, DispatchServices } from './dispatch-runtime.ts'
 import { constantTimeEqual, errorResponse, json, parseJsonBody, requireMethod } from './http.ts'
+import { handleSecurityEvents, type SecuritySummary } from './security-handler.ts'
 import { sendClaimed, type SentOutcome } from './send.ts'
 
 /**
@@ -18,6 +19,12 @@ import { sendClaimed, type SentOutcome } from './send.ts'
  *
  * The answer and the logs carry counts, ids, templates and codes only: never phones, tokens,
  * subscription ids or names.
+ *
+ * 1.9 (contract 1.9 §3.2): every run starts with the SECURITY PHASE (`security-handler.ts`): the
+ * authenticator-device changes the detector found without a grant are contained (an added factor
+ * deleted, every session revoked) and notified (emails, and the owners' push queued in
+ * `messages_log`, which the message rounds of the same run then send). The detector nudges with
+ * `{ source: 'security' }`; the sweep's nudge every 5′ is the fallback.
  */
 
 /** The header pg_net sends with Vault `dispatch_secret`. */
@@ -26,7 +33,7 @@ export const DISPATCH_SECRET_HEADER = 'x-anaklo-dispatch-secret'
 /** `{ source }` is all the body carries. */
 export const DISPATCH_MAX_BODY_BYTES = 1024
 
-export const DISPATCH_SOURCES = ['nudge', 'sweep', 'test'] as const
+export const DISPATCH_SOURCES = ['nudge', 'sweep', 'test', 'security'] as const
 export const DispatchRequest = z.strictObject({ source: z.enum(DISPATCH_SOURCES) })
 export type DispatchRequest = z.infer<typeof DispatchRequest>
 
@@ -45,6 +52,8 @@ export type DispatchSummary = {
   failed: number
   rejected: number
   unknown: number
+  /** 1.9: the security phase, counts only. */
+  security: SecuritySummary
 }
 
 export type DispatchDeps = {
@@ -63,6 +72,11 @@ async function run(
 ): Promise<{ summary: DispatchSummary; ok: boolean; error: string | null }> {
   const { rpc } = services
   const started = now()
+
+  // 1.9: the security phase first (≤ 15 s), so the owners' push it queues goes out in the
+  // message rounds below.
+  const security = await handleSecurityEvents(services, log, now)
+
   const summary: DispatchSummary = {
     rounds: 0,
     claimed: 0,
@@ -70,9 +84,10 @@ async function run(
     failed: 0,
     rejected: 0,
     unknown: 0,
+    security: security.summary,
   }
-  let ok = true
-  let error: string | null = null
+  let ok = security.ok
+  let error: string | null = security.error
 
   while (summary.rounds < DISPATCH_MAX_ROUNDS && now() - started < DISPATCH_TIME_BUDGET_MS) {
     let claimed: z.infer<typeof ClaimDueResult>
@@ -80,21 +95,21 @@ async function run(
       const result = await rpc('claim_due_messages', { p_limit: DISPATCH_BATCH_SIZE })
       if (result.error !== null) {
         ok = false
-        error = result.error.code ?? 'claim_failed'
+        error ??= result.error.code ?? 'claim_failed'
         log('dispatch_claim_failed', { sqlstate: result.error.code ?? null })
         break
       }
       const parsed = ClaimDueResult.safeParse(result.data)
       if (!parsed.success) {
         ok = false
-        error = 'invalid_claim'
+        error ??= 'invalid_claim'
         log('dispatch_claim_failed', { sqlstate: null, reason: 'invalid_result' })
         break
       }
       claimed = parsed.data
     } catch {
       ok = false
-      error = 'claim_exception'
+      error ??= 'claim_exception'
       log('dispatch_claim_failed', { sqlstate: null, reason: 'exception' })
       break
     }
@@ -105,12 +120,13 @@ async function run(
     if (!claimed.more) break
   }
 
-  // The heartbeat of 1.9's health check: one row per run, even when nothing was due.
+  // The heartbeat of 1.9's health check: one row per run, even when nothing was due. ok only
+  // when both phases were; rows = messages sent + security events notified.
   try {
     const recorded = await rpc('record_dispatch_run', {
       p_started_at: new Date(started).toISOString(),
       p_ok: ok,
-      p_rows: summary.sent,
+      p_rows: summary.sent + summary.security.notified,
       p_error: error,
     })
     if (recorded.error !== null) {
@@ -147,9 +163,14 @@ export async function handleDispatch(
     runtime.log('unhandled_error', { source: body.data.source })
     return errorResponse('internal', 'Internal error.', 500)
   }
+  const { security, ...messages } = result.summary
   const fields: Record<string, LogValue> = {
     source: body.data.source,
-    ...result.summary,
+    ...messages,
+    security_claimed: security.claimed,
+    security_contained: security.contained,
+    security_notified: security.notified,
+    security_failed: security.failed,
     ok: result.ok,
     error: result.error,
   }

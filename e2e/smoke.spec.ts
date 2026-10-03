@@ -49,11 +49,29 @@ test('the booking page does not offer the pro app manifest', async ({ page }) =>
 
 // Exit criterion of step 1.1 (ADR-0008 §3): the Edge Functions answer only through the proxy,
 // which adds the shared secret. In CI this also proves PROXY_SECRET reached the edge runtime.
+// Since 1.9 (contract §3.1, §5.5-C): the six checks of public.health(), none stale (the jobs ran
+// or are still within their threshold since the migration started watching them).
 test('health answers through /api and refuses direct calls', async ({ request }) => {
   const viaProxy = await request.get('/api/functions/v1/health')
-  expect(viaProxy.status()).toBe(200)
+  const body = (await viaProxy.json()) as {
+    ok: boolean
+    checks: Array<{ name: string; age_seconds: number | null; stale: boolean }>
+  }
+  expect(viaProxy.status(), JSON.stringify(body)).toBe(200)
   expect(viaProxy.headers()['cache-control']).toBe('no-store')
-  expect(await viaProxy.json()).toMatchObject({ ok: true })
+  expect(body.ok).toBe(true)
+  expect(body.checks.map((check) => check.name)).toEqual([
+    'auto_complete',
+    'detect_factor_changes',
+    'dispatch',
+    'dispatch_sweep',
+    'purge',
+    'security_events',
+  ])
+  expect(body.checks.filter((check) => check.stale)).toEqual([])
+  for (const check of body.checks) {
+    expect(Object.keys(check).sort()).toEqual(['age_seconds', 'max_age_seconds', 'name', 'stale'])
+  }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
   const direct = await request.get(`${supabaseUrl}/functions/v1/health`)

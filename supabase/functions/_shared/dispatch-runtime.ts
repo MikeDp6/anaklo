@@ -1,16 +1,21 @@
 import { configValue, parseAnakloEnv, parseBookingConfig } from './booking-config.ts'
 import type { Log, Rpc } from './booking-rpc.ts'
 import { buildSenders, parsePushConfigOf, type SenderDeps } from './booking-runtime.ts'
+import { EMAIL_CONFIG_VARIABLES, parseEmailConfig } from './email-config.ts'
+import { createEmailProvider, type EmailProvider } from './email-provider.ts'
+import type { FactorsAdminPort } from './member-functions.ts'
 import { PUSH_CONFIG_VARIABLES } from './push-config.ts'
 import type { PushProvider } from './push-provider.ts'
 import type { SendConfig } from './send.ts'
 import type { SmsProvider } from './sms-provider.ts'
 
 /**
- * What `dispatch` builds once at start-up from its environment (contract 1.5 §3.1, §3.5). Pure:
- * `dispatch/index.ts` reads `DISPATCH_ENV_NAMES` from `Deno.env`, passes a factory for the
- * service-role `Rpc`, and serves every request with the result. An invalid configuration is
- * never partly used: every request answers 500 `not_configured`.
+ * What `dispatch` builds once at start-up from its environment (contract 1.5 §3.1, §3.5; 1.9
+ * §3.3). Pure: `dispatch/index.ts` reads `DISPATCH_ENV_NAMES` from `Deno.env`, passes factories
+ * for the service-role `Rpc` and the Auth admin port, and serves every request with the result.
+ * An invalid configuration is never partly used: every request answers 500 `not_configured`
+ * (since 1.9 also without a valid email configuration: no security event is ever contained
+ * without its emails).
  *
  * The OTP test variables of `public-booking` are not read: `dispatch` never claims OTP.
  */
@@ -26,6 +31,8 @@ export const DISPATCH_ENV_NAMES = [
   'SMS_PROVIDER',
   'SMS_ALLOWED_RECIPIENTS',
   ...PUSH_CONFIG_VARIABLES,
+  // 1.9: the security emails (contract 1.9 §3.6).
+  ...EMAIL_CONFIG_VARIABLES,
 ] as const
 export type DispatchEnvName = (typeof DISPATCH_ENV_NAMES)[number]
 export type DispatchEnv = Partial<Record<DispatchEnvName, string | undefined>>
@@ -44,6 +51,18 @@ export type DispatchServices = {
   readonly provider: SmsProvider
   readonly pushProvider: PushProvider
   readonly config: SendConfig
+  /** 1.9: the security emails (`email-provider.ts`). */
+  readonly emailProvider: EmailProvider
+  /** 1.9: `auth.admin.mfa.deleteFactor` of the same service-role client. */
+  readonly factors: FactorsAdminPort
+  /** 1.9: the Nous address of the security emails (`SUPPORT_EMAIL`). */
+  readonly supportEmail: string
+}
+
+/** What `dispatch` passes in besides its environment. */
+export type DispatchRuntimeDeps = SenderDeps & {
+  /** The Auth admin port over the service-role client (`factorsAdminPort`). */
+  readonly createFactors: (supabaseUrl: string, serviceRoleKey: string) => FactorsAdminPort
 }
 
 export type DispatchRuntime = {
@@ -53,7 +72,7 @@ export type DispatchRuntime = {
   readonly log: Log
 }
 
-export function buildDispatchRuntime(env: DispatchEnv, deps: SenderDeps): DispatchRuntime {
+export function buildDispatchRuntime(env: DispatchEnv, deps: DispatchRuntimeDeps): DispatchRuntime {
   const problems: string[] = []
 
   const supabaseUrl = configValue(env.SUPABASE_URL)
@@ -80,6 +99,9 @@ export function buildDispatchRuntime(env: DispatchEnv, deps: SenderDeps): Dispat
   if (!booking.ok) problems.push(...booking.problems)
   const push = parsePushConfigOf(env)
   if (!push.ok) problems.push(...push.problems)
+  const anakloEnv = parseAnakloEnv(env.ANAKLO_ENV)
+  const email = parseEmailConfig(env, anakloEnv)
+  if (!email.ok) problems.push(...email.problems)
 
   const notConfigured = (found: string[]): DispatchRuntime => {
     // Names and rules only: no value is ever logged.
@@ -90,6 +112,7 @@ export function buildDispatchRuntime(env: DispatchEnv, deps: SenderDeps): Dispat
     problems.length > 0 ||
     !booking.ok ||
     !push.ok ||
+    !email.ok ||
     supabaseUrl === null ||
     serviceRoleKey === null ||
     secret === null
@@ -100,12 +123,27 @@ export function buildDispatchRuntime(env: DispatchEnv, deps: SenderDeps): Dispat
   const senders = buildSenders(booking.config, push.config, deps)
   if (!senders.ok) return notConfigured(senders.problems)
 
+  let emailProvider: EmailProvider
+  try {
+    emailProvider = createEmailProvider({
+      env: anakloEnv,
+      provider: email.config.provider,
+      ...(deps.emailLog === undefined ? {} : { log: deps.emailLog }),
+      ...(deps.emailRecord === undefined ? {} : { record: deps.emailRecord }),
+    })
+  } catch {
+    return notConfigured(['EMAIL_PROVIDER: refused for this ANAKLO_ENV'])
+  }
+
   return {
     secret,
     services: {
       rpc: deps.createRpc(supabaseUrl, serviceRoleKey),
       ...senders.senders,
       config: booking.config,
+      emailProvider,
+      factors: deps.createFactors(supabaseUrl, serviceRoleKey),
+      supportEmail: email.config.supportEmail,
     },
     log: deps.log,
   }

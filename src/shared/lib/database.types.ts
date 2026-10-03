@@ -644,6 +644,9 @@ isOneToOne: false
 "claim_messages":
 { Args: { "p_ids": (string)[] }; Returns: Json
                            },
+"claim_security_events":
+{ Args: { "p_limit": number }; Returns: Json
+                           },
 "client_card":
 { Args: { "p_business_id": string,"p_client_id": string }; Returns: Json
                            },
@@ -652,6 +655,9 @@ isOneToOne: false
                            },
 "erase_client":
 { Args: { "p_business_id": string,"p_client_id": string }; Returns: Json
+                           },
+"health":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "list_members":
 { Args: { "p_business_id": string }; Returns: {
@@ -708,6 +714,9 @@ isOneToOne: false
                            },
 "record_dispatch_run":
 { Args: { "p_error": string,"p_ok": boolean,"p_rows": number,"p_started_at": string }; Returns: number
+                           },
+"record_security_event_result":
+{ Args: { "p_emails_failed"?: number,"p_emails_sent"?: number,"p_error"?: string,"p_id": string,"p_lease_id": string,"p_outcome": string }; Returns: Json
                            },
 "record_send_result":
 { Args: { "p_cost_cents": number,"p_error": string,"p_id": string,"p_lease_id": string,"p_outcome": string,"p_provider": string,"p_provider_message_id": string,"p_segments": number }; Returns: boolean

@@ -115,6 +115,8 @@ export const ClaimedPush = z.object({
   timezone: z.nullable(z.string()),
   starts_at: z.nullable(Instant),
   staff_name: z.nullable(z.string()),
+  /** The business of the row; `push_security_alert` (1.9) names it, the others do not. */
+  business_name: z.nullable(z.string()),
   /** First word of the client's name (null: none or erased). Never the surname or the phone. */
   client_first_name: z.nullable(z.string()),
   service_name: z.nullable(z.string()),
@@ -190,6 +192,9 @@ export function pushVariables(item: ClaimedPush, locale: PushLocale): Record<str
   if (item.staff_name !== null && item.staff_name.trim() !== '') {
     vars.staff = capPushValue(item.staff_name, PUSH_VARIABLE_LIMITS.staff)
   }
+  if (item.business_name !== null && item.business_name.trim() !== '') {
+    vars.business = capPushValue(item.business_name, PUSH_VARIABLE_LIMITS.business)
+  }
   if (item.starts_at !== null) {
     if (item.timezone === null) throw new Error('A push about an appointment needs its time zone')
     const instant = new Date(item.starts_at)
@@ -199,12 +204,16 @@ export function pushVariables(item: ClaimedPush, locale: PushLocale): Record<str
   return vars
 }
 
+/** Where the security alert opens (1.9): Ρυθμίσεις → Μέλη of the pro app. */
+export const SECURITY_ALERT_PATH = 'settings/members'
+
 /**
- * Where the tap opens: the pro app's day of the appointment (business-local date), or `/app/`
- * for the test push.
+ * Where the tap opens: the pro app's day of the appointment (business-local date), `/app/` for
+ * the test push, Ρυθμίσεις → Μέλη for the security alert (contract 1.9 §3.5).
  */
 export function pushUrl(siteHost: string, item: ClaimedPush): string {
   const base = appUrl(siteHost)
+  if (item.template === 'push_security_alert') return `${base}${SECURITY_ALERT_PATH}`
   if (item.template === 'push_test' || item.starts_at === null || item.timezone === null) {
     return base
   }

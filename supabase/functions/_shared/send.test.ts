@@ -641,6 +641,74 @@ describe('sendMessages: push (contract 1.5 §3.2)', () => {
   })
 })
 
+describe('sendMessages: the security alert (contract 1.9 §3.5)', () => {
+  /** A `push_security_alert` row as claim_core returns it: no appointment, the owner's devices. */
+  function alertItem(overrides: Partial<ClaimedPush> & Record<string, unknown> = {}) {
+    return pushItem({
+      template: 'push_security_alert',
+      starts_at: null,
+      staff_name: null,
+      client_first_name: null,
+      service_name: null,
+      ...overrides,
+    })
+  }
+
+  it('names the business only, opens Settings → Members, to the item devices only', async () => {
+    const db = fakeRpc([alertItem()])
+    const push = fakePush()
+    const outcomes = await sendMessages({
+      ...options(db, fakeProvider().provider, { ids: [PUSH_ID] }),
+      pushProvider: push.pushProvider,
+    })
+    expect(outcomes[PUSH_ID]).toBe('sent')
+    expect(push.payloads).toHaveLength(1)
+    const payload = push.payloads[0]
+    expect(payload?.include_subscription_ids).toEqual([DEVICE])
+    expect(payload?.headings).toEqual({ el: 'Ειδοποίηση ασφαλείας', en: 'Security alert' })
+    expect(payload?.contents.el).toBe(
+      'Κουρείο Demo: μια συσκευή κωδικών άλλαξε χωρίς έγκριση. Δες το email σου.',
+    )
+    expect(payload?.contents.en).toBe(
+      'Κουρείο Demo: an authenticator device changed without approval. Check your email.',
+    )
+    expect(payload?.url).toBe('http://localhost:5173/app/settings/members')
+    expect(Object.keys(payload ?? {}).sort()).toEqual([
+      'app_id',
+      'contents',
+      'headings',
+      'include_subscription_ids',
+      'target_channel',
+      'url',
+    ])
+  })
+
+  it('caps a long business name to 32 characters', () => {
+    const long = 'Κομμωτήριο Ομορφιάς και Περιποίησης Αγία Παρασκευή'
+    const vars = pushVariables(alertItem({ business_name: long }), 'el')
+    expect(Array.from(vars.business ?? '')).toHaveLength(32)
+    expect(vars.business?.endsWith('…')).toBe(true)
+  })
+
+  it('opens https on a public host', () => {
+    expect(pushUrl('dev.anaklo.gr', alertItem())).toBe('https://dev.anaklo.gr/app/settings/members')
+  })
+
+  it('fails to render (and sends nothing) without the business name', async () => {
+    for (const name of [null, '  ']) {
+      const db = fakeRpc([alertItem({ business_name: name })])
+      const push = scriptedPush({ ok: true, providerMessageId: 'x' })
+      const outcomes = await sendMessages({
+        ...options(db, fakeProvider().provider, { ids: [PUSH_ID] }),
+        pushProvider: push.pushProvider,
+      })
+      expect(outcomes[PUSH_ID]).toBe('failed')
+      expect(push.requests).toEqual([])
+      expect(db.records()[0]).toMatchObject({ p_outcome: 'failed', p_error: 'render_error' })
+    }
+  })
+})
+
 describe('sendClaimed (the dispatcher path)', () => {
   it('sends SMS and push items of one batch and returns every outcome', async () => {
     const db = fakeRpc([])

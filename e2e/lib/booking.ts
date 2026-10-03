@@ -165,12 +165,19 @@ export async function enterCode(page: Page, code = OTP_TEST_CODE): Promise<void>
 /**
  * After the proof: books at once when the phone has no clients, otherwise the visitor confirms
  * the preselected choice (the first name typed). Ends on the confirmation.
+ *
+ * The «Κλείνεις ως» step shows in both cases: with nobody to choose it books by itself and its
+ * button only shows the progress («Κλείνουμε το ραντεβού…»). So the button is pressed only when
+ * the step offers a choice (the group of first names), never because the heading is on screen:
+ * a slow automatic booking would otherwise leave the test waiting for a button that never comes.
  */
 export async function finishBooking(page: Page): Promise<void> {
   const confirmed = page.getByRole('heading', { name: TEXT.bookedTitle })
   const choice = page.getByRole('heading', { name: TEXT.bookAs })
   await expect(confirmed.or(choice)).toBeVisible()
-  if (await choice.isVisible()) await page.getByRole('button', { name: TEXT.bookCta }).click()
+  if (await page.getByRole('group', { name: TEXT.bookAs }).isVisible()) {
+    await page.getByRole('button', { name: TEXT.bookCta }).click()
+  }
   await expect(confirmed).toBeVisible()
 }
 

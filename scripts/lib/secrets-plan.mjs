@@ -53,6 +53,15 @@ const dispatchSecretCheck = (value, context) => {
   return null
 }
 
+/** One plain address (1.9 SUPPORT_EMAIL): no spaces, quotes or a second `@`. */
+const EMAIL_ADDRESS = /^[^\s@'"]+@[^\s@'"]+\.[^\s@'"]+$/
+
+/** The synthetic placeholder of `.env.example` and CI: never a remote value. */
+const PLACEHOLDER_EMAIL_DOMAIN = '@example.com'
+
+/** Email senders `dispatch` accepts (contract 1.9 §3.3): `fake` until 1.10 adds `resend`. */
+export const EMAIL_PROVIDERS = ['fake']
+
 /** The only URL pg_net may call on dev: that project's own `dispatch` (contract 1.5 §3.5). */
 export function dispatchUrlFor(/** @type {string} */ projectRef) {
   return `https://${projectRef}.supabase.co/functions/v1/dispatch`
@@ -115,6 +124,32 @@ export const SECRETS = [
     targets: ['functions'],
     required: true,
     check: dispatchSecretCheck,
+  },
+  {
+    // The sender of the security emails of `dispatch` (contract 1.9 §3.3, §3.6). `fake` until the
+    // Resend sender of 1.10 exists (dev runs with ANAKLO_ENV=dev, which accepts it); without it
+    // dispatch answers 500 not_configured (fail closed).
+    name: 'EMAIL_PROVIDER',
+    from: ['EMAIL_PROVIDER'],
+    targets: ['functions'],
+    required: true,
+    check: (value) =>
+      EMAIL_PROVIDERS.includes(value) ? null : `must be ${EMAIL_PROVIDERS.join(' or ')}`,
+  },
+  {
+    // The Nous address the security emails name (contract 1.9 §3.4); the same as
+    // VITE_SUPPORT_EMAIL. Never the placeholder of .env.example.
+    name: 'SUPPORT_EMAIL',
+    from: ['SUPPORT_EMAIL'],
+    targets: ['functions'],
+    required: true,
+    check: (value) => {
+      if (!EMAIL_ADDRESS.test(value)) return 'must be one email address'
+      if (value.toLowerCase().endsWith(PLACEHOLDER_EMAIL_DOMAIN)) {
+        return 'is the @example.com placeholder; use the real Nous address'
+      }
+      return null
+    },
   },
   {
     // spike-push (ADR-0010 §3), later dispatch. Optional until the push test; the app id and the

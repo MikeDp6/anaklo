@@ -92,6 +92,9 @@ describe('ClientCardPage (contract 1.8 §4.3)', () => {
     expect(document.querySelectorAll('.skeleton').length).toBeGreaterThan(3)
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
 
+    // The skeleton can show before the card query has called the API (membership first); answer
+    // only once the pending call exists, or the answer goes nowhere and the card never comes.
+    await waitFor(() => expect(api.fetchClientCard).toHaveBeenCalled())
     answer(toClientCard(liveCardJson()))
     expect(await screen.findByRole('heading', { level: 1, name: 'Γιώργος Π.' })).toBeVisible()
     expect(document.querySelectorAll('.skeleton')).toHaveLength(0)

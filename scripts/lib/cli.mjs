@@ -202,12 +202,12 @@ export function runNpmScript(script, env) {
 }
 
 /**
- * Local stack address and keys, from `supabase status` (the stack must be running). Used by
- * `provision:local` and the database integration tests (`npm run test:race`).
- * @returns {{ apiUrl: string, publishableKey: string, secretKey: string }}
+ * The address and keys in one `supabase status -o json` answer, or null when the answer is not
+ * usable (the command failed, or a field is missing). Throws when the API URL is not local.
+ * @param {{ status: number | null, stdout?: string | null }} result
+ * @returns {{ apiUrl: string, publishableKey: string, secretKey: string } | null}
  */
-export function localSupabase() {
-  const result = runTool('supabase', ['status', '-o', 'json'], { capture: true })
+export function parseLocalStatus(result) {
   const stdout = result.stdout ?? ''
   const json = stdout.slice(stdout.indexOf('{'), stdout.lastIndexOf('}') + 1)
   /** @type {Record<string, unknown>} */
@@ -220,14 +220,39 @@ export function localSupabase() {
   const apiUrl = typeof status.API_URL === 'string' ? status.API_URL : ''
   const publishableKey = typeof status.PUBLISHABLE_KEY === 'string' ? status.PUBLISHABLE_KEY : ''
   const secretKey = typeof status.SECRET_KEY === 'string' ? status.SECRET_KEY : ''
-  if (result.status !== 0 || !apiUrl || !publishableKey || !secretKey) {
-    throw new Error('Could not read the local stack from `supabase status`. Run: npm run db:start')
-  }
+  if (result.status !== 0 || !apiUrl || !publishableKey || !secretKey) return null
   const host = new URL(apiUrl).hostname
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
     throw new Error(`supabase status reports a non-local API URL (${apiUrl}); refusing.`)
   }
   return { apiUrl, publishableKey, secretKey }
+}
+
+/** @param {number} ms */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * Local stack address and keys, from `supabase status` (the stack must be running). Used by
+ * `provision:local` and the database integration tests (`npm run test:race`). Under load (many
+ * Playwright workers asking at once, Docker on Windows) one `supabase status` sometimes fails
+ * although the stack is up, so a failed read is retried twice before giving up.
+ * @param {{ run?: () => { status: number | null, stdout?: string | null }, sleep?: (ms: number) => void }} [deps]
+ * @returns {{ apiUrl: string, publishableKey: string, secretKey: string }}
+ */
+export function localSupabase(deps = {}) {
+  const run = deps.run ?? (() => runTool('supabase', ['status', '-o', 'json'], { capture: true }))
+  const sleep = deps.sleep ?? sleepSync
+  const backoffMs = [500, 2000]
+  for (let attempt = 0; ; attempt += 1) {
+    const stack = parseLocalStatus(run())
+    if (stack) return stack
+    const wait = backoffMs[attempt]
+    if (wait === undefined) break
+    sleep(wait)
+  }
+  throw new Error('Could not read the local stack from `supabase status`. Run: npm run db:start')
 }
 
 /**

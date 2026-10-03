@@ -37,6 +37,7 @@ SUPABASE_DEV_PUBLISHABLE_KEY), PUSH_PROVIDER (functions: fake | onesignal), DISP
 (functions, and Vault dispatch_secret with the same value), DISPATCH_URL (Vault dispatch_url:
 exactly https://<dev ref>.supabase.co/functions/v1/dispatch), when present
 ONESIGNAL_APP_ID + ONESIGNAL_REST_API_KEY (functions; required with PUSH_PROVIDER=onesignal),
+EMAIL_PROVIDER (functions: fake until 1.10) + SUPPORT_EMAIL (functions: the real Nous address),
 and OTP_HMAC_KEY + PHONE_HMAC_KEY (Vault: otp_hmac_key, phone_hmac_key). Vault needs
 supabase link to the dev project. CLI tokens in the file
 (SUPABASE_ACCESS_TOKEN, CLOUDFLARE_API_TOKEN, …) are passed to the CLIs only. Values are never

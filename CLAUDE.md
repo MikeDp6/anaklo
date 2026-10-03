@@ -24,7 +24,7 @@ Booking → Memory → Retention. Πρώτος κλάδος: **κουρεία**.
 - Σύνδεση προσωπικού (ADR-0009): κωδικός email 6 ψηφίων, signup κλειστό. Owner/manager: κωδικός email + εφαρμογή κωδικών (TOTP, από το 1.7) σε κάθε νέα σύνδεση, υποχρεωτική πρόταση 2ης συσκευής, επαναφορά μόνο από τη Nous (runbook `mfa-reset.md`), συνεδρία λήγει μετά από 30 ημέρες αδράνειας («Inactivity timeout» 720h στο prod και φύλακας στην εφαρμογή, γιατί το Free δεν το έχει)· staff μόνο κωδικός email, ποτέ TOTP· στο UI ποτέ «TOTP/MFA/2FA» (Vitest στις τιμές i18n).
 - Συνεδρίες και ρόλοι (ADR-0009): αποσύνδεση `signOut({ scope: 'local' })` + `OneSignal.User.PushSubscription.optOut()` (κοινά κινητά· από το 1.5 και `unregister_push_subscription`)· «Αποσύνδεση από όλες τις συσκευές» (`global`) στις Ρυθμίσεις → Ασφάλεια. Ο ρόλος διαβάζεται πάντα από το `business_members`, ποτέ από το JWT. `set_member_role`/`remove_member` (owner με φρέσκο κωδικό, `audit_log`) ανακαλούν τις συνεδρίες του χρήστη στην ίδια συναλλαγή· όταν ο υψηλότερος ρόλος του πέφτει σε staff ή σε κανέναν, σβήνουν και τους παράγοντές του. Αυτές οι συνέπειες ζουν στο trigger `business_members_access_changed` (0009), που ισχύει και για το provisioning· ποτέ κώδικας που το παρακάμπτει. Owner/manager με επαληθευμένο παράγοντα μετρούν στο RLS και στις RPCs μόνο σε `aal2` (`private.session_mfa_ok()` στις βοηθητικές functions συμμετοχής, D2 του contract 1.7). Ο έλεγχος φρέσκου κωδικού γίνεται μόνο μέσα στο `_impl` (`42501`, hint `aal2_required` ή `fresh_totp_required`)· μόνο αυτά τα δύο hints ανοίγουν το `StepUpSheet` (μία επανάληψη της κλήσης). Συσκευές κωδικών: αφαίρεση μόνο μέσω Edge Function `manage-factors`, προσθήκη μόνο μετά από `authorize_factor_change`· ποτέ `mfa.unenroll` για επαληθευμένο παράγοντα.
 - **Χωρίς Realtime στη Φάση 1:** refetch on focus και κάθε 60″, μαζί με push.
-- Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.10). **Τοπικά πρώτα:** μέχρι το 1.10 μόνο localhost, με ψεύτικο adapter SMS και δοκιμαστικούς αριθμούς· domain, deploy, λογαριασμοί, πραγματικός πάροχος SMS και δοκιμές σε συσκευές στο 1.10.
+- Πλάνο Φάσης 1: `docs/plans/phase-1.md` (βήματα 1.1–1.10). **Τοπικά πρώτα:** μέχρι το 1.10 μόνο localhost, με ψεύτικους αποστολείς SMS, push και email (1.9) και δοκιμαστικούς αριθμούς· domain, deploy, λογαριασμοί, πραγματικός πάροχος SMS και δοκιμές σε συσκευές στο 1.10.
 - PWA πρώτα. Native (Capacitor) μόνο αν αποφασιστεί ρητά.
 
 ## Εντολές
@@ -41,7 +41,7 @@ npm run check:secrets # τρέχει αυτόματα μετά το build: κα�
 npm run db:start     # τοπικό Supabase (Docker)
 npm run db:reset     # migrations + seed στην τοπική βάση
 npm run db:test      # pgTAP
-npm run test:race    # ταυτόχρονες κρατήσεις μέσω HTTP στο τοπικό Supabase (θέλει db:start· όχι μαζί με e2e)
+npm run test:race    # ταυτόχρονες κρατήσεις μέσω HTTP και η άσκηση ανίχνευσης του 1.9 στο τοπικό Supabase (θέλει db:start με EMAIL_PROVIDER/SUPPORT_EMAIL· όχι μαζί με e2e)
 npm run db:push      # ΝΕΑ migrations στο συνδεδεμένο (remote) project
 npm run db:reset:dev # ξαναχτίζει τη remote DEV βάση (μόνο πριν τα πραγματικά δεδομένα)
 npm run db:test:dev  # pgTAP πάνω στη remote DEV βάση (rollback, δεν αφήνει δεδομένα)
@@ -115,7 +115,7 @@ docs/                 SPEC.md, adr/, plans/, design/MOTION.md, SETUP.md, runbook
 - **Μοτίβο RPC:** η λογική σε `private.<name>_impl` (SECURITY DEFINER, `set search_path = ''`, κάνει η ίδια ελέγχους μέλους/ρόλου)· το API βλέπει λεπτό wrapper στο `public` (SECURITY INVOKER) με ρητό `GRANT EXECUTE` ανά ρόλο. Καμία SECURITY DEFINER function στο `public`. `EXECUTE` κλειστό για PUBLIC (και global).
 - Ποιος ενεργεί (`anaklo.actor_type`, με `set_config(…, true)` μέσα στο `_impl`): οι RPCs κράτησης/διαχείρισης για πελάτες `client`· τα cron jobs `system`· ο importer `import`· seed και fixtures των tests `system`. Οι RPCs του `authenticated` **δεν** δηλώνουν τίποτα (→ `staff`) και ποτέ `system`. Edge Functions και scripts γράφουν ραντεβού μόνο μέσω RPC που δηλώνει actor. Χωρίς δήλωση και χωρίς συνδεδεμένο χρήστη → `42501`· άγνωστη τιμή → `22023` (ποτέ σιωπηρό `system`).
 - Ο έλεγχος ρόλου/ποσών ζει στη definer `_impl`, ποτέ μόνο στο wrapper.
-- Κρίσιμες ενέργειες (ανωνυμοποίηση, μέλη/ρόλοι/owner, slug/ζώνη/νόμισμα, εξαγωγή, συσκευές κωδικών, απενεργοποίηση επιχείρησης) → `private.require_fresh_totp()` μέσα στο `_impl` (aal2 + `totp` στο `amr` ≤ 5′, hints `aal2_required`/`fresh_totp_required`)· ποτέ μόνο στο UI· όχι σε καθημερινές ενέργειες. `business_members` αλλάζει μόνο μέσω RPC.
+- Κρίσιμες ενέργειες (ανωνυμοποίηση, μέλη/ρόλοι/owner, slug/ζώνη/νόμισμα, εξαγωγή, συσκευές κωδικών, απενεργοποίηση επιχείρησης) → `private.require_fresh_totp()` μέσα στο `_impl` (aal2 + `totp` στο `amr` ≤ 5′, από ζωντανή συνεδρία με εγκεκριμένη συσκευή κωδικών, 0011· hints `aal2_required`/`fresh_totp_required`)· ποτέ μόνο στο UI· όχι σε καθημερινές ενέργειες. `business_members` αλλάζει μόνο μέσω RPC.
 - Στήλες που δεν αλλάζουν από την εφαρμογή → UPDATE **ανά στήλη** (π.χ. `businesses`: όχι slug/timezone/currency/vertical· τα τρία πρώτα μόνο με RPC του owner με φρέσκο κωδικό, `change_business_identity` στο 1.7· το vertical μόνο στη δημιουργία).
 - Ωράρια/εξαιρέσεις: exclusion constraints κατά επικάλυψης. `time_off.reason` ουδέτερο (ποτέ δεδομένα υγείας).
 - Online κράτηση ⇔ `verified_via` (otp|trusted_device). `clients.phone_verified_at` το γράφει μόνο η ροή OTP.

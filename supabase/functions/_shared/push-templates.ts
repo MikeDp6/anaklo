@@ -10,6 +10,10 @@
  * normally (lower case, accents).
  *
  * The keys are the push templates of `messages_log` (`domain.ts` derives its list from them).
+ *
+ * 1.9 (contract 1.9 §3.5): `push_security_alert` goes to the OWNERS of a business when a member's
+ * authenticator device changed without approval. The business name only: never the member, the
+ * device or what changed (the email carries that).
  */
 export type PushLocale = 'el' | 'en'
 
@@ -31,6 +35,8 @@ export const PUSH_VARIABLE_LIMITS = {
   staff: 20,
   date: 9,
   time: 5,
+  /** `push_security_alert` (1.9): the business, cut like the others. */
+  business: 32,
 } as const
 
 export type PushVariable = keyof typeof PUSH_VARIABLE_LIMITS
@@ -83,6 +89,20 @@ export const PUSH_TEMPLATES = {
     en: {
       title: 'Test notification',
       body: 'If you can see this, notifications work on this device.',
+    },
+  },
+  /**
+   * 1.9: to the owners of the business when a member's authenticator device was added or removed
+   * outside the app (`security_events`); opens Ρυθμίσεις → Μέλη. Drafts for Michalis (§7).
+   */
+  push_security_alert: {
+    el: {
+      title: 'Ειδοποίηση ασφαλείας',
+      body: '{{business}}: μια συσκευή κωδικών άλλαξε χωρίς έγκριση. Δες το email σου.',
+    },
+    en: {
+      title: 'Security alert',
+      body: '{{business}}: an authenticator device changed without approval. Check your email.',
     },
   },
 } as const satisfies Record<string, Record<PushLocale, PushTemplate>>

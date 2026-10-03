@@ -6,6 +6,7 @@ import {
   type BookingConfig,
 } from './booking-config.ts'
 import type { Log, Rpc } from './booking-rpc.ts'
+import type { EmailProviderLog, EmailSendRequest } from './email-provider.ts'
 import { errorResponse } from './http.ts'
 import type { OneSignalPushPayload } from './onesignal.ts'
 import { PUSH_CONFIG_VARIABLES, parsePushConfig, type PushConfig } from './push-config.ts'
@@ -56,6 +57,10 @@ export type SenderDeps = {
   readonly pushRecord?: (payload: OneSignalPushPayload) => void
   /** The OneSignal sender's HTTP client (default: the global `fetch`). */
   readonly fetch?: typeof fetch
+  /** 1.9, `dispatch` only: where the fake email sender prints with `ANAKLO_ENV=local`. */
+  readonly emailLog?: EmailProviderLog
+  /** 1.9, `dispatch` only (Vitest): every request the fake email sender would have sent. */
+  readonly emailRecord?: (request: EmailSendRequest) => void
 }
 
 export type BuildBookingRuntimeDeps = SenderDeps

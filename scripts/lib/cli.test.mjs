@@ -14,6 +14,8 @@ import {
   readSecretEnvFile,
   requireDevProjectRef,
   resolveSupabaseTarget,
+  localSupabase,
+  parseLocalStatus,
 } from './cli.mjs'
 
 describe('isInside', () => {
@@ -141,5 +143,56 @@ describe('parseSupportInput', () => {
     expect(() => parseSupportInput({ reason: 'lost phone', ticket: 'x'.repeat(41) })).toThrow(
       /--ticket/,
     )
+  })
+})
+
+describe('localSupabase (supabase status, retried under load)', () => {
+  const ok = {
+    status: 0,
+    stdout:
+      'Stopped services: []\n{"API_URL":"http://127.0.0.1:54321","PUBLISHABLE_KEY":"sb_publishable_x","SECRET_KEY":"sb_secret_x"}',
+  }
+  const failed = { status: 1, stdout: '' }
+
+  it('reads the local address and keys', () => {
+    expect(parseLocalStatus(ok)).toEqual({
+      apiUrl: 'http://127.0.0.1:54321',
+      publishableKey: 'sb_publishable_x',
+      secretKey: 'sb_secret_x',
+    })
+  })
+
+  it('refuses a non-local API URL at once', () => {
+    const remote = {
+      status: 0,
+      stdout: ok.stdout.replace('http://127.0.0.1:54321', 'https://x.supabase.co'),
+    }
+    expect(() => parseLocalStatus(remote)).toThrow(/non-local/)
+  })
+
+  it('retries a failed read twice, then succeeds', () => {
+    const answers = [failed, { status: 0, stdout: '{"API_URL":"http://127.0.0.1:54321"}' }, ok]
+    /** @type {number[]} */
+    const waits = []
+    const stack = localSupabase({
+      run: () => answers.shift() ?? failed,
+      sleep: (ms) => waits.push(ms),
+    })
+    expect(stack.apiUrl).toBe('http://127.0.0.1:54321')
+    expect(waits).toEqual([500, 2000])
+  })
+
+  it('gives up after three failed reads', () => {
+    let calls = 0
+    expect(() =>
+      localSupabase({
+        run: () => {
+          calls += 1
+          return failed
+        },
+        sleep: () => {},
+      }),
+    ).toThrow(/npm run db:start/)
+    expect(calls).toBe(3)
   })
 })

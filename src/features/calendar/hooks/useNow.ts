@@ -9,3 +9,12 @@ export function useNow(intervalMs = 60_000): Date {
   }, [intervalMs])
   return now
 }
+
+/**
+ * The later of the ticking clock and the moment the data on screen was fetched. An item that
+ * started between two ticks (a walk-in just added) is already «Τώρα» once its list refetched,
+ * instead of showing its own start time until the next tick.
+ */
+export function clockAtLeast(now: Date, fetchedAtMs: number): Date {
+  return fetchedAtMs > now.getTime() ? new Date(fetchedAtMs) : now
+}

@@ -69,6 +69,8 @@ export const PUSH_MESSAGE_TEMPLATES = [
   'push_booking_cancelled',
   'push_booking_moved',
   'push_test',
+  /** To the owners when an authenticator device of a member changed without approval (0011). */
+  'push_security_alert',
 ] as const
 export const MESSAGE_TEMPLATES = [...SMS_MESSAGE_TEMPLATES, ...PUSH_MESSAGE_TEMPLATES] as const
 export const MESSAGE_CATEGORIES = ['otp', 'transactional', 'reminder', 'marketing'] as const
@@ -100,8 +102,17 @@ export const PUSH_PROVIDERS = ['onesignal', 'vapid'] as const
 /** When the reminder goes out (SPEC §12): 24 h before, or 18:00 local the evening before. */
 export const REMINDER_MODES = ['24h', 'evening_before'] as const
 
-/** Jobs that write a heartbeat to `private.job_runs` (0006, 0007; 1.9 health reads them). */
-export const JOB_NAMES = ['auto_complete', 'dispatch_sweep', 'dispatch', 'purge'] as const
+/**
+ * Jobs that write a heartbeat to `private.job_runs` (0006, 0007, 0011) and that `health` watches
+ * (`private.health_jobs`, 0011).
+ */
+export const JOB_NAMES = [
+  'auto_complete',
+  'dispatch_sweep',
+  'dispatch',
+  'purge',
+  'detect_factor_changes',
+] as const
 
 /**
  * `private.factor_change_grants` (0009): the permission for one change of a user's devices of the
@@ -110,6 +121,18 @@ export const JOB_NAMES = ['auto_complete', 'dispatch_sweep', 'dispatch', 'purge'
 export const FACTOR_GRANT_ACTIONS = ['add', 'remove'] as const
 /** Who allowed it: the user (fresh code), Nous (mfa-reset), a demotion/removal, the 1.9 reaction. */
 export const FACTOR_GRANT_SOURCES = ['user', 'nous_support', 'demotion', 'system'] as const
+
+/**
+ * `private.security_events` (0011): a change of a user's authenticator devices that no grant
+ * matched, and its handling by `dispatch` (containment until done, notifications at most once).
+ */
+export const SECURITY_EVENT_KINDS = [
+  'factor_added_unauthorized',
+  'factor_removed_unauthorized',
+] as const
+export const SECURITY_EVENT_STATUSES = ['pending', 'containing', 'notifying', 'done'] as const
+/** How a finished event ended: notified, or the lease was lost while notifying (never re-sent). */
+export const SECURITY_EVENT_RESULTS = ['notified', 'notify_unknown'] as const
 
 /**
  * RPC outputs, not CHECK lists (so not in CHECKED_VALUE_LISTS; domain.test.ts checks that 0008
@@ -143,6 +166,13 @@ export const CLIENT_CARD_STATES = ['live', 'merged', 'erased'] as const
 export const RING_STATES = ['no_visits', 'no_interval', 'within', 'beyond'] as const
 /** A family's consent per purpose (`private.consent_state`): the latest active record wins. */
 export const CONSENT_STATES = ['granted', 'refused', 'none'] as const
+/**
+ * RPC outputs of 0011 (contract 1.9 §2.9; domain.test.ts checks that 0011 names them). The checks
+ * of `health`: one per watched job and the oldest unfinished security event.
+ */
+export const HEALTH_CHECK_NAMES = [...JOB_NAMES, 'security_events'] as const
+/** Who an email of `record_security_event_result` (contained) goes to: the account, its owners. */
+export const SECURITY_EMAIL_AUDIENCES = ['user', 'owner'] as const
 
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
@@ -158,6 +188,9 @@ export const ConsentPurpose = z.enum(CONSENT_PURPOSES)
 export const ConsentState = z.enum(CONSENT_STATES)
 export const RingState = z.enum(RING_STATES)
 export const ClientCardState = z.enum(CLIENT_CARD_STATES)
+export const SecurityEventKind = z.enum(SECURITY_EVENT_KINDS)
+export const HealthCheckName = z.enum(HEALTH_CHECK_NAMES)
+export const SecurityEmailAudience = z.enum(SECURITY_EMAIL_AUDIENCES)
 
 export type Vertical = z.infer<typeof Vertical>
 export type Locale = z.infer<typeof Locale>
@@ -173,6 +206,9 @@ export type ConsentPurpose = z.infer<typeof ConsentPurpose>
 export type ConsentState = z.infer<typeof ConsentState>
 export type RingState = z.infer<typeof RingState>
 export type ClientCardState = z.infer<typeof ClientCardState>
+export type SecurityEventKind = z.infer<typeof SecurityEventKind>
+export type HealthCheckName = z.infer<typeof HealthCheckName>
+export type SecurityEmailAudience = z.infer<typeof SecurityEmailAudience>
 
 /** CHECK constraint name → the list above that must match it exactly (order-insensitive). */
 export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = {
@@ -209,4 +245,8 @@ export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = 
   push_subscriptions_provider: PUSH_PROVIDERS,
   factor_change_grants_action: FACTOR_GRANT_ACTIONS,
   factor_change_grants_source: FACTOR_GRANT_SOURCES,
+  health_jobs_job: JOB_NAMES,
+  security_events_kind: SECURITY_EVENT_KINDS,
+  security_events_status: SECURITY_EVENT_STATUSES,
+  security_events_result: SECURITY_EVENT_RESULTS,
 }

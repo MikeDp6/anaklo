@@ -55,6 +55,10 @@ jobs:
       # the seed's Vault dispatch_secret (pg_net → http://kong:8000/functions/v1/dispatch).
       PUSH_PROVIDER: fake
       DISPATCH_SECRET: local-dev-only-dispatch-secret-not-a-secret-01
+      # Security emails of dispatch (contract 1.9 §3.6): the fake sender records and sends
+      # nothing. Without them dispatch answers 500 not_configured and health turns 503.
+      EMAIL_PROVIDER: fake
+      SUPPORT_EMAIL: support@example.com
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -71,8 +75,10 @@ jobs:
       # Concurrent bookings over HTTP (tests/db/**, vitest.db.config.ts). The tests read the API URL
       # and keys from `supabase status -o json` themselves (scripts/lib/cli.mjs, localhost only),
       # so no key goes into $GITHUB_ENV. Before e2e: both sign the seed owner in. Since 1.5 also
-      # two dispatchers at once and a dispatcher killed mid-batch (dispatch-race.test.ts).
-      - name: Booking and dispatch race tests
+      # two dispatchers at once and a dispatcher killed mid-batch (dispatch-race.test.ts); since
+      # 1.9 the detection drill (security-detection.test.ts: a factor added and one removed
+      # straight at GoTrue, contained and notified through the real dispatch).
+      - name: Booking, dispatch and security race tests
         run: npm run test:race
       - name: Generated DB types are up to date
         run: npm run check:types

@@ -423,13 +423,20 @@ SMS_ALLOWED_RECIPIENTS = "env(SMS_ALLOWED_RECIPIENTS)"
 # 500 not_configured. ONESIGNAL_* are not passed here: only 1.10 uses PUSH_PROVIDER=onesignal.
 PUSH_PROVIDER = "env(PUSH_PROVIDER)"
 DISPATCH_SECRET = "env(DISPATCH_SECRET)"
+# Step 1.9 (contract 1.9 §3.6): the security emails of dispatch. EMAIL_PROVIDER=fake records and
+# sends nothing (with ANAKLO_ENV=local one `fake-email` line per email in the edge runtime log);
+# SUPPORT_EMAIL is the Nous address the emails name. Unset, dispatch answers 500 not_configured
+# (and health 503 `dispatch` within 15 minutes). Resend (RESEND_API_KEY, EMAIL_FROM) is 1.10.
+EMAIL_PROVIDER = "env(EMAIL_PROVIDER)"
+SUPPORT_EMAIL = "env(SUPPORT_EMAIL)"
 
 # Edge Functions (ADR-0008 §3). Every function needs its own section: fn:check fails without an
 # explicit verify_jwt and the shared import map (the CLI only looks for a deno.json inside the
 # function's own folder). verify_jwt = false only where the function checks the caller itself.
 [functions.health]
 enabled = true
-# Behind the /api proxy (publishable key, not a JWT): checks the proxy secret in code.
+# Behind the /api proxy (publishable key, not a JWT): checks the proxy secret in code. Since 1.9
+# it also reads public.health() with the injected service-role key: 503 when a job is stale.
 verify_jwt = false
 import_map = "./functions/deno.json"
 

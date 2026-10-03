@@ -11,7 +11,7 @@ import { Page } from '@/shared/ui/Page'
 import { formatLongDate, useAppLocale } from '../format'
 import { useBusinessToday } from '../hooks/useBusinessToday'
 import { useTodaySummary } from '../hooks/useDayQueries'
-import { useNow } from '../hooks/useNow'
+import { clockAtLeast, useNow } from '../hooks/useNow'
 import { useWorkspace, type Workspace } from '../hooks/useWorkspace'
 import { GapsList } from './GapsList'
 import { LoadError } from './LoadError'
@@ -50,7 +50,7 @@ function TodayContent({ workspace }: { workspace: Workspace }) {
   const { business, businessId } = workspace
   const today = useBusinessToday(business.timeZone)
   const summary = useTodaySummary(businessId, today)
-  const now = useNow()
+  const now = clockAtLeast(useNow(), summary.dataUpdatedAt)
   const [sheet, setSheet] = useState<OpenSheet | null>(null)
   const data = summary.data
   const showStaff = data?.scope === 'business'

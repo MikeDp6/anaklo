@@ -6,10 +6,13 @@ import {
   CLIENT_CARD_STATES,
   CONFLICT_REASONS,
   CONSENT_STATES,
+  HEALTH_CHECK_NAMES,
+  JOB_NAMES,
   MESSAGE_TEMPLATES,
   PUSH_MESSAGE_TEMPLATES,
   REASSIGN_BLOCKERS,
   RING_STATES,
+  SECURITY_EMAIL_AUDIENCES,
   SMS_MESSAGE_TEMPLATES,
   STEP_UP_HINTS,
   SUPPORT_ACTIONS,
@@ -134,5 +137,40 @@ describe('RPC output lists match the functions that produce them (0010)', () => 
     for (const value of values) {
       expect(body?.includes(`'${value}'`), `${name} names '${value}'`).toBe(true)
     }
+  })
+})
+
+describe('RPC output lists match the functions that produce them (0011)', () => {
+  const sql = migrationSql()
+
+  it('health checks are exactly the watched jobs and the security events', () => {
+    expect([...HEALTH_CHECK_NAMES]).toEqual([...JOB_NAMES, 'security_events'])
+    expect(new Set(HEALTH_CHECK_NAMES).size).toBe(HEALTH_CHECK_NAMES.length)
+  })
+
+  it('0011 watches every job: one health_jobs row per job name', () => {
+    const insert = /insert\s+into\s+private\.health_jobs\s*\([^)]*\)\s*values([^;]*);/i.exec(sql)
+    expect(insert, 'insert into private.health_jobs not found in migrations').not.toBeNull()
+    const jobs = [...(insert?.[1] ?? '').matchAll(/\(\s*'([a-z_]+)'\s*,/g)].map((m) => m[1])
+    expect([...jobs].sort()).toEqual([...JOB_NAMES].sort())
+  })
+
+  it('private.health_impl names the security events check', () => {
+    const body = functionBody(sql, 'private.health_impl')
+    expect(body, 'function private.health_impl not found in migrations').not.toBeNull()
+    expect(body?.includes(`'security_events'`)).toBe(true)
+  })
+
+  it('private.queue_security_notifications names every email audience, in the order of the list', () => {
+    const body = functionBody(sql, 'private.queue_security_notifications')
+    expect(
+      body,
+      'function private.queue_security_notifications not found in migrations',
+    ).not.toBeNull()
+    const positions = SECURITY_EMAIL_AUDIENCES.map(
+      (value) => body?.indexOf(`'audience', '${value}'`) ?? -1,
+    )
+    expect(positions.every((position) => position >= 0)).toBe(true)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
   })
 })

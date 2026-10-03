@@ -20,7 +20,13 @@ export default defineConfig((configEnv) =>
           'e2e/lib/**/*.test.ts',
         ],
         setupFiles: ['src/test/setup.ts'],
-        env: { TZ: 'UTC' },
+        // Unit tests never reach a Supabase: the pro client only needs well-formed public values to
+        // load. Fixed here so the suite does not depend on a developer's .env.local (CI has none).
+        env: {
+          TZ: 'UTC',
+          VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+          VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_vitest-placeholder',
+        },
         restoreMocks: true,
       },
     }),

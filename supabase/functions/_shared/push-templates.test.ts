@@ -22,6 +22,7 @@ const LONGEST: Readonly<Record<PushVariable, string>> = {
   staff: 'Παναγιώτης-Χρυσόστομ'.slice(0, PUSH_VARIABLE_LIMITS.staff),
   date: 'Τετ 30/09',
   time: '23:45',
+  business: 'Κομμωτήριο Ομορφιάς Αγία Παρασκευή'.slice(0, PUSH_VARIABLE_LIMITS.business),
 }
 
 describe('push templates', () => {
@@ -30,6 +31,7 @@ describe('push templates', () => {
       'push_booking_cancelled',
       'push_booking_created',
       'push_booking_moved',
+      'push_security_alert',
       'push_test',
     ])
     expect(isPushTemplateKey('push_test')).toBe(true)
@@ -74,8 +76,31 @@ describe('push templates', () => {
   it('never carry a phone, an amount or a surname variable', () => {
     for (const key of PUSH_TEMPLATE_KEYS) {
       for (const name of pushTemplateVariables(key, 'el')) {
-        expect(['client', 'service', 'date', 'time', 'staff']).toContain(name)
+        expect(['client', 'service', 'date', 'time', 'staff', 'business']).toContain(name)
       }
+    }
+  })
+
+  it('the security alert (1.9) names the business only, capped at 32', () => {
+    expect(PUSH_VARIABLE_LIMITS.business).toBe(32)
+    expect(pushTemplateVariables('push_security_alert', 'el')).toEqual(['business'])
+    expect(pushTemplateVariables('push_security_alert', 'en')).toEqual(['business'])
+    const texts = renderPushAllLocales('push_security_alert', {
+      el: { business: 'Κουρείο Demo' },
+      en: { business: 'Κουρείο Demo' },
+    })
+    expect(texts.el).toEqual({
+      title: 'Ειδοποίηση ασφαλείας',
+      body: 'Κουρείο Demo: μια συσκευή κωδικών άλλαξε χωρίς έγκριση. Δες το email σου.',
+    })
+    expect(texts.en).toEqual({
+      title: 'Security alert',
+      body: 'Κουρείο Demo: an authenticator device changed without approval. Check your email.',
+    })
+    // Never what changed, which member or which device: the email carries that.
+    for (const locale of PUSH_LOCALES) {
+      const { title, body } = PUSH_TEMPLATES.push_security_alert[locale]
+      expect(`${title} ${body}`).not.toMatch(/totp|mfa|2fa|http|www\.|@/i)
     }
   })
 

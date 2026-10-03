@@ -18,6 +18,8 @@ const PHONE_HMAC = `p${HMAC}`
 const DISPATCH = 'd'.repeat(43)
 const REF = 'abcdefghijklmnopqrst'
 const DISPATCH_URL = `https://${REF}.supabase.co/functions/v1/dispatch`
+/** Synthetic: the real Nous address lives only in the env file outside the repo. */
+const SUPPORT = 'support@nous-support.test'
 const context = { knownLocalValues: ['local-dev-proxy-secret-change-me'], projectRef: REF }
 const base = {
   PROXY_SECRET: PROXY,
@@ -27,11 +29,15 @@ const base = {
   PUSH_PROVIDER: 'fake',
   DISPATCH_SECRET: DISPATCH,
   DISPATCH_URL,
+  EMAIL_PROVIDER: 'fake',
+  SUPPORT_EMAIL: SUPPORT,
 }
 const BASE_FUNCTIONS = [
   { name: 'PROXY_SECRET', value: PROXY },
   { name: 'PUSH_PROVIDER', value: 'fake' },
   { name: 'DISPATCH_SECRET', value: DISPATCH },
+  { name: 'EMAIL_PROVIDER', value: 'fake' },
+  { name: 'SUPPORT_EMAIL', value: SUPPORT },
 ]
 const BASE_VAULT = [
   { name: 'otp_hmac_key', value: HMAC },
@@ -60,6 +66,8 @@ describe('planSecrets', () => {
       'SUPABASE_PUBLISHABLE_KEY: missing (source: SUPABASE_DEV_PUBLISHABLE_KEY)',
       'PUSH_PROVIDER: missing (source: PUSH_PROVIDER)',
       'DISPATCH_SECRET: missing (source: DISPATCH_SECRET)',
+      'EMAIL_PROVIDER: missing (source: EMAIL_PROVIDER)',
+      'SUPPORT_EMAIL: missing (source: SUPPORT_EMAIL)',
       'otp_hmac_key: missing (source: OTP_HMAC_KEY)',
       'phone_hmac_key: missing (source: PHONE_HMAC_KEY)',
       'dispatch_secret: missing (source: DISPATCH_SECRET)',
@@ -125,6 +133,8 @@ describe('planSecrets', () => {
       'PROXY_SECRET',
       'PUSH_PROVIDER',
       'DISPATCH_SECRET',
+      'EMAIL_PROVIDER',
+      'SUPPORT_EMAIL',
       'ONESIGNAL_APP_ID',
       'ONESIGNAL_REST_API_KEY',
     ])
@@ -156,6 +166,8 @@ describe('planSecrets', () => {
       'PROXY_SECRET',
       'PUSH_PROVIDER',
       'DISPATCH_SECRET',
+      'EMAIL_PROVIDER',
+      'SUPPORT_EMAIL',
     ])
     const weak = planSecrets({ ...base, OTP_HMAC_KEY: 'short' }, context)
     expect(weak.problems[0]).toMatch(/^otp_hmac_key: must be at least 32 characters/)
@@ -232,6 +244,43 @@ describe('planSecrets: messaging (contract 1.5 §3.5)', () => {
     const plan = planSecrets(withKeys, context)
     expect(plan.problems).toEqual([])
     expect(plan.functions).toContainEqual({ name: 'PUSH_PROVIDER', value: 'onesignal' })
+  })
+})
+
+describe('planSecrets: security emails (contract 1.9 §3.6)', () => {
+  it('sends EMAIL_PROVIDER and SUPPORT_EMAIL to the functions only', () => {
+    const plan = planSecrets(base, context)
+    expect(plan.problems).toEqual([])
+    expect(plan.functions).toContainEqual({ name: 'EMAIL_PROVIDER', value: 'fake' })
+    expect(plan.functions).toContainEqual({ name: 'SUPPORT_EMAIL', value: SUPPORT })
+    expect(plan.worker.map((entry) => entry.name)).not.toContain('SUPPORT_EMAIL')
+    expect(plan.vault.map((entry) => entry.name)).not.toContain('SUPPORT_EMAIL')
+  })
+
+  it('takes EMAIL_PROVIDER fake only until the Resend sender of 1.10', () => {
+    for (const bad of ['resend', 'smtp', 'FAKE']) {
+      expect(planSecrets({ ...base, EMAIL_PROVIDER: bad }, context).problems).toEqual([
+        'EMAIL_PROVIDER: must be fake',
+      ])
+    }
+  })
+
+  it('refuses a support value that is not one address, or the @example.com placeholder', () => {
+    for (const bad of ['nous', 'a@b', 'a b@nous.gr', 'a@b.gr,c@d.gr@x']) {
+      const plan = planSecrets({ ...base, SUPPORT_EMAIL: bad }, context)
+      expect(plan.problems).toEqual(['SUPPORT_EMAIL: must be one email address'])
+      expect(plan.problems[0]).not.toContain(bad)
+    }
+    for (const placeholder of ['support@example.com', 'Support@Example.COM']) {
+      expect(planSecrets({ ...base, SUPPORT_EMAIL: placeholder }, context).problems).toEqual([
+        'SUPPORT_EMAIL: is the @example.com placeholder; use the real Nous address',
+      ])
+    }
+  })
+
+  it('still leaves RESEND_API_KEY and EMAIL_FROM unused until 1.10', () => {
+    const plan = planSecrets(base, context, ['RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_PROVIDER'])
+    expect(plan.ignored).toEqual(['RESEND_API_KEY', 'EMAIL_FROM'])
   })
 })
 
