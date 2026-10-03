@@ -51,6 +51,11 @@
   cursor: pointer;
 }
 
+.close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .close svg {
   width: 20px;
   height: 20px;

@@ -3,7 +3,7 @@
 - Κατάσταση: αποδεκτό
 - Ημερομηνία: 2026-09-27
 - Αναθεώρηση: 2026-09-28 (φρέσκος κωδικός στις κρίσιμες ενέργειες και `business_members` μόνο μέσω RPC, §8)
-- Υλοποίηση: 2026-10-02, βήμα 1.7, τοπικά (`0009_members_identity.sql`· §2 και §8: συμμετοχή owner/manager μόνο σε `aal2` όταν υπάρχει παράγοντας, και trigger για τις συνέπειες μιας αλλαγής μέλους· D1/D2 του [contract 1.7](../plans/contracts/1.7-security-members.md), προς έγκριση)
+- Υλοποίηση: 2026-10-02, βήμα 1.7, τοπικά (`0009_members_identity.sql`· §2 και §8: συμμετοχή owner/manager μόνο σε `aal2` όταν υπάρχει παράγοντας, και trigger για τις συνέπειες μιας αλλαγής μέλους· D1/D2 του [contract 1.7](../plans/contracts/1.7-security-members.md), εγκρίθηκαν)· 2026-10-03, βήμα 1.8, τοπικά (`0010_client_ops.sql`· §4: συναινέσεις μόνο μέσω `set_client_consent`, `INSERT (id)` στις σημειώσεις· [contract 1.8](../plans/contracts/1.8-client-ops.md) D8/D10)
 
 ## Πλαίσιο
 Από 30/5/2026 τα νέα Supabase projects δεν εκθέτουν πίνακες στο Data API χωρίς ρητό `GRANT`. Όταν εμφανιστεί το πρώτο «permission denied», η εύκολη αντίδραση είναι το `grant all … to anon`, που εκθέτει τα πάντα.
@@ -40,8 +40,8 @@
    - `authenticated`: μόνο όσα χρειάζεται η εφαρμογή επαγγελματία, πάντα μαζί με RLS.
    - Όπου μια στήλη δεν πρέπει να αλλάζει από την εφαρμογή, το UPDATE δίνεται **ανά στήλη**. Το RLS λέει ποιες γραμμές, το GRANT ποιες στήλες. Παραδείγματα:
      - `clients`: όχι provenance, συγχώνευση, ανωνυμοποίηση, `phone_verified_at`
-     - `client_notes`: μόνο `body`
-     - `client_consents`: μόνο `withdrawn_at`
+     - `client_notes`: UPDATE μόνο `body`· από το 0010 και `INSERT (id)`, για αναγνωριστικά από την εφαρμογή (μια επανάληψη είναι upsert που δεν γράφει δεύτερη)
+     - `client_consents`: μέχρι το 0009 μόνο `withdrawn_at`· **από το 0010 (βήμα 1.8) καμία εγγραφή από τον `authenticated`**: ούτε INSERT ούτε UPDATE, ούτε ανά στήλη, και καμία πολιτική πέρα από το `SELECT`. Η εφαρμογή γράφει μόνο μέσω της RPC `set_client_consent` (definer), ώστε ο κανόνας κατάστασης της οικογένειας να ζει μόνο σε SQL (`private.consent_state`, κανόνας 13). Το `service_role` κρατά τα δικαιώματά του για τον importer (Φάση 3)· ο φύλακας `guard_consent_update` και ο νέος trigger του 0010 (καμία συναίνεση για ανωνυμοποιημένο ή συγχωνευμένο πελάτη) δεσμεύουν κάθε ρόλο
      - `businesses`: όχι `slug`, `timezone`, `currency`, `vertical`, ούτε για τον owner. Τα τρία πρώτα αλλάζουν μόνο με RPC του owner με φρέσκο κωδικό (`change_business_identity`, §8, ADR-0009, βήμα 1.7), που χειρίζεται τις συνέπειες (παλιά links, τοπική ώρα των μελλοντικών ραντεβού, νόημα των ποσών). Το `vertical` γράφεται μόνο στη δημιουργία και δεν αλλάζει στη Φάση 1.
      - `business_members`: από το 0009 μόνο `SELECT` για τον `authenticated`. Κάθε αλλαγή μέλους ή ρόλου γίνεται μόνο μέσω RPC (§8).
    - Πίνακες στο `private` (π.χ. `platform_settings`, `factor_change_grants`, `mfa_factor_snapshot`, `security_events`): κανένα GRANT στους ρόλους του API. Τους διαβάζουν και τους γράφουν μόνο definer functions και jobs.

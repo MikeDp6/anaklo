@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { expect } from '@playwright/test'
 import { z } from 'zod/mini'
 import { literal, PsqlSession } from '../../tests/db/lib/psql'
@@ -287,4 +288,121 @@ export async function deleteMembership(businessId: string, userId: string): Prom
      select json_build_object('deleted', count(*)) from d;`,
   )
   return z.object({ deleted: z.number() }).parse(result).deleted
+}
+
+// ---------------------------------------------------------------------------------------------
+// Step 1.8 (contract 1.8 §5.4): synthetic clients of the clients spec's own shop, and what an
+// anonymisation leaves of them. `createClientFixture` is the second writing helper (after
+// `deleteMembership`): LOCAL, as postgres, with the actor `system` declared inside its own
+// transaction like seed.sql, never through PostgREST tables. Synthetic `+3069000…` numbers only.
+// ---------------------------------------------------------------------------------------------
+
+export interface ClientFixture {
+  readonly clientId: string
+  readonly appointmentId: string
+  /** The business-local date (yyyy-MM-dd) of the completed visit. */
+  readonly visitDate: string
+}
+
+/**
+ * A client of the business with one `completed` «Κούρεμα» by `staffId`, `daysAgo` local days ago
+ * at 10:00 in the business zone (a completed row never meets the double-booking constraint), and
+ * a verified phone (as after an online booking). Ids are made here.
+ */
+export async function createClientFixture(
+  businessId: string,
+  staffId: string,
+  client: { fullName: string; phoneE164: string; daysAgo?: number },
+): Promise<ClientFixture> {
+  if (!/^\+3069000\d{5}$/.test(client.phoneE164)) {
+    throw new Error(`fixture phones are synthetic +3069000… numbers, not ${client.phoneE164}`)
+  }
+  const clientId = randomUUID()
+  const appointmentId = randomUUID()
+  const daysAgo = client.daysAgo ?? 10
+  const result = await selectJson(
+    `do $$
+     declare
+       v_tz text;
+       v_day date;
+       v_service uuid;
+     begin
+       perform set_config('anaklo.actor_type', 'system', true);
+       select b.timezone into strict v_tz from public.businesses b
+        where b.id = ${literal(businessId)}::uuid;
+       v_day := (now() at time zone v_tz)::date - ${daysAgo};
+       select s.id into strict v_service from public.services s
+        where s.business_id = ${literal(businessId)}::uuid and s.name = 'Κούρεμα';
+       insert into public.clients (id, business_id, full_name, phone_e164, phone_verified_at, source)
+       values (${literal(clientId)}::uuid, ${literal(businessId)}::uuid,
+               ${literal(client.fullName)}, ${literal(client.phoneE164)}, now(), 'online');
+       insert into public.appointments (id, business_id, client_id, staff_id, starts_at, ends_at,
+                                        status, source, total_cents, charged_cents)
+       values (${literal(appointmentId)}::uuid, ${literal(businessId)}::uuid,
+               ${literal(clientId)}::uuid, ${literal(staffId)}::uuid,
+               (v_day + time '10:00') at time zone v_tz, (v_day + time '10:30') at time zone v_tz,
+               'completed', 'phone', 1300, 1300);
+       insert into public.appointment_services (business_id, appointment_id, position, service_id,
+                                                price_cents, duration_min)
+       values (${literal(businessId)}::uuid, ${literal(appointmentId)}::uuid, 0, v_service, 1300, 30);
+     end;
+     $$;
+     select json_build_object(
+       'visit_date', to_char((now() at time zone b.timezone)::date - ${daysAgo}, 'YYYY-MM-DD'))
+       from public.businesses b where b.id = ${literal(businessId)}::uuid;`,
+  )
+  const { visit_date } = z.object({ visit_date: z.string() }).parse(result)
+  return { clientId, appointmentId, visitDate: visit_date }
+}
+
+const ClientRow = z.object({
+  full_name: z.string(),
+  phone_e164: z.nullable(z.string()),
+  email: z.nullable(z.string()),
+  phone_verified_at: z.nullable(z.string()),
+  erased_at: z.nullable(z.string()),
+  merged_into_id: z.nullable(z.string()),
+  search_text: z.string(),
+})
+export type ClientRow = z.infer<typeof ClientRow>
+
+/** One client row (the identifying columns and the erase/merge markers). */
+export async function clientRowOf(clientId: string): Promise<ClientRow> {
+  const row = await selectJson(
+    `select coalesce((select jsonb_build_object(
+               'full_name', c.full_name, 'phone_e164', c.phone_e164, 'email', c.email,
+               'phone_verified_at', c.phone_verified_at, 'erased_at', c.erased_at,
+               'merged_into_id', c.merged_into_id, 'search_text', c.search_text)
+             from public.clients c where c.id = ${literal(clientId)}::uuid), 'null'::jsonb);`,
+  )
+  return ClientRow.parse(row)
+}
+
+const ChildCounts = z.object({ notes: z.number(), consents: z.number(), appointments: z.number() })
+
+/** How many notes, consent records and appointments point at the client. */
+export async function clientChildCountsOf(clientId: string): Promise<z.infer<typeof ChildCounts>> {
+  const row = await selectJson(
+    `select json_build_object(
+       'notes', (select count(*) from public.client_notes n where n.client_id = ${literal(clientId)}::uuid),
+       'consents', (select count(*) from public.client_consents cc
+                     where cc.client_id = ${literal(clientId)}::uuid),
+       'appointments', (select count(*) from public.appointments a
+                         where a.client_id = ${literal(clientId)}::uuid));`,
+  )
+  return ChildCounts.parse(row)
+}
+
+/**
+ * The `suppression_list` reasons of a phone in a business, looked up by the HMAC the database
+ * computes with its Vault key (`private.phone_hmac`): the number itself is never stored there.
+ */
+export async function suppressedFor(businessId: string, phoneE164: string): Promise<string[]> {
+  const rows = await selectJson(
+    `select coalesce(jsonb_agg(s.reason order by s.reason), '[]'::jsonb)
+       from public.suppression_list s
+      where s.business_id = ${literal(businessId)}::uuid
+        and s.phone_hmac = private.phone_hmac(${literal(phoneE164)});`,
+  )
+  return z.array(z.string()).parse(rows)
 }

@@ -308,3 +308,18 @@ export function resetShopFile(managerEmail: string): unknown {
     [{ email: managerEmail, role: 'owner' }],
   )
 }
+
+/**
+ * Clients spec (contract 1.8 §5.4, D22): slug `e2e-clients-<project>`, owner
+ * `owner@e2e-clients-<project>.test`, one staff row «Ε2Ε Πελάτες». The erase and merge scenarios
+ * write here (fixture clients, an anonymisation), never on demo-barber.
+ */
+export function clientsShopFile(project: string): unknown {
+  const slug = `e2e-clients-${project}`
+  return securityShopFile(
+    slug,
+    `E2E Clients ${project}`,
+    ['Ε2Ε Πελάτες'],
+    [{ email: `owner@${slug}.test`, role: 'owner' }],
+  )
+}

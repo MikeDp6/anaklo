@@ -18,6 +18,8 @@ import {
 } from '@/features/auth/loaders'
 import { DayPage } from '@/features/calendar/components/DayPage'
 import { TodayPage } from '@/features/calendar/components/TodayPage'
+import { ClientCardPage } from '@/features/clients/components/ClientCardPage'
+import { ClientsPage } from '@/features/clients/components/ClientsPage'
 import { MembersPage } from '@/features/members/components/MembersPage'
 import { NotificationsPage } from '@/features/push/components/NotificationsPage'
 import { ServicesPage } from '@/features/services/components/ServicesPage'
@@ -43,6 +45,8 @@ import { RouteErrorPage } from './RouteErrorPage'
 // second step (ADR-0009 §10, contract 1.7 §6.2): an owner or manager without a device enrols
 // (`mfa/enroll`, blocking), with a device but an `aal1` session gives the code (`mfa/challenge`).
 // The `mfa/*` screens are siblings of the member route: no tab bar, only «Αποσύνδεση».
+// «Πελάτες» (contract 1.8 §4.1): the search and the card, for every role (the server decides what
+// each role sees and may do on a card).
 // Settings (contracts 1.6 §4.1, 1.7 §6.1): the index, «Ειδοποιήσεις» and «Ασφάλεια» for every
 // role; the shop's configuration and the schedule operations for owner/manager (`ManagerOnly`);
 // «Μέλη» and «Ταυτότητα επιχείρησης» for the owner (`OwnerOnly`). The server refuses anyone
@@ -93,6 +97,8 @@ export const router = createBrowserRouter(
           children: [
             { index: true, element: <TodayPage /> },
             { path: 'day', element: <DayPage /> },
+            { path: 'clients', element: <ClientsPage /> },
+            { path: 'clients/:clientId', element: <ClientCardPage /> },
             { path: 'settings', element: <SettingsPage /> },
             { path: 'settings/notifications', element: <NotificationsPage /> },
             { path: 'settings/security', element: <SecurityPage /> },

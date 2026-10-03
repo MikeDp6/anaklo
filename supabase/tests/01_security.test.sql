@@ -4,13 +4,18 @@
 -- 1.7 (0009, contract docs/plans/contracts/1.7-security-members.md §2.2, §2.10, §7.2): business_members
 -- is SELECT-only for authenticated, the alias and grant tables, the twelve authenticated and eight
 -- service_role functions, and the eight internal functions nobody executes.
+-- 1.8 (0010, contract docs/plans/contracts/1.8-client-ops.md §2.2, §2.9, §5.2): client_consents is written
+-- only through set_client_consent (no INSERT/UPDATE for authenticated, only its SELECT policy), notes take a
+-- client-generated id, otp_challenges.phone_hmac is nullable (the erase wipes it), the guard triggers of
+-- notes and consents, the eight authenticated functions (client_card, set_client_consent, merge_clients,
+-- erase_client and their _impl) and the seven internal functions nobody executes.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(59);
+select plan(66);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -79,11 +84,30 @@ select is(
    where c.table_schema = 'public' and c.grantee = 'authenticated' and c.privilege_type = 'UPDATE'
      and c.table_name in ('clients', 'client_consents', 'client_notes')),
   array[
-    'client_consents.withdrawn_at',
     'client_notes.body',
     'clients.birthday', 'clients.email', 'clients.full_name', 'clients.locale', 'clients.phone_e164'
   ]::text[],
-  'the app may update only these client, consent and note columns'
+  'the app may update only these client and note columns (0010: no consent column, withdrawals go through '
+  || 'set_client_consent)'
+);
+
+-- 0010 (contract 1.8 §2.2): consents are written only by set_client_consent (definer); the 0002 insert and
+-- withdraw policies are gone, the SELECT policy stays.
+select is(
+  (select array_agg(p.policyname || ':' || p.cmd order by p.policyname)
+   from pg_policies p
+   where p.schemaname = 'public' and p.tablename = 'client_consents'),
+  array['client_consents_select:SELECT']::text[],
+  'client_consents has exactly one policy: client_consents_select (SELECT)'
+);
+
+select is(
+  (select array_agg(x.priv order by x.priv)
+   from unnest(array['DELETE', 'INSERT', 'TRUNCATE', 'UPDATE']) as x (priv)
+   where has_table_privilege('authenticated', 'public.client_consents', x.priv)
+      or (x.priv in ('INSERT', 'UPDATE') and has_any_column_privilege('authenticated', 'public.client_consents', x.priv))),
+  null::text[],
+  'authenticated cannot write client_consents at all, not even single columns (0010: set_client_consent only)'
 );
 
 select is(
@@ -359,15 +383,29 @@ select is(
    where c.table_schema = 'public' and c.grantee = 'authenticated' and c.privilege_type = 'INSERT'
      and c.table_name in ('clients', 'client_consents', 'client_notes')),
   array[
-    'client_consents.business_id', 'client_consents.client_id', 'client_consents.created_by',
-    'client_consents.given_by', 'client_consents.granted', 'client_consents.legal_basis',
-    'client_consents.policy_version', 'client_consents.purpose', 'client_consents.source',
     'client_notes.author_id', 'client_notes.body', 'client_notes.business_id', 'client_notes.client_id',
+    'client_notes.id',
     'clients.birthday', 'clients.business_id', 'clients.email', 'clients.full_name', 'clients.locale',
     'clients.phone_e164', 'clients.source'
   ]::text[],
-  'the app may set only these columns when creating clients, consents and notes (no ids, dates or provenance)'
+  'the app may set only these columns when creating clients and notes (0010: a note''s client-generated id, no '
+  || 'consent column at all; no dates or provenance)'
 );
+
+-- 0010: the erase wipes the phone HMAC of OTP challenges (the table keeps no privilege for any role, above).
+select is(
+  (select c.is_nullable::text from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'otp_challenges' and c.column_name = 'phone_hmac'),
+  'YES',
+  'otp_challenges.phone_hmac is nullable (erase_client wipes it, 0010)'
+);
+
+-- 0010: no note or consent for an erased or merged client, for every role (BEFORE INSERT guards).
+select has_trigger('public', 'client_notes', 'client_notes_guard_client',
+  'client_notes has the trigger client_notes_guard_client');
+
+select has_trigger('public', 'client_consents', 'client_consents_guard_client',
+  'client_consents has the trigger client_consents_guard_client');
 
 -- Appointments are written only through the booking RPCs (0004): the app holds no INSERT or
 -- UPDATE on any appointment table, not even on single columns.
@@ -449,27 +487,32 @@ select is(
   array[
     'private.authorize_factor_change_impl',
     'private.available_slots_impl', 'private.busy_calendar_impl', 'private.can_manage_members_impl',
-    'private.cancel_appointment_impl', 'private.change_business_identity_impl',
+    'private.cancel_appointment_impl', 'private.change_business_identity_impl', 'private.client_card_impl',
+    'private.erase_client_impl',
     'private.has_role', 'private.is_member', 'private.is_reserved_slug',
-    'private.is_valid_timezone', 'private.list_members_impl', 'private.mark_absence_impl', 'private.my_business_ids',
+    'private.is_valid_timezone', 'private.list_members_impl', 'private.mark_absence_impl',
+    'private.merge_clients_impl', 'private.my_business_ids',
     'private.my_business_ids_with_role', 'private.my_staff_id', 'private.my_staff_ids',
     'private.public_booking_catalogue_impl', 'private.public_business_profile_impl',
     'private.public_slug_for_code_impl', 'private.reassign_appointment_impl', 'private.reassign_candidates_impl',
     'private.register_push_subscription_impl', 'private.remove_member_impl', 'private.replace_week_hours_impl',
     'private.request_test_push_impl',
     'private.save_service_impl', 'private.schedule_conflicts_impl', 'private.search_clients_impl',
-    'private.set_appointment_status_impl', 'private.set_member_role_impl', 'private.set_staff_order_impl',
+    'private.set_appointment_status_impl', 'private.set_client_consent_impl', 'private.set_member_role_impl',
+    'private.set_staff_order_impl',
     'private.staff_available_slots_impl',
     'private.staff_book_appointment_impl', 'private.staff_move_appointment_impl', 'private.today_summary_impl',
     'private.unregister_push_subscription_impl',
     'public.authorize_factor_change',
     'public.available_slots', 'public.busy_calendar', 'public.can_manage_members', 'public.cancel_appointment',
-    'public.change_business_identity', 'public.list_members', 'public.mark_absence',
+    'public.change_business_identity', 'public.client_card', 'public.erase_client', 'public.list_members',
+    'public.mark_absence', 'public.merge_clients',
     'public.public_booking_catalogue', 'public.public_business_profile', 'public.public_slug_for_code',
     'public.reassign_appointment', 'public.reassign_candidates', 'public.register_push_subscription',
     'public.remove_member', 'public.replace_week_hours',
     'public.request_test_push', 'public.save_service', 'public.schedule_conflicts', 'public.search_clients',
-    'public.set_appointment_status', 'public.set_member_role', 'public.set_staff_order', 'public.staff_available_slots',
+    'public.set_appointment_status', 'public.set_client_consent', 'public.set_member_role', 'public.set_staff_order',
+    'public.staff_available_slots',
     'public.staff_book_appointment', 'public.staff_move_appointment', 'public.today_summary',
     'public.unregister_push_subscription'
   ]::text[],
@@ -477,14 +520,39 @@ select is(
   || '0007: register/unregister_push_subscription, request_test_push; 0008: mark_absence, reassign_appointment, '
   || 'reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order; 0009: '
   || 'authorize_factor_change, can_manage_members, change_business_identity, list_members, remove_member, '
-  || 'set_member_role; each with its _impl)'
+  || 'set_member_role; 0010: client_card, erase_client, merge_clients, set_client_consent; each with its _impl)'
 );
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'private') and has_function_privilege('authenticated', p.oid, 'execute')),
-  64::bigint,
-  'authenticated may execute exactly 64 functions in public/private (52 until 0008, twelve more in 0009)'
+  72::bigint,
+  'authenticated may execute exactly 72 functions in public/private (64 until 0009, eight more in 0010)'
+);
+
+-- 1.8 (0010): the family helpers, the consent rule, the booking box, the merge core (Phase 3 importer)
+-- and the two trigger functions are granted to nobody. All of them must exist, so the check is not
+-- vacuous.
+select is(
+  (select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private' and p.proname = any (array[
+     'client_root', 'client_family', 'consent_state', 'apply_marketing_box', 'merge_clients_core',
+     'guard_client_child_insert', 'set_client_search_text'])),
+  7::bigint,
+  'the 0010 internal functions exist (client_root, client_family, consent_state, apply_marketing_box, '
+  || 'merge_clients_core, guard_client_child_insert, set_client_search_text)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || p.proname order by r.role_name, p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   cross join unnest(array['anon', 'authenticated', 'service_role']) as r (role_name)
+   where n.nspname = 'private' and p.proname = any (array[
+     'client_root', 'client_family', 'consent_state', 'apply_marketing_box', 'merge_clients_core',
+     'guard_client_child_insert', 'set_client_search_text'])
+     and has_function_privilege(r.role_name, p.oid, 'execute')),
+  null::text[],
+  'no API role may execute the 0010 internal functions (merge_clients_core only for the importer, as postgres)'
 );
 
 -- 1.7 (0009): the freshness rule, the D2 session check, the grant writer, the privilege test, the

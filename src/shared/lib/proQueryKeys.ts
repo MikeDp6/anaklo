@@ -51,8 +51,12 @@ export const proKeys = {
       query.to,
       query.excludeAppointmentId ?? '-',
     ] as const,
+  /** Prefix of the client search and of every client card (contract 1.8 §3.3). */
+  clientsAll: (businessId: string) => ['pro', businessId, 'clients'] as const,
   clientSearch: (businessId: string, query: string) =>
     ['pro', businessId, 'clients', 'search', query.trim()] as const,
+  clientCard: (businessId: string, clientId: string) =>
+    ['pro', businessId, 'clients', 'card', clientId] as const,
   /**
    * The signed-in user's own push subscriptions (contract 1.5 §4.3). Per user, not per business
    * (ADR-0010 §2), hence `'user'` where the other keys have the business.

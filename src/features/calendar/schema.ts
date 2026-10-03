@@ -96,7 +96,12 @@ export const DayAppointmentRows = z.array(
     total_cents: Cents,
     cancel_reason: z.nullable(CancelReason),
     client: z.nullable(
-      z.object({ id: Id, full_name: z.string(), phone_e164: z.nullable(z.string()) }),
+      z.object({
+        id: Id,
+        full_name: z.string(),
+        phone_e164: z.nullable(z.string()),
+        erased_at: z.nullable(Instant),
+      }),
     ),
     services: z.array(
       z.object({
@@ -108,6 +113,40 @@ export const DayAppointmentRows = z.array(
     ),
   }),
 )
+
+type DayAppointmentRow = z.infer<typeof DayAppointmentRows>[number]
+
+/**
+ * One row of a staff member's day in the app's shape. An erased client (contract 1.8 §4.10) is
+ * no client at all: the day column and the sheet then say «Walk-in χωρίς όνομα», like «Σήμερα»
+ * and the conflicts, instead of an empty name.
+ */
+export function toDayAppointment(row: DayAppointmentRow): DayAppointment {
+  return {
+    id: row.id,
+    staffId: row.staff_id,
+    clientId: row.client_id,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    bufferAfterMin: row.buffer_after_min,
+    status: row.status,
+    source: row.source,
+    totalCents: row.total_cents,
+    cancelReason: row.cancel_reason,
+    client:
+      row.client && row.client.erased_at === null
+        ? { id: row.client.id, fullName: row.client.full_name, phoneE164: row.client.phone_e164 }
+        : null,
+    services: [...row.services]
+      .sort((a, b) => a.position - b.position)
+      .map((line) => ({
+        position: line.position,
+        serviceId: line.service_id,
+        durationMin: line.duration_min,
+        priceCents: line.price_cents,
+      })),
+  }
+}
 
 export interface DayAppointment {
   readonly id: string

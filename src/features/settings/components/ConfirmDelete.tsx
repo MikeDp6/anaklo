@@ -10,6 +10,7 @@ export function ConfirmDelete({
   confirming,
   busy,
   label,
+  question,
   onAsk,
   onCancel,
   onConfirm,
@@ -18,6 +19,8 @@ export function ConfirmDelete({
   busy: boolean
   /** The accessible name of the first button when «Διαγραφή» alone is ambiguous (a list item). */
   label?: string
+  /** The question when «Να διαγραφεί;» alone is too vague (e.g. «Να διαγραφεί η σημείωση;»). */
+  question?: string
   onAsk: () => void
   onCancel: () => void
   onConfirm: () => void
@@ -32,7 +35,7 @@ export function ConfirmDelete({
   }
   return (
     <div className={styles.stack}>
-      <p className={styles.status}>{t('form.confirmDelete')}</p>
+      <p className={styles.status}>{question ?? t('form.confirmDelete')}</p>
       <div className={styles.actions}>
         <Button variant="secondary" disabled={busy} onClick={onConfirm}>
           {t('form.delete')}

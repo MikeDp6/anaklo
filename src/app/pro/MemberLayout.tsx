@@ -6,8 +6,9 @@ import styles from './MemberLayout.module.css'
 
 /**
  * Frame of the signed-in area: brand + sign-out on top, a bottom tab bar (one hand, thumb reach)
- * with the two day screens and «Ρυθμίσεις» (every role: notifications are per user; the 1.6
- * screens join that list, not the bar). The settings tab stays active on its sub-screens.
+ * with the two day screens, «Πελάτες» (contract 1.8 §4.1) and «Ρυθμίσεις» (every role:
+ * notifications are per user; the 1.6 screens join that list, not the bar). The clients and
+ * settings tabs stay active on their sub-screens (a card, a settings page).
  */
 export function MemberLayout() {
   const { t } = useTranslation(['pro', 'common'])
@@ -26,6 +27,9 @@ export function MemberLayout() {
         </NavLink>
         <NavLink to="/day" className={tab}>
           {t('nav.day')}
+        </NavLink>
+        <NavLink to="/clients" className={tab}>
+          {t('nav.clients')}
         </NavLink>
         <NavLink to="/settings" className={tab}>
           {t('nav.settings')}

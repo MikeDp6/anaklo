@@ -169,6 +169,7 @@
     "label": "Main navigation",
     "today": "Today",
     "day": "Calendar",
+    "clients": "Clients",
     "settings": "Settings"
   },
   "settings": {
@@ -690,7 +691,8 @@
       "noShow": "No-show",
       "move": "Move",
       "cancel": "Cancel"
-    }
+    },
+    "clientCard": "Client card"
   },
   "cancel": {
     "title": "Cancel appointment",
@@ -793,6 +795,154 @@
     "warning": {
       "outside_hours": "Outside the working hours.",
       "buffer_overlap": "In the break after another appointment."
+    }
+  },
+  "clients": {
+    "title": "Clients",
+    "search": {
+      "label": "Search clients",
+      "hint": "Name (also in Latin letters) or the last digits of the phone.",
+      "searching": "Searching…",
+      "results": "Search results",
+      "none": "No client found.",
+      "erased": "The client was anonymised.",
+      "lastVisit": "Last visit {{date}}"
+    },
+    "card": {
+      "loading": "Loading the client card…",
+      "back": "Clients",
+      "backLabel": "Back to clients",
+      "notFound": "Client not found.",
+      "notFoundBody": "The link may be wrong, or the client does not belong to this business.",
+      "erasedTitle": "Anonymised client",
+      "erasedBody": "This client’s details have been erased. Their appointments count only in the statistics."
+    },
+    "details": {
+      "verified": "Verified phone",
+      "noPhone": "No mobile",
+      "locale": "Message language: {{language}}",
+      "since": "Client since {{date}}",
+      "aliases": "Also as: {{names}}",
+      "edit": "Edit details"
+    },
+    "languages": {
+      "el": "Ελληνικά",
+      "en": "English"
+    },
+    "edit": {
+      "title": "Edit details",
+      "fullName": "Full name",
+      "phone": "Mobile",
+      "phoneHint": "If you change the mobile, the next online booking will verify it again.",
+      "locale": "Message language",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
+      "errors": {
+        "nameRequired": "Write the client’s name.",
+        "nameTooLong": "The name is too long.",
+        "phoneInvalid": "Write a valid mobile or leave it empty."
+      }
+    },
+    "ring": {
+      "label": "Visit rhythm",
+      "daysUnit_one": "day",
+      "daysUnit_other": "days",
+      "sinceLast_one": "{{count}} day since the last visit.",
+      "sinceLast_other": "{{count}} days since the last visit.",
+      "within_one": "Within the usual interval (about {{count}} week).",
+      "within_other": "Within the usual interval (about {{count}} weeks).",
+      "beyond_one": "Past the usual interval by {{count}} day.",
+      "beyond_other": "Past the usual interval by {{count}} days.",
+      "noVisits": "No completed visit yet.",
+      "noInterval": "No interval to compare with yet.",
+      "basisBusiness": "based on the shop’s clients",
+      "basisVertical": "based on the trade",
+      "aria": "{{label}}. {{text}}"
+    },
+    "counters": {
+      "title": "Statistics",
+      "visits": "Visits",
+      "lastVisit": "Last visit",
+      "noShows": "No-shows"
+    },
+    "history": {
+      "title": "History",
+      "upcoming": "Upcoming appointments",
+      "upcomingEmpty": "No upcoming appointment.",
+      "empty": "No past appointments.",
+      "more": "Show more",
+      "capped": "Showing the 50 most recent.",
+      "amount": "Amount: {{amount}}"
+    },
+    "notes": {
+      "title": "Notes",
+      "body": "Note",
+      "hint": "Write only what helps the service. No sensitive personal data.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "The note was saved.",
+      "empty": "No notes.",
+      "list": "Client notes",
+      "byMe": "You",
+      "formerMember": "Former member",
+      "deleteLabel": "Delete the note of {{date}}",
+      "confirmDelete": "Delete the note?",
+      "capped": "Showing the 100 most recent.",
+      "errors": {
+        "required": "Write the note.",
+        "tooLong": "Up to 2000 characters."
+      }
+    },
+    "consents": {
+      "title": "Consents",
+      "marketingSms": "Offers by SMS",
+      "bookingForm": "From the booking form, {{date}} (with the option to refuse).",
+      "inShop": "Consent in the shop, {{date}}.",
+      "inShopGuardian": "Consent in the shop, {{date}}, by a guardian.",
+      "refused": "The client refused, {{date}}.",
+      "none": "No consent given.",
+      "sheetTitle": "Consent to offers by SMS",
+      "confirmBody": "You asked the client and they agreed just now to receive offers by SMS from the shop. They can withdraw it whenever they want.",
+      "guardian": "Given by a parent or guardian (client under 15)",
+      "confirm": "Record consent",
+      "confirming": "Recording…",
+      "recorded": "The consent was recorded.",
+      "withdrawn": "The consent was withdrawn.",
+      "history": "Consent history",
+      "historyEmpty": "No records.",
+      "yes": "Yes",
+      "no": "No",
+      "guardianShort": "by a guardian",
+      "withdrawnAt": "withdrawn {{date}}",
+      "purposes": {
+        "marketing_sms": "Offers by SMS",
+        "marketing_email": "Offers by email",
+        "photos_record": "Photos in the shop’s records",
+        "photos_publish": "Publishing photos"
+      },
+      "sources": {
+        "booking_form": "Booking form",
+        "staff_ui": "In the shop",
+        "import": "Import",
+        "link": "Link"
+      }
+    },
+    "erase": {
+      "open": "Anonymise client",
+      "title": "Anonymise client",
+      "lead": "What happens:",
+      "consequences": {
+        "details": "Their name, phone and other details are erased for good.",
+        "notes": "Their notes and consents are erased.",
+        "appointments": "Their appointments stay in the statistics, without a name.",
+        "marketing": "They will not receive offers on this phone again.",
+        "final": "It cannot be undone."
+      },
+      "understand": "I understand that it cannot be undone.",
+      "confirm": "Anonymise",
+      "erasing": "Anonymising…",
+      "cancel": "Cancel"
     }
   }
 }

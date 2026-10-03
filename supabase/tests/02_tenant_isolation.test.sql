@@ -5,6 +5,9 @@
 -- also calls as the owner with an OLD authenticator code and records each error's hint, so a
 -- critical RPC that checked the fresh code before the membership would show (a step-up hint for a
 -- business the caller does not belong to).
+-- 1.8 (0010, contract 1.8 §5.2): the loop also covers client_card, erase_client, merge_clients and
+-- set_client_consent (≥ 25 signatures); erase_client, a critical RPC, refuses a foreign business with a
+-- bare 42501 for every caller; notes, still direct writes, keep the tenant check of RLS.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
@@ -13,7 +16,7 @@ set local role postgres;
 set local search_path = public, extensions;
 -- Fixture appointments are written by the system (appointment writes must declare an actor).
 select set_config('anaklo.actor_type', 'system', true);
-select plan(28);
+select plan(30);
 
 -- ---------------------------------------------------------------------------------------------
 -- Fixture (as postgres)
@@ -155,6 +158,16 @@ select throws_ok(
   '42501',
   null,
   'owner A cannot add staff to B'
+);
+
+-- 1.8 (0010): notes stay direct writes (with a client-generated id); RLS keeps them inside the business.
+select throws_ok(
+  $$insert into public.client_notes (id, business_id, client_id, author_id, body)
+    values ('a5000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001',
+            'b3000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000000a', 'Intruder note')$$,
+  '42501',
+  null,
+  'owner A cannot add a note to a client of B (1.8)'
 );
 
 set local role postgres;
@@ -340,27 +353,38 @@ select set_config('anaklo.actor_type', 'system', true);
 -- busy_calendar, cancel_appointment, search_clients, set_appointment_status, staff_move_appointment,
 -- today_summary; 1.5 (0007) request_test_push; 1.6 (0008) mark_absence, reassign_appointment,
 -- reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order; 1.7 (0009)
--- can_manage_members, change_business_identity, list_members, remove_member, set_member_role.
+-- can_manage_members, change_business_identity, list_members, remove_member, set_member_role; 1.8 (0010)
+-- client_card, erase_client, merge_clients, set_client_consent.
 -- register_push_subscription and unregister_push_subscription take no p_business_id (contract 1.5
 -- D14: subscriptions belong to the user, not to a business); their isolation is tested in
 -- 12_push_subscriptions. authorize_factor_change takes none either (phase-1 plan: the only
 -- exception, it concerns the caller's own factors); 14_members_identity covers it.
 select ok(
-  (select count(distinct signature) from tenant_rpc_calls) >= 21,
-  'the generic loop found at least 21 business-scoped RPCs'
+  (select count(distinct signature) from tenant_rpc_calls) >= 25,
+  'the generic loop found at least 25 business-scoped RPCs'
 );
 
 select ok(
-  array['busy_calendar', 'can_manage_members', 'cancel_appointment', 'change_business_identity', 'list_members',
-        'mark_absence', 'reassign_appointment', 'reassign_candidates', 'remove_member',
-        'replace_week_hours', 'request_test_push', 'save_service', 'schedule_conflicts', 'search_clients',
-        'set_appointment_status', 'set_member_role', 'set_staff_order', 'staff_available_slots',
-        'staff_book_appointment', 'staff_move_appointment', 'today_summary']
+  array['busy_calendar', 'can_manage_members', 'cancel_appointment', 'change_business_identity', 'client_card',
+        'erase_client', 'list_members', 'mark_absence', 'merge_clients', 'reassign_appointment', 'reassign_candidates',
+        'remove_member', 'replace_week_hours', 'request_test_push', 'save_service', 'schedule_conflicts',
+        'search_clients', 'set_appointment_status', 'set_client_consent', 'set_member_role', 'set_staff_order',
+        'staff_available_slots', 'staff_book_appointment', 'staff_move_appointment', 'today_summary']
     <@ (select array_agg(proname) from tenant_rpc_calls),
-  'the loop covers busy_calendar, can_manage_members, cancel_appointment, change_business_identity, list_members, '
-  || 'mark_absence, reassign_appointment, reassign_candidates, remove_member, replace_week_hours, request_test_push, '
-  || 'save_service, schedule_conflicts, search_clients, set_appointment_status, set_member_role, set_staff_order, '
-  || 'staff_available_slots, staff_book_appointment, staff_move_appointment and today_summary'
+  'the loop covers busy_calendar, can_manage_members, cancel_appointment, change_business_identity, client_card, '
+  || 'erase_client, list_members, mark_absence, merge_clients, reassign_appointment, reassign_candidates, '
+  || 'remove_member, replace_week_hours, request_test_push, save_service, schedule_conflicts, search_clients, '
+  || 'set_appointment_status, set_client_consent, set_member_role, set_staff_order, staff_available_slots, '
+  || 'staff_book_appointment, staff_move_appointment and today_summary'
+);
+
+-- 1.8: erase_client is critical (fresh code inside its _impl); membership comes first, so the owner at aal2
+-- with a fresh or an old code and the staff member at aal1 all get the bare 42501 for business B.
+select is(
+  (select array_agg(caller || ' ' || outcome || ' ' || coalesce(hint, '-') order by caller collate "C")
+   from tenant_rpc_calls where proname = 'erase_client'),
+  array['owner (aal2) 42501 -', 'owner (aal2, old code) 42501 -', 'staff 42501 -']::text[],
+  'erase_client with the id of B: 42501 without hint for the owner of A (fresh or old code) and for staff (1.8)'
 );
 
 select is(

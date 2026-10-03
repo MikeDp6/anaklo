@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   CancelInput,
@@ -55,19 +56,22 @@ function open(appointment: DayAppointment) {
     defaultOptions: { queries: { retry: false }, mutations: { networkMode: 'always', retry: 0 } },
   })
   const onClose = vi.fn()
+  // A router: the sheet links to the client's card (contract 1.8 §4.10).
   const view = render(
-    <QueryClientProvider client={queryClient}>
-      <AppointmentSheet
-        workspace={testWorkspace()}
-        target={{
-          appointmentId: appointment.id,
-          staffId: appointment.staffId,
-          localDate: '2026-09-29',
-        }}
-        today="2026-09-29"
-        onClose={onClose}
-      />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <AppointmentSheet
+          workspace={testWorkspace()}
+          target={{
+            appointmentId: appointment.id,
+            staffId: appointment.staffId,
+            localDate: '2026-09-29',
+          }}
+          today="2026-09-29"
+          onClose={onClose}
+        />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
   return { onClose, queryClient, unmount: view.unmount }
 }
@@ -394,7 +398,20 @@ describe('AppointmentSheet', () => {
   it('a walk-in without a phone: no SMS option on cancel', async () => {
     open(testAppointment({ client: null, clientId: null, source: 'walkin' }))
     expect(await screen.findByText('Walk-in χωρίς όνομα')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Καρτέλα πελάτη' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Ακύρωση' }))
     expect(screen.queryByRole('checkbox', { name: /Ενημέρωση με SMS/ })).toBeNull()
+  })
+
+  it('links to the client card when there is a client (contract 1.8 §4.10)', async () => {
+    open(testAppointment())
+    const link = await screen.findByRole('link', { name: 'Καρτέλα πελάτη' })
+    expect(link).toHaveAttribute('href', `/clients/${IDS.client}`)
+  })
+
+  it('an erased client (no client on the row): «Walk-in χωρίς όνομα» and no card link', async () => {
+    open(testAppointment({ client: null }))
+    expect(await screen.findByText('Walk-in χωρίς όνομα')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Καρτέλα πελάτη' })).toBeNull()
   })
 })

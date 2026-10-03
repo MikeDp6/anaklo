@@ -19,6 +19,14 @@
   font-size: max(16px, var(--text-md)); /* no iOS zoom */
 }
 
+/* TextAreaField: the same box, several lines, ≥ 88px, resized only in height. */
+.textarea {
+  min-height: 88px;
+  padding: var(--space-3) var(--space-4);
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .input[aria-invalid='true'] {
   border-color: var(--color-danger);
 }

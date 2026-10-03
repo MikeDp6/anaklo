@@ -64,6 +64,10 @@ export const DOMAIN_ERROR_HTTP_STATUS = {
   AN029: 409,
   AN030: 404,
   AN031: 409,
+  // 0010: erase_client with an upcoming appointment; a client merged or erased meanwhile
+  // (contract 1.8 §2.8).
+  AN032: 409,
+  AN033: 409,
 } as const satisfies Record<DomainErrorCode, number>
 
 /** `{ error: { code: 'AN0xx', message: <name> } }` with the status of §2.1. */

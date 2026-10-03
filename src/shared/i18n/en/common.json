@@ -38,6 +38,8 @@
     "AN029": "This professional already has their own sign-in.",
     "AN030": "No longer a member of the business.",
     "AN031": "This email cannot be added from here. Contact Nous.",
+    "AN032": "The client has an upcoming appointment. Cancel it first, then anonymise the client.",
+    "AN033": "The client changed in the meantime (merged or anonymised). Open the card again.",
     "network": "You are offline. Try again.",
     "unknown": "Something went wrong. Try again."
   }

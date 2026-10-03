@@ -3,10 +3,13 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   CHECKED_VALUE_LISTS,
+  CLIENT_CARD_STATES,
   CONFLICT_REASONS,
+  CONSENT_STATES,
   MESSAGE_TEMPLATES,
   PUSH_MESSAGE_TEMPLATES,
   REASSIGN_BLOCKERS,
+  RING_STATES,
   SMS_MESSAGE_TEMPLATES,
   STEP_UP_HINTS,
   SUPPORT_ACTIONS,
@@ -115,5 +118,21 @@ describe('RPC inputs and hints match the functions that use them (0009)', () => 
     const accepted = /p_action\s+not\s+in\s*\(([^)]*)\)/.exec(body ?? '')?.[1] ?? ''
     const values = [...accepted.matchAll(/'([^']*)'/g)].map((m) => m[1])
     expect(values).toEqual([...SUPPORT_ACTIONS])
+  })
+})
+
+describe('RPC output lists match the functions that produce them (0010)', () => {
+  const sql = migrationSql()
+
+  it.each([
+    ['private.client_card_impl', CLIENT_CARD_STATES],
+    ['private.client_card_impl', RING_STATES],
+    ['private.consent_state', CONSENT_STATES],
+  ] as const)('%s names every value of %j', (name, values) => {
+    const body = functionBody(sql, name)
+    expect(body, `function ${name} not found in migrations`).not.toBeNull()
+    for (const value of values) {
+      expect(body?.includes(`'${value}'`), `${name} names '${value}'`).toBe(true)
+    }
   })
 })

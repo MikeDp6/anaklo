@@ -49,7 +49,8 @@ export const APPOINTMENT_EVENTS = [
   'imported',
 ] as const
 export const EVENT_ACTOR_TYPES = ['client', 'staff', 'system', 'import'] as const
-export const AUDIT_ACTOR_TYPES = ['staff', 'nous_support', 'system'] as const
+/** Who wrote an audit row; 'import' since 0010 (merge_clients_core with the importer's actor). */
+export const AUDIT_ACTOR_TYPES = ['staff', 'nous_support', 'system', 'import'] as const
 /** The outbox, `messages_log` (0005, 0007). */
 export const MESSAGE_CHANNELS = ['sms', 'push'] as const
 /** SMS templates: exactly the keys of SMS_TEMPLATES in sms-templates.ts (domain.test.ts). */
@@ -132,6 +133,16 @@ export const REASSIGN_BLOCKERS = ['not_offered', 'busy', 'off', 'tight'] as cons
 export const STEP_UP_HINTS = ['aal2_required', 'fresh_totp_required'] as const
 /** What Nous records through `record_support_action` (0009, service_role only). */
 export const SUPPORT_ACTIONS = ['mfa_reset', 'provision_update'] as const
+/**
+ * RPC outputs of 0010 (contract 1.8 §2.8; domain.test.ts checks that 0010 names them). The three
+ * states of `client_card`: the card of a family, a merged source (the app redirects to the root),
+ * an erased client (the state only).
+ */
+export const CLIENT_CARD_STATES = ['live', 'merged', 'erased'] as const
+/** The E18 ring of `client_card`: days since the last visit against the next-visit interval. */
+export const RING_STATES = ['no_visits', 'no_interval', 'within', 'beyond'] as const
+/** A family's consent per purpose (`private.consent_state`): the latest active record wins. */
+export const CONSENT_STATES = ['granted', 'refused', 'none'] as const
 
 export const Vertical = z.enum(VERTICALS)
 export const Locale = z.enum(LOCALES)
@@ -143,6 +154,10 @@ export const ConflictReason = z.enum(CONFLICT_REASONS)
 export const ReassignBlocker = z.enum(REASSIGN_BLOCKERS)
 export const StepUpHint = z.enum(STEP_UP_HINTS)
 export const SupportAction = z.enum(SUPPORT_ACTIONS)
+export const ConsentPurpose = z.enum(CONSENT_PURPOSES)
+export const ConsentState = z.enum(CONSENT_STATES)
+export const RingState = z.enum(RING_STATES)
+export const ClientCardState = z.enum(CLIENT_CARD_STATES)
 
 export type Vertical = z.infer<typeof Vertical>
 export type Locale = z.infer<typeof Locale>
@@ -154,6 +169,10 @@ export type ConflictReason = z.infer<typeof ConflictReason>
 export type ReassignBlocker = z.infer<typeof ReassignBlocker>
 export type StepUpHint = z.infer<typeof StepUpHint>
 export type SupportAction = z.infer<typeof SupportAction>
+export type ConsentPurpose = z.infer<typeof ConsentPurpose>
+export type ConsentState = z.infer<typeof ConsentState>
+export type RingState = z.infer<typeof RingState>
+export type ClientCardState = z.infer<typeof ClientCardState>
 
 /** CHECK constraint name → the list above that must match it exactly (order-insensitive). */
 export const CHECKED_VALUE_LISTS: Readonly<Record<string, readonly string[]>> = {

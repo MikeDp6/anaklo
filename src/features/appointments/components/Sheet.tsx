@@ -13,6 +13,7 @@ export function Sheet({
   onClose,
   children,
   busy = false,
+  closable = true,
 }: {
   /** From i18n or data. */
   title: string
@@ -20,15 +21,22 @@ export function Sheet({
   children: ReactNode
   /** aria-busy while its content loads (E17 skeleton inside). */
   busy?: boolean
+  /**
+   * false while a write that must not be abandoned is in flight (an erase): the X is disabled and
+   * Esc does nothing, so the sheet stays until the server answers.
+   */
+  closable?: boolean
 }) {
   const { t } = useTranslation('pro')
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const closeRef = useRef(onClose)
+  const closableRef = useRef(closable)
 
   useEffect(() => {
     closeRef.current = onClose
-  }, [onClose])
+    closableRef.current = closable
+  }, [onClose, closable])
 
   // A LAYOUT effect: its cleanup runs while the <dialog> is still in the document (a passive
   // effect's cleanup runs after React removed it). close() on a connected modal dialog hands the
@@ -45,7 +53,7 @@ export function Sheet({
     }
     const onCancel = (event: Event) => {
       event.preventDefault()
-      closeRef.current()
+      if (closableRef.current) closeRef.current()
     }
     dialog.addEventListener('cancel', onCancel)
     return () => {
@@ -66,6 +74,7 @@ export function Sheet({
             type="button"
             className={cx(styles.close, 'pressable')}
             aria-label={t('sheet.close')}
+            disabled={!closable}
             onClick={onClose}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

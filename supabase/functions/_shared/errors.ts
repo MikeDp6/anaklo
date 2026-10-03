@@ -43,6 +43,9 @@ export const DOMAIN_ERRORS = {
   AN029: 'staff_has_login',
   AN030: 'not_a_member',
   AN031: 'member_elsewhere',
+  // 0010 (client card, merge, erasure)
+  AN032: 'client_has_upcoming',
+  AN033: 'client_unavailable',
 } as const
 
 export type DomainErrorCode = keyof typeof DOMAIN_ERRORS

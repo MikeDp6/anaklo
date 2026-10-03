@@ -350,13 +350,13 @@ isOneToOne: false
                   ]
                 },"otp_challenges": {
                   Row: {
-                    "attempts": number,"business_id": string,"code_hmac": string,"created_at": string,"expires_at": string,"grant_appointment_id": string | null,"grant_expires_at": string | null,"grant_hash": string | null,"grant_used_at": string | null,"id": string,"phone_hmac": string,"verified_at": string | null
+                    "attempts": number,"business_id": string,"code_hmac": string,"created_at": string,"expires_at": string,"grant_appointment_id": string | null,"grant_expires_at": string | null,"grant_hash": string | null,"grant_used_at": string | null,"id": string,"phone_hmac": string | null,"verified_at": string | null
                   }
                   Insert: {
-                    "attempts"?: number,"business_id": string,"code_hmac": string,"created_at"?: string,"expires_at": string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac": string,"verified_at"?: string | null
+                    "attempts"?: number,"business_id": string,"code_hmac": string,"created_at"?: string,"expires_at": string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac"?: string | null,"verified_at"?: string | null
                   }
                   Update: {
-                    "attempts"?: number,"business_id"?: string,"code_hmac"?: string,"created_at"?: string,"expires_at"?: string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac"?: string,"verified_at"?: string | null
+                    "attempts"?: number,"business_id"?: string,"code_hmac"?: string,"created_at"?: string,"expires_at"?: string,"grant_appointment_id"?: string | null,"grant_expires_at"?: string | null,"grant_hash"?: string | null,"grant_used_at"?: string | null,"id"?: string,"phone_hmac"?: string | null,"verified_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -644,8 +644,14 @@ isOneToOne: false
 "claim_messages":
 { Args: { "p_ids": (string)[] }; Returns: Json
                            },
+"client_card":
+{ Args: { "p_business_id": string,"p_client_id": string }; Returns: Json
+                           },
 "clients_for_phone":
 { Args: { "p_business_id": string,"p_grant": string,"p_phone": string,"p_trusted_device_token": string }; Returns: Json
+                           },
+"erase_client":
+{ Args: { "p_business_id": string,"p_client_id": string }; Returns: Json
                            },
 "list_members":
 { Args: { "p_business_id": string }; Returns: {
@@ -668,6 +674,9 @@ isOneToOne: false
                            },
 "mark_absence":
 { Args: { "p_business_id": string,"p_from": string,"p_staff_id": string,"p_to": string }; Returns: Json
+                           },
+"merge_clients":
+{ Args: { "p_business_id": string,"p_source": string,"p_target": string }; Returns: Json
                            },
 "otp_start":
 { Args: { "p_business_id": string,"p_code"?: string,"p_ip": string,"p_locale": string,"p_phone": string,"p_service_ids": (string)[],"p_staff_id": string,"p_starts_at": string }; Returns: Json
@@ -736,6 +745,9 @@ isOneToOne: false
                            },
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_from_status": string,"p_status": string }; Returns: Json
+                           },
+"set_client_consent":
+{ Args: { "p_business_id": string,"p_client_id": string,"p_given_by"?: string,"p_granted": boolean,"p_policy_version"?: string,"p_purpose": string }; Returns: Json
                            },
 "set_member_role":
 { Args: { "p_business_id": string,"p_role": string,"p_user_id": string }; Returns: Json

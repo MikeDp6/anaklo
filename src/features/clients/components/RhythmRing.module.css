@@ -1,0 +1,53 @@
+/* E18 ring (contract 1.8 §4.4). The fill animation and its reduced-motion rule live in
+   motion.css (`ring-progress`); here only the size and the colours (semantic tokens: the brand
+   line within the interval, the accent past it; never gold on a light background). */
+.ring {
+  position: relative;
+  flex: none;
+  width: 96px;
+  height: 96px;
+}
+
+.ring svg {
+  display: block;
+}
+
+.track,
+.progress {
+  fill: none;
+}
+
+.track {
+  stroke: var(--color-line);
+}
+
+.progress {
+  stroke: var(--color-brand-line);
+  /* Butt ends: an empty ring (fraction 0) draws nothing, not a dot. */
+  stroke-linecap: butt;
+}
+
+.ring[data-state='beyond'] .progress {
+  stroke: var(--color-accent);
+}
+
+.centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.days {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}

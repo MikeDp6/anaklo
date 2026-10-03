@@ -453,13 +453,25 @@ clients               id, business_id, full_name, phone_e164?, phone_verified_at
                       merged_into_id?, erased_at?, created_at
                       -- phone_verified_at: τελευταίο OTP γι' αυτόν τον αριθμό· μηδενίζεται όταν αλλάξει
                       --   ο αριθμός (εκτός αν το ίδιο UPDATE τον επαληθεύει)
+                      -- οικογένεια (0010): ο πελάτης και όσοι συγχωνεύτηκαν σε αυτόν (merged_into_id)·
+                      --   καρτέλα, συναινέσεις και ανωνυμοποίηση διαβάζουν και γράφουν όλη την οικογένεια
+                      --   (private.client_family)· το merge_clients ισιώνει τις αλυσίδες (ένα επίπεδο)
+                      -- ανωνυμοποιημένος: full_name '', search_text ακριβώς '', καμία τιμή ταυτότητας (CHECK)
 client_consents       id, business_id, client_id, purpose (marketing_sms|marketing_email|photos_record|photos_publish),
                       legal_basis (consent|soft_opt_in), granted, source (booking_form|staff_ui|import|link),
                       policy_version, given_by (client|guardian), created_at, withdrawn_at
                       -- αποδεικτικό: trigger σε ΚΑΘΕ UPDATE (και για service_role) επιτρέπει μόνο
                       --   withdrawn_at null → now(), μία φορά (και created_by → null από το FK,
                       --   όταν σβήνεται ο λογαριασμός που την κατέγραψε)
+                      -- από το 0010: ο authenticated γράφει ΜΟΝΟ μέσω set_client_consent (καμία εγγραφή
+                      --   ή στήλη απευθείας)· on = νέα εγγραφή staff_ui/consent, off = withdrawn_at σε κάθε
+                      --   ενεργό «ναι» της οικογένειας· κατάσταση ανά σκοπό = η πιο πρόσφατη ενεργή εγγραφή
+                      --   της οικογένειας, ΜΟΝΟ στο private.consent_state (και για το κουτί της κράτησης)·
+                      --   οι συναινέσεις μένουν στον source μιας συγχώνευσης
+                      -- trigger (κάθε ρόλος): καμία νέα συναίνεση ή σημείωση για ανωνυμοποιημένο ή
+                      --   συγχωνευμένο πελάτη (AN033)
 client_notes          id, business_id, client_id, author_id, body, created_at
+                      -- από το 0010 και id από την εφαρμογή (upsert: μια επανάληψη δεν γράφει δεύτερη)
 appointments          id, business_id, client_id? (null = ανώνυμο walk-in), staff_id (not null),
                       starts_at, ends_at (τέλος υπηρεσίας), buffer_after_min,
                       status (booked|confirmed|completed|no_show|cancelled),
@@ -476,8 +488,10 @@ appointment_events    id, business_id, appointment_id,
                       from_status, to_status, old_starts_at, new_starts_at, old_staff_id, new_staff_id,
                       actor_type (client|staff|system|import), actor_id?, occurred_at
                       -- ΜΟΝΟ INSERT, χωρίς προσωπικά στοιχεία
-audit_log             id, business_id, actor_type (staff|nous_support|system), actor_id?,
+audit_log             id, business_id, actor_type (staff|nous_support|system|import), actor_id?,
                       action, entity, entity_id, reason?, at
+                      -- import από το 0010 (merge_clients_core του importer, Φάση 3)· 1.8: clients_merged
+                      --   (reason source=<id>), client_erased (reason clients=<πλήθος οικογένειας>)
 
 -- Φάση 1
 -- Οι πίνακες του 0005 (1.3) έχουν RLS χωρίς πολιτικές και χωρίς GRANT σε κανέναν ρόλο του API (ούτε
@@ -491,6 +505,8 @@ businesses (1.5)      quiet_start/quiet_end (τοπικές, προεπιλογ�
 otp_challenges        (1.3) business_id, phone_hmac, code_hmac (δεμένο στο id), expires_at (5′),
                       attempts (≤ 5), verified_at, grant_hash, grant_expires_at (10′), grant_used_at,
                       grant_appointment_id (το εφάπαξ grant και η κράτηση που το κατανάλωσε)
+                      -- phone_hmac nullable από το 0010: το erase_client το σβήνει (η πρόκληση δεν
+                      --   επαληθεύεται πια)
 trusted_devices       (1.3) business_id, phone_hmac, token_hash, expires_at (180 μέρες, σταθερό), revoked_at
 booking_tokens        (1.3) business_id, appointment_id, token_hash, issued_for (booking|message), expires_at
                       (400 μέρες), revoked_at
@@ -610,10 +626,12 @@ import_batches        business_id, source, file_name, imported_by, stats, create
   - βάζει `erased_at`
 
   Τα ραντεβού και τα events μένουν ανώνυμα, για τα στατιστικά της επιχείρησης. Test: το όνομα και το τηλέφωνο δεν εμφανίζονται πια σε καμία στήλη κειμένου της επιχείρησης. Τα FK προς το `clients` είναι `RESTRICT`, ώστε τίποτα να μη διαγράφεται «κατά λάθος» σε αλυσίδα.
+
+  Όπως χτίστηκε (1.8, `0010_client_ops.sql`, [contract 1.8](plans/contracts/1.8-client-ops.md) §2.7): μόνο ο owner, με φρέσκο κωδικό μέσα στο `_impl`· όλη η οικογένεια (και με το id ενός συγχωνευμένου)· απορρίπτεται όσο υπάρχει μελλοντικό ή τρέχον ραντεβού (AN032, ο owner το ακυρώνει πρώτα). Μία συναλλαγή: `clients` (όνομα `''`, τηλέφωνο, email, γενέθλια, `external_ref` null, `erased_at`· το `phone_verified_at` από τον trigger)· DELETE σημειώσεων και **όλων** των συναινέσεων (ενεργών και ανακλημένων: το αποδεικτικό φεύγει μαζί με το πρόσωπο· ο φύλακας είναι μόνο σε UPDATE)· «αριθμοί της οικογένειας» = **κάθε αριθμός που χρησιμοποίησε**, όχι μόνο ο τρέχων (μετά από αλλαγή κινητού από την καρτέλα ο παλιός μένει στις παλιές γραμμές): τα τηλέφωνα των πελατών της, όσα πήγαν τα SMS της και των προκλήσεων OTP που έκλεισαν ραντεβού της (`grant_appointment_id`)· `messages_log.to_e164` null για την οικογένεια, για τις γραμμές OTP αυτών των προκλήσεων και για κάθε γραμμή OTP σε αριθμό της (μια γραμμή σε αναμονή ακυρώνεται `no_recipient` στο claim)· `otp_challenges.phone_hmac` null· ανάκληση έμπιστων συσκευών (με το HMAC του αριθμού) και όλων των tokens των ραντεβού της· `appointments.request_hash` και `external_ref` null· `suppression_list` (HMAC με κλειδί Vault, reason `erased`) για κάθε αριθμό της οικογένειας, **και όταν τον μοιράζεται άλλος ζωντανός πελάτης** (σε εκείνον σταματούν μάρκετινγκ και υπενθυμίσεις ραντεβού από εισαγωγή)· μία γραμμή `audit_log` `client_erased`. Δεύτερη κλήση → `erased: false`, τίποτα δεν γράφεται. Δεν αγγίζει (δεν έχουν όνομα ή τηλέφωνο): `appointment_events`, `appointment_services`, push (το μικρό όνομα λύνεται στο claim, null για ανωνυμοποιημένο), `rate_limits` (HMAC), `provider_message_id` (σβήσιμο στον πάροχο κατά το DPA, Φάση 3).
 - **Αναζήτηση:**
   - Το `search_text` περιέχει το όνομα σε πεζά, χωρίς τόνους και με ς → σ, μαζί με τη μεταγραφή του σε λατινικά και τα ψηφία του τηλεφώνου.
   - Έχει index `pg_trgm`.
-  - Η συγχώνευση διπλών πελατών γίνεται με `merge_clients()` (Φάση 1).
+  - Η συγχώνευση διπλών πελατών γίνεται με `merge_clients()` (Φάση 1· owner/manager, χωρίς φρέσκο κωδικό, χωρίς οθόνη μέχρι τον importer της Φάσης 3): ραντεβού, σημειώσεις και μηνύματα πάνε στον target, οι συναινέσεις μένουν στον source και μετρούν μέσω της οικογένειας· ο target παίρνει μόνο το **κενό** τηλέφωνο (με την επαλήθευσή του), email και γενέθλια του source· μία γραμμή `audit_log`. Ο importer καλεί το `private.merge_clients_core(…, 'import')` (χωρίς GRANT).
 - **Soft delete:** στο `staff.active` και στο `services.active`. Οι πελάτες δεν σβήνονται: ανωνυμοποιούνται ή συγχωνεύονται.
 - **Migrations:** αλλάζουν ελεύθερα μέχρι να μπουν τα πρώτα πραγματικά δεδομένα. Τότε γίνονται squash σε baseline και από εκεί είναι αμετάβλητα (ADR-0004).
 
@@ -821,6 +839,7 @@ anaklo/
   - Η συναίνεση συλλέγεται στην επόμενη κράτηση ή «στην καρέκλα» (`source = staff_ui`).
   - Όσοι δεν έχουν νόμιμη βάση μπαίνουν σε λίστα για τηλεφώνημα.
   - Δεν στέλνουμε μαζικό SMS που ζητά συναίνεση.
+- **Συναίνεση «στην καρέκλα» (1.8):** ο διακόπτης «Προσφορές με SMS» της καρτέλας πελάτη δείχνει μόνο την κατάσταση του server. **On** → φύλλο «Ρώτησες τον πελάτη και συμφώνησε τώρα να λαμβάνει προσφορές με SMS από το κατάστημα. Μπορεί να το ανακαλέσει όποτε θέλει.» (+ «Τη δίνει γονιός ή κηδεμόνας») → **νέα** εγγραφή `consent`/`staff_ui` με την έκδοση του κειμένου (`STAFF_CONSENT_NOTICE_VERSION`). **Off** → ανάκληση αμέσως, χωρίς επιπλέον βήμα (ποτέ δυσκολότερη από τη συναίνεση). Ποτέ αλλαγή σε `purpose`/`granted`, ποτέ νέα εγγραφή άρνησης από το προσωπικό· το ίδιο και για το κουτί της φόρμας κράτησης, που συγκρίνει με την κατάσταση όλης της οικογένειας.
 - **Ανήλικοι κάτω των 15:** για φωτογραφίες και μάρκετινγκ χρειάζεται συναίνεση γονέα (ν. 4624/2019 άρ. 21, `given_by = guardian`).
 - Κάθε μήνυμα μάρκετινγκ έχει το όνομα της επιχείρησης και δωρεάν opt-out.
 
@@ -979,7 +998,7 @@ anaklo/
 | Τύπος | Εργαλείο | Τι καλύπτει |
 |---|---|---|
 | Unit | Vitest (σε UTC) | `money`, `dates`, `phone`, `sms` (GSM-7, 1 SMS ανά πρότυπο, link byte προς byte), λίστες τιμών ίδιες με τα CHECK, κατάλογοι i18n el = en, πρότυπα email ασφαλείας el = en, θέμα/αντίθεση, λογική UI (φύλλο κωδικού: και τα δύο hints → μία επανάληψη, δεύτερη αποτυχία → σφάλμα· το `manage-factors` αρνείται χωρίς φρέσκο κωδικό πριν φτιάξει client `service_role`) |
-| Βάση | pgTAP (`supabase test db`, τοπικά και στο CI) | RLS και απομόνωση Α/Β · allow-list δικαιωμάτων (πίνακες, στήλες και functions για `anon`/`authenticated`) · προεπιλεγμένα δικαιώματα νέων αντικειμένων · σύνθετα FK · διπλοκράτηση · ωράρια/εξαιρέσεις χωρίς επικαλύψεις · μεταβάσεις και διορθώσεις κατάστασης · δηλωμένος actor · events σε κάθε αλλαγή · αναζήτηση ΓΙΩΡΓΟΣ/Γιώργος/giorgos · συναινέσεις (αμετάβλητες, μόνο ανάκληση) · επαλήθευση τηλεφώνου · ζώνες ώρας · διαθεσιμότητα (αλλαγή ώρας, μεσάνυχτα, εξαιρέσεις, μισή μέρα, δεύτερη ζώνη) · κράτηση (επανέλεγχος, idempotency) · «μνήμη» (σενάρια, σταθερό `as_of`) · ανωνυμοποίηση · φρέσκος κωδικός σε κάθε κρίσιμο `_impl` (`aal1` → `aal2_required`· `totp` 6′ πριν ή μόνο `otp` → `fresh_totp_required`· `totp` 1′ πριν → εντάξει· παράθυρο 0 → πάντα `fresh_totp_required`· CHECK > 300 απορρίπτεται) · `authorize_factor_change` (παλιός κωδικός, τελευταίος παράγοντας) · εντοπισμός αλλαγών συσκευών κωδικών (χωρίς άδεια → ένα `security_event`, με άδεια → κανένα) |
+| Βάση | pgTAP (`supabase test db`, τοπικά και στο CI) | RLS και απομόνωση Α/Β · allow-list δικαιωμάτων (πίνακες, στήλες και functions για `anon`/`authenticated`) · προεπιλεγμένα δικαιώματα νέων αντικειμένων · σύνθετα FK · διπλοκράτηση · ωράρια/εξαιρέσεις χωρίς επικαλύψεις · μεταβάσεις και διορθώσεις κατάστασης · δηλωμένος actor · events σε κάθε αλλαγή · αναζήτηση ΓΙΩΡΓΟΣ/Γιώργος/giorgos · συναινέσεις (αμετάβλητες, μόνο ανάκληση) · επαλήθευση τηλεφώνου · ζώνες ώρας · διαθεσιμότητα (αλλαγή ώρας, μεσάνυχτα, εξαιρέσεις, μισή μέρα, δεύτερη ζώνη) · κράτηση (επανέλεγχος, idempotency) · «μνήμη» (σενάρια, σταθερό `as_of`) · ανωνυμοποίηση (σάρωση του καταλόγου: καμία στήλη κειμένου/json του `public` και του `private` δεν κρατά όνομα ή τηλέφωνο, με έλεγχο ότι πριν τα βρίσκει) · συγχώνευση (μεταφορές, οικογένεια, συναινέσεις αμετάβλητες) · φρέσκος κωδικός σε κάθε κρίσιμο `_impl` (`aal1` → `aal2_required`· `totp` 6′ πριν ή μόνο `otp` → `fresh_totp_required`· `totp` 1′ πριν → εντάξει· παράθυρο 0 → πάντα `fresh_totp_required`· CHECK > 300 απορρίπτεται) · `authorize_factor_change` (παλιός κωδικός, τελευταίος παράγοντας) · εντοπισμός αλλαγών συσκευών κωδικών (χωρίς άδεια → ένα `security_event`, με άδεια → κανένα) |
 | E2E | Playwright (κινητό viewport) | Οι ροές του §5 · φρέσκος κωδικός (παράθυρο 10 s στο τοπικό seed· το test περιμένει να παλιώσει ο κωδικός της συνεδρίας): ο owner ανωνυμοποιεί πελάτη και αφαιρεί δεύτερη συσκευή στις Ρυθμίσεις → Ασφάλεια, με φύλλο κωδικού → επιτυχία· το staff δεν βλέπει ποτέ το φύλλο |
 | Integration | Supabase Auth (μέρα 1 του 1.7) | Νέο verify ανανεώνει τον χρόνο `totp` στο `amr` του JWT |
 | Συσκευές | Πραγματικό iPhone + Android | Πριν από κάθε release, σύντομος χειροκίνητος έλεγχος: Instagram in-app (iOS/Android), Facebook in-app, Safari, εγκατεστημένη PWA με push |
@@ -1037,6 +1056,8 @@ anaklo/
 **Φάση 1 — Πυρήνας κράτησης (~8,5 εβδομάδες: 38 εργάσιμες + 3 buffer)**
 
 Εγκρίθηκε στις 27/9/2026· ο φρέσκος κωδικός για κρίσιμες ενέργειες προστέθηκε στις 28/9/2026 (+2 μέρες). Την ίδια μέρα: **τοπικά πρώτα** (όλα τα remote, οι λογαριασμοί και οι δοκιμές σε συσκευές στο νέο τελικό βήμα 1.10) και **κατεύθυνση σχεδιασμού Δ** (ADR-0011), μαζί +1 μέρα. Το αναλυτικό πλάνο ανά βήμα (βάση, Edge Functions, frontend, tests, κριτήρια εξόδου, προαπαιτούμενα) βρίσκεται στο `docs/plans/phase-1.md`. Με 1η μέρα τη Δευτέρα 28/9/2026 και την αργία της 28/10, η μέρα 38 είναι η 19/11/2026 και το buffer τελειώνει στις 24/11/2026.
+
+> Κατάσταση (3/10/2026): το 1.7 έγινε commit (`8482261`). Το 1.8 υλοποιήθηκε τοπικά κατά το [contract 1.8](plans/contracts/1.8-client-ops.md) (as-built στο §8): `0010_client_ops.sql` (οικογένεια πελάτη μέσω `merged_into_id`, `client_card` με ποσά ανά ρόλο και τιμή δαχτυλιδιού E18 από τον server, `set_client_consent` ως μόνος δρόμος συναινέσεων της εφαρμογής με τον κανόνα στο `private.consent_state`, κουτί κράτησης ανά οικογένεια, `merge_clients` + `private.merge_clients_core` για τον importer, `erase_client` μόνο για owner με φρέσκο κωδικό, AN032–AN033)· «Πελάτες» (αναζήτηση με greeklish), καρτέλα πελάτη με ιστορικό, σημειώσεις, συναινέσεις, επεξεργασία στοιχείων και ανωνυμοποίηση μέσω του φύλλου κωδικού· όλα τα tests πράσινα (pgTAP 1303, Vitest, `test:race`, Playwright σε Chromium + WebKit δύο φορές) και ο έλεγχος του §13 με το χέρι: μετά την ανωνυμοποίηση πελάτη που έκλεισε online (OTP, έμπιστη συσκευή, link διαχείρισης, SMS, push), καμία στήλη κανενός schema της τοπικής βάσης δεν κρατά όνομα ή τηλέφωνο. Τα σημεία του §7 του contract εγκρίθηκαν και έγινε commit στις 3/10/2026· το `db:push` του 0010 στο 1.10. Επόμενο το 1.9.
 
 > Κατάσταση (2/10/2026): το 1.6 έγινε commit (`3aeda67`). Το 1.7 υλοποιήθηκε τοπικά κατά το [contract 1.7](plans/contracts/1.7-security-members.md) (as-built στο §10): ο έλεγχος της μέρας 1 πέρασε (νέο verify ανανεώνει το `totp` του `amr`)· `0009_members_identity.sql` (`fresh_totp_max_age_seconds`, `has_fresh_totp`/`require_fresh_totp`, D2, `business_slug_aliases` με φύλακα, `factor_change_grants`, trigger ανάκλησης στο `business_members`, RPCs μελών/ταυτότητας/`authorize_factor_change` και του `service_role`, AN024–AN031)· Edge Functions `invite-member` και `manage-factors`· 301 από τα παλιά slugs (Worker και Vite)· `mfa-reset.mjs` και runbook· εγγραφή με οδηγό, δεύτερη συσκευή, οθόνη χαμένης συσκευής, φύλλο κωδικού και Ρυθμίσεις → Ασφάλεια, Μέλη, Ταυτότητα· όλα τα tests πράσινα (pgTAP, Vitest, `test:race`, Playwright σε Chromium + WebKit) και τα κριτήρια εξόδου ελεγμένα και με απευθείας κλήσεις. Οι αποφάσεις του contract (μαζί με το D2) εγκρίθηκαν και έγινε commit στις 3/10/2026· το `db:push` του 0009 στο 1.10.
 

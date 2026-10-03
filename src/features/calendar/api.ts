@@ -24,6 +24,7 @@ import {
   type StatusResult,
   type TodayItem,
   type TodaySummary,
+  toDayAppointment,
   toMoveResult,
 } from './schema'
 
@@ -106,7 +107,7 @@ export async function fetchStaffDay(
   let query = supabase
     .from('appointments')
     .select(
-      'id, staff_id, client_id, starts_at, ends_at, buffer_after_min, status, source, total_cents, cancel_reason, client:clients(id, full_name, phone_e164), services:appointment_services(position, service_id, duration_min, price_cents)',
+      'id, staff_id, client_id, starts_at, ends_at, buffer_after_min, status, source, total_cents, cancel_reason, client:clients(id, full_name, phone_e164, erased_at), services:appointment_services(position, service_id, duration_min, price_cents)',
     )
     .eq('business_id', businessId)
     .eq('staff_id', staffId)
@@ -118,29 +119,7 @@ export async function fetchStaffDay(
   if (signal) query = query.abortSignal(signal)
   const { data, error, status } = await query
   throwIfFailed(error, status)
-  return DayAppointmentRows.parse(data).map((row) => ({
-    id: row.id,
-    staffId: row.staff_id,
-    clientId: row.client_id,
-    startsAt: row.starts_at,
-    endsAt: row.ends_at,
-    bufferAfterMin: row.buffer_after_min,
-    status: row.status,
-    source: row.source,
-    totalCents: row.total_cents,
-    cancelReason: row.cancel_reason,
-    client: row.client
-      ? { id: row.client.id, fullName: row.client.full_name, phoneE164: row.client.phone_e164 }
-      : null,
-    services: [...row.services]
-      .sort((a, b) => a.position - b.position)
-      .map((line) => ({
-        position: line.position,
-        serviceId: line.service_id,
-        durationMin: line.duration_min,
-        priceCents: line.price_cents,
-      })),
-  }))
+  return DayAppointmentRows.parse(data).map(toDayAppointment)
 }
 
 function toTodayItem(item: {

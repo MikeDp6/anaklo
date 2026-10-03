@@ -93,15 +93,21 @@ async function entries() {
 }
 
 describe('Ρυθμίσεις (contract 1.5 §4.1, 1.6 §4.1, 1.7 §6.1)', () => {
-  it('a third bottom tab «Ρυθμίσεις» leads to the settings list', async () => {
+  it('the last bottom tab «Ρυθμίσεις» leads to the settings list (after «Πελάτες», 1.8 §4.1)', async () => {
     open('/')
     const nav = await screen.findByRole('navigation', { name: 'Κύρια πλοήγηση' })
     const tabs = within(nav).getAllByRole('link')
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Σήμερα', 'Ημερολόγιο', 'Ρυθμίσεις'])
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Σήμερα',
+      'Ημερολόγιο',
+      'Πελάτες',
+      'Ρυθμίσεις',
+    ])
     expect(within(nav).getByRole('link', { name: 'Ρυθμίσεις' })).toHaveAttribute(
       'href',
       '/settings',
     )
+    expect(within(nav).getByRole('link', { name: 'Πελάτες' })).toHaveAttribute('href', '/clients')
   })
 
   it('owner: the eleven entries in order', async () => {

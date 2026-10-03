@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { initI18n } from '@/shared/i18n'
 import { proCatalogues } from '@/shared/i18n/pro'
 import { Sheet } from './Sheet'
@@ -43,6 +43,21 @@ describe('Sheet', () => {
     fireEvent.click(close)
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(opener)
+  })
+
+  it('closable={false}: the X is disabled and Esc does nothing', () => {
+    const onClose = vi.fn()
+    render(
+      <Sheet title="Ανωνυμοποίηση" onClose={onClose} closable={false}>
+        <p>…</p>
+      </Sheet>,
+    )
+    const close = screen.getByRole('button', { name: 'Κλείσιμο' })
+    expect(close).toBeDisabled()
+    fireEvent.click(close)
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeVisible()
   })
 
   it('also when a control inside the sheet closes it («Τέλος»)', () => {
