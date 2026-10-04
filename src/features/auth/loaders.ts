@@ -8,7 +8,7 @@ import {
   type Aal,
   type AuthRoute,
 } from './mfa-route'
-import { fetchAuthState, type VerifiedFactor } from './mfaApi'
+import { fetchAuthState, fetchEnrolmentBlocked, type VerifiedFactor } from './mfaApi'
 import type { Membership } from './schema'
 import { currentActiveUser, signOutRevoked } from './session'
 
@@ -29,6 +29,8 @@ export const MFA_ENROLL_PATH = '/mfa/enroll'
 export const MFA_CHALLENGE_PATH = '/mfa/challenge'
 export const MFA_LOST_DEVICE_PATH = '/mfa/lost-device'
 export const MFA_SECOND_DEVICE_PATH = '/mfa/second-device'
+/** «Επικοινώνησε με τη Nous»: adding a device is blocked until Nous resets (contract 1.9b §4.2). */
+export const MFA_BLOCKED_PATH = '/mfa/blocked'
 export const SECURITY_PATH = '/settings/security'
 
 /** Route id of the signed-in area; `useMember` reads its loader data. */
@@ -49,6 +51,11 @@ export interface AuthContext {
   readonly highestRole: MemberRole
   readonly aal: Aal
   readonly verifiedFactors: readonly VerifiedFactor[]
+  /**
+   * Adding a device is blocked until Nous resets the account (contract 1.9b C3). Asked only for
+   * an owner or manager without a verified device; false otherwise (the decision ignores it).
+   */
+  readonly enrolmentBlocked: boolean
 }
 
 /** What the member route's loader returns: `MemberContext` plus the decision's inputs. */
@@ -67,7 +74,10 @@ export async function requireSession(): Promise<SessionUser | Response> {
 
 /**
  * The session, the memberships and GoTrue's view of the session, read together (D21: `getUser`
- * on every run, so a revoked session is noticed here) → login, «no access», or the context.
+ * on every run, so a revoked session is noticed here) → login, «no access», or the context. Only
+ * when the decision would otherwise be the enrolment (owner/manager, no verified device) the
+ * server is asked whether adding a device is blocked (contract 1.9b §4.2); a failure of that
+ * call fails the guard like the other reads (the route's error page).
  */
 async function readAuthContext(): Promise<AuthContext | Response> {
   const user = await requireSession()
@@ -79,17 +89,25 @@ async function readAuthContext(): Promise<AuthContext | Response> {
   }
   const role = highestRole(memberships.map((membership) => membership.role))
   if (role === null) return redirect(NO_ACCESS_PATH)
+  const enrolmentBlocked =
+    role !== 'staff' && auth.verifiedFactors.length === 0 ? await fetchEnrolmentBlocked() : false
   return {
     user,
     memberships,
     highestRole: role,
     aal: auth.aal,
     verifiedFactors: auth.verifiedFactors,
+    enrolmentBlocked,
   }
 }
 
 function decide(context: AuthContext): AuthRoute {
-  return decideAuthRoute(context.highestRole, context.aal, context.verifiedFactors.length > 0)
+  return decideAuthRoute(
+    context.highestRole,
+    context.aal,
+    context.verifiedFactors.length > 0,
+    context.enrolmentBlocked,
+  )
 }
 
 /** The in-app path of a request (`/app/settings?x=1` → `/settings?x=1`). */
@@ -140,6 +158,9 @@ function redirectFor(route: AuthRoute, next: string | null): Response {
       return redirect(MFA_ENROLL_PATH)
     case 'challenge':
       return redirect(withNext(MFA_CHALLENGE_PATH, next))
+    case 'blocked':
+      // No `next`: the screen leads nowhere until Nous has reset the account.
+      return redirect(MFA_BLOCKED_PATH)
     case 'ok':
       return redirect(next ?? HOME_PATH)
   }
@@ -159,8 +180,10 @@ export async function requireMembership({
 }
 
 /**
- * `mfa/enroll` (expected `enroll`) and `mfa/challenge`, `mfa/lost-device` (expected `challenge`):
- * only while that is the decision; otherwise its own screen (`ok` → `next` or «Σήμερα»).
+ * `mfa/enroll` (expected `enroll`), `mfa/challenge`, `mfa/lost-device` (expected `challenge`) and
+ * `mfa/blocked` (expected `blocked`): only while that is the decision; otherwise its own screen
+ * (`ok` → `next` or «Σήμερα»). So once Nous has reset a blocked account, the next check (a
+ * return to the app) moves the user on, and a blocked one never sees the wizard.
  */
 export function mfaLoader(expected: Exclude<AuthRoute, 'ok'>) {
   return async ({ request }: LoaderFunctionArgs): Promise<MfaRouteData | Response> => {

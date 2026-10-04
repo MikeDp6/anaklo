@@ -19,7 +19,10 @@ export type EmailSendRequest = {
   readonly subject: string
   /** Plain text. */
   readonly text: string
-  /** `security:<event id>:<index>`: Resend's `Idempotency-Key` from 1.10. */
+  /**
+   * `security:<event id>:<index>`, or `security:<event id>:nous` for the Nous copy (1.9b): Resend's
+   * `Idempotency-Key` from 1.10.
+   */
   readonly idempotencyKey: string
 }
 

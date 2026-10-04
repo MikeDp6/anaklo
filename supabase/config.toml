@@ -425,7 +425,8 @@ PUSH_PROVIDER = "env(PUSH_PROVIDER)"
 DISPATCH_SECRET = "env(DISPATCH_SECRET)"
 # Step 1.9 (contract 1.9 §3.6): the security emails of dispatch. EMAIL_PROVIDER=fake records and
 # sends nothing (with ANAKLO_ENV=local one `fake-email` line per email in the edge runtime log);
-# SUPPORT_EMAIL is the Nous address the emails name. Unset, dispatch answers 500 not_configured
+# SUPPORT_EMAIL is the Nous address the emails name (1.9b: also the recipient of the Nous copy
+# of every security event). Unset, dispatch answers 500 not_configured
 # (and health 503 `dispatch` within 15 minutes). Resend (RESEND_API_KEY, EMAIL_FROM) is 1.10.
 EMAIL_PROVIDER = "env(EMAIL_PROVIDER)"
 SUPPORT_EMAIL = "env(SUPPORT_EMAIL)"

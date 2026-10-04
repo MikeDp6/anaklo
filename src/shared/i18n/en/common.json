@@ -40,6 +40,7 @@
     "AN031": "This email cannot be added from here. Contact Nous.",
     "AN032": "The client has an upcoming appointment. Cancel it first, then anonymise the client.",
     "AN033": "The client changed in the meantime (merged or anonymised). Open the card again.",
+    "AN034": "For your security, no authenticator device can be added to this account. Contact Nous.",
     "network": "You are offline. Try again.",
     "unknown": "Something went wrong. Try again."
   }

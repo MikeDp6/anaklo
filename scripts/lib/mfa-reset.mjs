@@ -5,8 +5,16 @@
 //
 // Order with --yes: user_id_for_email → record_support_action('mfa_reset') (a `remove` grant per
 // factor and an audit row per business, BEFORE anything is deleted, so the 1.9 detector never
-// flags it) → auth.admin.mfa.deleteFactor for each → revoke_user_sessions. Without --yes: a dry
-// run that only reads. Never reads or prints a TOTP secret (the admin API does not return it).
+// flags it; from 0012 it also lifts the account's enrolment block, contract 1.9b C4, ends every
+// session of the user in that same transaction, so no session sees the block lifted, and refuses
+// while an unauthorized removal of the user awaits the detector) → auth.admin.mfa.deleteFactor
+// for each → revoke_user_sessions (again: any session opened meanwhile). Without --yes: a dry run
+// that only reads (it cannot see a block: the runbook's read-only SQL does). Never reads or
+// prints a TOTP secret (the admin API does not return it).
+// A user who is owner or manager nowhere (contract 1.9b §7 item 17, approved 2026-10-04): the
+// script no longer refuses it itself. Only an enrolment block of such a user can be lifted (e.g.
+// a blocked manager demoted to staff), and only the server sees blocks: record_support_action
+// resets it, or refuses with 22023 and writes nothing. No email template applies to it.
 import { parseArgs } from 'node:util'
 import { z } from 'zod/mini'
 import { UsageError, parseSupportInput } from './cli.mjs'
@@ -14,9 +22,11 @@ import { UsageError, parseSupportInput } from './cli.mjs'
 /**
  * @typedef {import('@supabase/supabase-js').SupabaseClient<import('../../src/shared/lib/database.types.ts').Database>} Db
  * @typedef {'owner' | 'manager'} PrivilegedRole
- * @typedef {{ id: string, name: string, slug: string, timezone: string, role: PrivilegedRole }} PrivilegedBusiness
+ * @typedef {PrivilegedRole | 'staff'} MemberRole
+ * @typedef {{ id: string, name: string, slug: string, timezone: string, role: MemberRole }} MemberBusiness
+ * @typedef {MemberBusiness & { role: PrivilegedRole }} PrivilegedBusiness
  * @typedef {{ id: string, friendlyName: string | null, status: string, createdAt: string }} FactorInfo
- * @typedef {{ factorIds: string[], grants: number, auditRows: number }} SupportRecord
+ * @typedef {{ factorIds: string[], grants: number, auditRows: number, enrolmentUnblocked: boolean, sessions: number, pushSubscriptions: number }} SupportRecord
  * @typedef {{ ok: true } | { ok: false, status: number, message: string }} DeleteOutcome
  * @typedef {{ sessions: number, pushSubscriptions: number }} Revoked
  */
@@ -25,7 +35,7 @@ import { UsageError, parseSupportInput } from './cli.mjs'
  * Everything the reset reads and writes, as the service role. Errors are thrown.
  * @typedef {object} MfaResetPorts
  * @property {(email: string) => Promise<string | null>} userIdForEmail
- * @property {(userId: string) => Promise<PrivilegedBusiness[]>} privilegedBusinesses
+ * @property {(userId: string) => Promise<MemberBusiness[]>} memberBusinesses every membership, any role
  * @property {(userId: string) => Promise<FactorInfo[]>} listFactors ids, names, statuses: never secrets
  * @property {(input: { userId: string, reason: string, ticket: string }) => Promise<SupportRecord>} recordSupportAction
  * @property {(userId: string, factorId: string) => Promise<DeleteOutcome>} deleteFactor
@@ -188,12 +198,39 @@ const SupportActionResult = z.object({
   factor_ids: z.array(Uuid),
   grants: z.int().check(z.gte(0)),
   audit_rows: z.int().check(z.gte(0)),
+  /** 0012 (contract 1.9b C4): the reset lifted the account's enrolment block. */
+  enrolment_unblocked: z.boolean(),
+  /** 0012 review fix: the sessions and push devices the reset ended in its own transaction. */
+  sessions: z.int().check(z.gte(0)),
+  push_subscriptions: z.int().check(z.gte(0)),
 })
 const RevokeResult = z.object({
   sessions: z.int().check(z.gte(0)),
   push_subscriptions: z.int().check(z.gte(0)),
 })
-const PRIVILEGED_ROLES = /** @type {const} */ (['owner', 'manager'])
+
+/**
+ * `record_support_action` refuses the reset while an unauthorized device change of the user awaits
+ * the detector (0012, contract 1.9b C4: `55000`, hint `detection_pending`; nothing is written): a
+ * reset over an undetected removal would be followed by a block at the next run (≤ 5′).
+ */
+/**
+ * The plan of a user who is owner or manager nowhere (contract 1.9b §7 item 17): only a block can be
+ * lifted, and only the server knows whether there is one.
+ */
+export const NOT_PRIVILEGED_NOTE =
+  'Only an enrolment block can be lifted for this account (a blocked owner or manager who was demoted ' +
+  'or removed). Without a block record_support_action refuses (22023) and nothing is written; check ' +
+  'first with the read-only SQL of security-event.md §2.'
+
+/** After the reset of a user who is owner or manager nowhere: the runbook's emails do not apply. */
+export const NOT_PRIVILEGED_EMAIL_NOTE =
+  'No email template applies (owner or manager nowhere): tell the user on the call-back that the ' +
+  'block is lifted (runbook mfa-reset.md §6).'
+
+export const DETECTION_PENDING_MESSAGE =
+  'Μια αλλαγή συσκευής αυτού του χρήστη περιμένει τον έλεγχο (έως 5′). ' +
+  'Ξανατρέξε την ίδια εντολή σε λίγα λεπτά.'
 
 /**
  * @param {string} what
@@ -216,12 +253,11 @@ export function supportPorts(db) {
       return z.nullable(Uuid).parse(data)
     },
 
-    async privilegedBusinesses(userId) {
+    async memberBusinesses(userId) {
       const members = await db
         .from('business_members')
         .select('business_id, role')
         .eq('user_id', userId)
-        .in('role', [...PRIVILEGED_ROLES])
       check('read business_members', members.error)
       const rows = members.data ?? []
       if (rows.length === 0) return []
@@ -238,7 +274,9 @@ export function supportPorts(db) {
           const role = rows.find((row) => row.business_id === business.id)?.role
           return {
             ...business,
-            role: /** @type {PrivilegedRole} */ (role === 'owner' ? 'owner' : 'manager'),
+            role: /** @type {MemberRole} */ (
+              role === 'owner' ? 'owner' : role === 'manager' ? 'manager' : 'staff'
+            ),
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
@@ -262,12 +300,18 @@ export function supportPorts(db) {
         p_ticket: ticket,
         p_user_id: userId,
       })
+      if (error?.code === '55000' && error.hint === 'detection_pending') {
+        throw new Error(DETECTION_PENDING_MESSAGE)
+      }
       check('record_support_action', error)
       const parsed = SupportActionResult.parse(data)
       return {
         factorIds: parsed.factor_ids,
         grants: parsed.grants,
         auditRows: parsed.audit_rows,
+        enrolmentUnblocked: parsed.enrolment_unblocked,
+        sessions: parsed.sessions,
+        pushSubscriptions: parsed.push_subscriptions,
       }
     },
 
@@ -342,12 +386,14 @@ async function step(name, run) {
  * @property {number} alreadyGone deleted meanwhile (404)
  * @property {number} grants
  * @property {number} auditRows
- * @property {number} sessions
- * @property {number} pushSubscriptions
+ * @property {number} sessions ended by the reset's own transaction and by the revoke after it
+ * @property {number} pushSubscriptions the same, for the push devices
+ * @property {boolean} enrolmentUnblocked the account's enrolment block was lifted (0012)
  */
 
 /**
- * Steps 2–4 of the runbook: grants and audit rows first, then every factor, then every session.
+ * Steps 2–4 of the runbook: grants and audit rows first (from 0012 the same transaction also ends
+ * every session), then every factor, then every session again (any opened meanwhile).
  * The sessions are revoked even when a factor could not be deleted (then it throws afterwards,
  * naming the step), so a lost device never keeps a live session.
  * @param {MfaResetPorts} ports
@@ -379,8 +425,9 @@ export async function resetFactorsWith(ports, input) {
     alreadyGone,
     grants: recorded.grants,
     auditRows: recorded.auditRows,
-    sessions: revoked.sessions,
-    pushSubscriptions: revoked.pushSubscriptions,
+    sessions: recorded.sessions + revoked.sessions,
+    pushSubscriptions: recorded.pushSubscriptions + revoked.pushSubscriptions,
+    enrolmentUnblocked: recorded.enrolmentUnblocked,
   }
 }
 
@@ -437,21 +484,26 @@ export async function runMfaReset(ports, input) {
       print(`No account with the email ${input.email}. Nothing was written.`)
       return 1
     }
-    const businesses = await step('read memberships', () => ports.privilegedBusinesses(userId))
-    if (businesses.length === 0) {
-      print(
-        `${input.email} is not an owner or a manager anywhere: there are no devices to reset. ` +
-          'Nothing was written.',
-      )
-      return 1
-    }
+    const memberships = await step('read memberships', () => ports.memberBusinesses(userId))
+    const businesses = /** @type {PrivilegedBusiness[]} */ (
+      memberships.filter((business) => business.role !== 'staff')
+    )
     const factors = await step('list factors', () => ports.listFactors(userId))
 
     print(`User      ${input.email} (${userId})`)
     print(`Ticket    [${input.ticket}] ${input.reason}`)
-    print('Owner or manager of:')
-    for (const business of businesses) {
-      print(`  ${business.role.padEnd(8)} ${business.name} (/${business.slug})`)
+    if (businesses.length > 0) {
+      print('Owner or manager of:')
+      for (const business of businesses) {
+        print(`  ${business.role.padEnd(8)} ${business.name} (/${business.slug})`)
+      }
+    } else {
+      print(`${input.email} is not an owner or a manager anywhere.`)
+      if (memberships.length > 0) print('Staff of:')
+      for (const business of memberships) {
+        print(`  ${business.role.padEnd(8)} ${business.name} (/${business.slug})`)
+      }
+      print(NOT_PRIVILEGED_NOTE)
     }
     print(`Authenticator devices (${factors.length}):`)
     for (const factor of factors) print(`  ${describeFactor(factor)}`)
@@ -476,7 +528,17 @@ export async function runMfaReset(ports, input) {
     )
     print(`  sessions revoked        ${result.sessions}`)
     print(`  push devices removed    ${result.pushSubscriptions}`)
+    print(
+      result.enrolmentUnblocked
+        ? '  enrolment block         lifted (Μπλοκάρισμα προσθήκης συσκευής: άρθηκε)'
+        : '  enrolment block         none (Μπλοκάρισμα προσθήκης συσκευής: δεν υπήρχε)',
+    )
 
+    if (businesses.length === 0) {
+      print('')
+      print(NOT_PRIVILEGED_EMAIL_NOTE)
+      return 0
+    }
     const zone = businesses[0]?.timezone ?? 'UTC'
     for (const locale of /** @type {const} */ (['el', 'en'])) {
       const values = {

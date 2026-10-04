@@ -19,7 +19,10 @@ export type EmailConfigEnv = Partial<Record<EmailConfigVariable, string | undefi
 
 export type EmailConfig = {
   readonly provider: EmailProviderName
-  /** The Nous address the security emails name (lower-cased); the real one from 1.10. */
+  /**
+   * The Nous address the security emails name and the recipient of the Nous copy of every
+   * security event (contract 1.9b §3.2), lower-cased; the real one from 1.10.
+   */
   readonly supportEmail: string
 }
 

@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router'
 import { AddDevicePage } from '@/features/auth/components/AddDevicePage'
 import { LoginPage } from '@/features/auth/components/LoginPage'
 import { LostDevicePage } from '@/features/auth/components/LostDevicePage'
+import { MfaBlockedPage } from '@/features/auth/components/MfaBlockedPage'
 import { MfaChallengePage } from '@/features/auth/components/MfaChallengePage'
 import { MfaEnrollPage } from '@/features/auth/components/MfaEnrollPage'
 import { NoAccessPage } from '@/features/auth/components/NoAccessPage'
@@ -44,6 +45,8 @@ import { RouteErrorPage } from './RouteErrorPage'
 // under the member route, whose loader checks the session, reads the role live and decides the
 // second step (ADR-0009 §10, contract 1.7 §6.2): an owner or manager without a device enrols
 // (`mfa/enroll`, blocking), with a device but an `aal1` session gives the code (`mfa/challenge`).
+// Without a device and with adding one blocked until Nous resets the account (contract 1.9b §4.2):
+// «Επικοινώνησε με τη Nous» (`mfa/blocked`), never the wizard.
 // The `mfa/*` screens are siblings of the member route: no tab bar, only «Αποσύνδεση».
 // «Πελάτες» (contract 1.8 §4.1): the search and the card, for every role (the server decides what
 // each role sees and may do on a card).
@@ -81,6 +84,12 @@ export const router = createBrowserRouter(
           path: 'mfa/lost-device',
           element: <LostDevicePage />,
           loader: mfaLoader('challenge'),
+          errorElement: <RouteErrorPage />,
+        },
+        {
+          path: 'mfa/blocked',
+          element: <MfaBlockedPage />,
+          loader: mfaLoader('blocked'),
           errorElement: <RouteErrorPage />,
         },
         {

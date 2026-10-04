@@ -53,10 +53,18 @@ function reducedMotion(reduce: boolean) {
 function open({
   mode = 'first' as const,
   stepUp,
-}: { mode?: 'first' | 'second' | 'add'; stepUp?: StepUpDeps } = {}) {
+  blockedHandler = true,
+}: {
+  mode?: 'first' | 'second' | 'add'
+  stepUp?: StepUpDeps
+  /** Whether the host passes `onBlocked` (MfaEnrollPage does). */
+  blockedHandler?: boolean
+} = {}) {
   const onDone = vi.fn()
+  const onBlocked = vi.fn()
+  const onAuthRecheck = vi.fn()
   const askForCode = vi.fn(() => Promise.resolve(true))
-  const deps: StepUpDeps = stepUp ?? { askForCode, onAuthRecheck: vi.fn() }
+  const deps: StepUpDeps = stepUp ?? { askForCode, onAuthRecheck }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { networkMode: 'always', retry: 0 } },
   })
@@ -68,11 +76,12 @@ function open({
           userId={USER}
           verifiedCount={mode === 'first' ? 0 : 1}
           onDone={onDone}
+          onBlocked={blockedHandler ? onBlocked : undefined}
         />
       </StepUpContext>
     </QueryClientProvider>,
   )
-  return { onDone, askForCode }
+  return { onDone, onBlocked, askForCode, onAuthRecheck }
 }
 
 function stepContainer(): HTMLElement {
@@ -289,6 +298,86 @@ describe('EnrollWizard (contract 1.7 §6.4)', () => {
     fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
     expect(await screen.findByText('Η ενέργεια δεν έγινε.')).toBeInTheDocument()
     expect(api.enrollTotp).not.toHaveBeenCalled()
+  })
+})
+
+describe('EnrollWizard when adding a device is blocked (AN034, contract 1.9b §4.4)', () => {
+  /** What PostgREST answers for `private.raise_domain_error('AN034')`. */
+  const BLOCKED = { code: 'P0001', message: 'AN034', hint: 'enrolment_blocked' }
+  const AN034_TEXT =
+    'Για την ασφάλειά σου, δεν μπορεί να προστεθεί συσκευή κωδικών σε αυτόν τον λογαριασμό. Επικοινώνησε με τη Nous.'
+
+  it('first enrolment: onBlocked once, nothing else (no message, no enrolment, no sheet)', async () => {
+    api.authorizeFactorAdd.mockImplementation(() => {
+      order.push('authorize')
+      return Promise.reject(new RpcFailure({ kind: 'domain', code: 'AN034' }))
+    })
+    const { onBlocked, onDone, askForCode, onAuthRecheck } = open()
+    fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
+    await waitFor(() => expect(onBlocked).toHaveBeenCalledOnce())
+    expect(order).toEqual(['list', `unenroll:${OLD}`, 'authorize'])
+    expect(api.enrollTotp).not.toHaveBeenCalled()
+    expect(askForCode).not.toHaveBeenCalled()
+    expect(onAuthRecheck).not.toHaveBeenCalled()
+    expect(onDone).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText(AN034_TEXT)).toBeNull()
+    expect(api.authorizeFactorAdd).toHaveBeenCalledOnce()
+  })
+
+  it('also when the refusal is the raw PostgREST error (classified on the way)', async () => {
+    api.authorizeFactorAdd.mockRejectedValue(BLOCKED)
+    const { onBlocked, askForCode } = open()
+    fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
+    await waitFor(() => expect(onBlocked).toHaveBeenCalledOnce())
+    expect(api.enrollTotp).not.toHaveBeenCalled()
+    expect(askForCode).not.toHaveBeenCalled()
+  })
+
+  it('a resume at the QR stage that is refused goes to onBlocked, without a new enrolment', async () => {
+    savePendingEnrollment(window.sessionStorage, {
+      userId: USER,
+      factorId: OLD,
+      friendlyName: 'Συσκευή 1',
+      mode: 'first',
+      stage: 'scan',
+      createdAt: Date.now(),
+    })
+    api.authorizeFactorAdd.mockRejectedValue(new RpcFailure({ kind: 'domain', code: 'AN034' }))
+    const { onBlocked } = open()
+    await waitFor(() => expect(onBlocked).toHaveBeenCalledOnce())
+    expect(api.enrollTotp).not.toHaveBeenCalled()
+    expect(readPendingEnrollment(window.sessionStorage, USER, new Date())).toBeNull()
+  })
+
+  it.each(['add', 'second'] as const)(
+    'mode %s: the generic text of AN034, no onBlocked, no enrolment',
+    async (mode) => {
+      api.authorizeFactorAdd.mockRejectedValue(new RpcFailure({ kind: 'domain', code: 'AN034' }))
+      const { onBlocked, askForCode } = open({ mode })
+      fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
+      expect(await screen.findByText(AN034_TEXT)).toBeInTheDocument()
+      expect(onBlocked).not.toHaveBeenCalled()
+      expect(askForCode).not.toHaveBeenCalled()
+      expect(api.enrollTotp).not.toHaveBeenCalled()
+      expect(screen.getByRole('heading', { name: TEXT.step1 })).toBeInTheDocument()
+    },
+  )
+
+  it('first enrolment without a handler: the same text (never a silent failure)', async () => {
+    api.authorizeFactorAdd.mockRejectedValue(new RpcFailure({ kind: 'domain', code: 'AN034' }))
+    open({ blockedHandler: false })
+    fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
+    expect(await screen.findByText(AN034_TEXT)).toBeInTheDocument()
+    expect(api.enrollTotp).not.toHaveBeenCalled()
+  })
+
+  it('another domain error in the first enrolment is a message, not onBlocked', async () => {
+    api.authorizeFactorAdd.mockRejectedValue(new RpcFailure({ kind: 'domain', code: 'AN030' }))
+    const { onBlocked } = open()
+    fireEvent.click(screen.getByRole('button', { name: TEXT.done }))
+    expect(await screen.findByText('Δεν είναι πια μέλος της επιχείρησης.')).toBeInTheDocument()
+    expect(onBlocked).not.toHaveBeenCalled()
   })
 })
 

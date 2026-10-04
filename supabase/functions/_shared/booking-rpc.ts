@@ -68,6 +68,9 @@ export const DOMAIN_ERROR_HTTP_STATUS = {
   // (contract 1.8 §2.8).
   AN032: 409,
   AN033: 409,
+  // 0012: authorize_factor_change('add') while the account's enrolment is blocked until Nous resets
+  // it (contract 1.9b §2.4, G2).
+  AN034: 403,
 } as const satisfies Record<DomainErrorCode, number>
 
 /** `{ error: { code: 'AN0xx', message: <name> } }` with the status of §2.1. */

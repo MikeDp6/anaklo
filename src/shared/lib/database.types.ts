@@ -656,6 +656,9 @@ isOneToOne: false
 "erase_client":
 { Args: { "p_business_id": string,"p_client_id": string }; Returns: Json
                            },
+"factor_enrolment_blocked":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "health":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },

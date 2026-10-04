@@ -46,6 +46,8 @@ export const DOMAIN_ERRORS = {
   // 0010 (client card, merge, erasure)
   AN032: 'client_has_upcoming',
   AN033: 'client_unavailable',
+  // 0012 (security hardening): adding a device while the account's enrolment is blocked
+  AN034: 'enrolment_blocked',
 } as const
 
 export type DomainErrorCode = keyof typeof DOMAIN_ERRORS

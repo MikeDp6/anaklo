@@ -15,13 +15,20 @@
 -- and their _impl), and the four internal functions nobody executes (detect_factor_changes_impl,
 -- queue_security_notifications, match_add_grants, unvetted_factors; has_fresh_totp is replaced and stays in
 -- the 0009 list). authenticated and anon gain nothing.
+-- 1.9b (0012, contract docs/plans/contracts/1.9b-security-hardening.md §2.2, §2.7, §6.2): private.factor_enrolment_blocks
+-- is closed to every API role, authenticated gains factor_enrolment_blocked and its _impl (72 → 74), service_role
+-- and anon gain nothing, and the five internal helpers (session_alive, remove_grant_for,
+-- unauthorized_removal_pending, enrolment_blocked, and mfa_level_ok of the approved §7 item 2: the six
+-- membership helpers, replaced, keep their 0001 grants) are granted to nobody. The replaced internals
+-- (session_mfa_ok, require_fresh_totp, match_add_grants, queue_security_notifications, detect_factor_changes_impl,
+-- raise_domain_error) keep no grant: the lists below did not change for them.
 begin;
 create extension if not exists pgtap with schema extensions;
 -- Run as postgres everywhere. Remotely the CLI connects as a NOINHERIT member of postgres with a
 -- bare search_path, so both are set explicitly (locally this is a no-op).
 set local role postgres;
 set local search_path = public, extensions;
-select plan(71);
+select plan(76);
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -400,6 +407,28 @@ select is(
   'no API role and not PUBLIC holds any table or column privilege on the 0011 tables'
 );
 
+-- 0012 (1.9b): the enrolment blocks are written only by the detector and lifted only by mfa_reset (both
+-- definer code): RLS on, no policy, and no privilege of any kind for any API role or PUBLIC.
+select ok(
+  coalesce((select c.relrowsecurity from pg_class c where c.oid = to_regclass('private.factor_enrolment_blocks')), false),
+  'private.factor_enrolment_blocks exists and has row level security enabled'
+);
+
+select is(
+  (select count(*) from pg_policies p where p.schemaname = 'private' and p.tablename = 'factor_enrolment_blocks'),
+  0::bigint,
+  'private.factor_enrolment_blocks has no RLS policy'
+);
+
+select is(
+  (select array_agg(r.role_name order by r.role_name)
+   from unnest(array['anon', 'authenticated', 'service_role', 'public']) as r (role_name)
+   where has_table_privilege(r.role_name, 'private.factor_enrolment_blocks', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      or has_any_column_privilege(r.role_name, 'private.factor_enrolment_blocks', 'SELECT,INSERT,UPDATE,REFERENCES')),
+  null::text[],
+  'no API role and not PUBLIC holds any table or column privilege on private.factor_enrolment_blocks'
+);
+
 -- The freshness window (C6) lives in the private settings singleton (0009); 14_members_identity
 -- checks its CHECK and default.
 select has_column('private', 'platform_settings', 'fresh_totp_max_age_seconds',
@@ -526,7 +555,7 @@ select is(
     'private.authorize_factor_change_impl',
     'private.available_slots_impl', 'private.busy_calendar_impl', 'private.can_manage_members_impl',
     'private.cancel_appointment_impl', 'private.change_business_identity_impl', 'private.client_card_impl',
-    'private.erase_client_impl',
+    'private.erase_client_impl', 'private.factor_enrolment_blocked_impl',
     'private.has_role', 'private.is_member', 'private.is_reserved_slug',
     'private.is_valid_timezone', 'private.list_members_impl', 'private.mark_absence_impl',
     'private.merge_clients_impl', 'private.my_business_ids',
@@ -543,7 +572,8 @@ select is(
     'private.unregister_push_subscription_impl',
     'public.authorize_factor_change',
     'public.available_slots', 'public.busy_calendar', 'public.can_manage_members', 'public.cancel_appointment',
-    'public.change_business_identity', 'public.client_card', 'public.erase_client', 'public.list_members',
+    'public.change_business_identity', 'public.client_card', 'public.erase_client',
+    'public.factor_enrolment_blocked', 'public.list_members',
     'public.mark_absence', 'public.merge_clients',
     'public.public_booking_catalogue', 'public.public_business_profile', 'public.public_slug_for_code',
     'public.reassign_appointment', 'public.reassign_candidates', 'public.register_push_subscription',
@@ -558,14 +588,41 @@ select is(
   || '0007: register/unregister_push_subscription, request_test_push; 0008: mark_absence, reassign_appointment, '
   || 'reassign_candidates, replace_week_hours, save_service, schedule_conflicts, set_staff_order; 0009: '
   || 'authorize_factor_change, can_manage_members, change_business_identity, list_members, remove_member, '
-  || 'set_member_role; 0010: client_card, erase_client, merge_clients, set_client_consent; each with its _impl)'
+  || 'set_member_role; 0010: client_card, erase_client, merge_clients, set_client_consent; 0012: '
+  || 'factor_enrolment_blocked; each with its _impl)'
 );
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'private') and has_function_privilege('authenticated', p.oid, 'execute')),
-  72::bigint,
-  'authenticated may execute exactly 72 functions in public/private (64 until 0009, eight more in 0010, none in 0011)'
+  74::bigint,
+  'authenticated may execute exactly 74 functions in public/private (64 until 0009, eight more in 0010, none in 0011, '
+  || 'two in 0012)'
+);
+
+-- 1.9b (0012): the live-session check, THE remove-grant rule, the pending-removal test, THE block rule and
+-- THE D2 level without the session (mfa_level_ok, §7 item 2 as approved on 2026-10-04) are called only by
+-- definer code and granted to nobody. All must exist, so the check is not vacuous.
+select is(
+  (select count(distinct p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private'
+     and p.proname = any (array['session_alive', 'remove_grant_for', 'unauthorized_removal_pending',
+                                'enrolment_blocked', 'mfa_level_ok'])),
+  5::bigint,
+  'the 0012 internal functions exist (session_alive, remove_grant_for, unauthorized_removal_pending, '
+  || 'enrolment_blocked, mfa_level_ok)'
+);
+
+select is(
+  (select array_agg(r.role_name || ' ' || p.proname order by r.role_name, p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   cross join unnest(array['anon', 'authenticated', 'service_role']) as r (role_name)
+   where n.nspname = 'private'
+     and p.proname = any (array['session_alive', 'remove_grant_for', 'unauthorized_removal_pending',
+                                'enrolment_blocked', 'mfa_level_ok'])
+     and has_function_privilege(r.role_name, p.oid, 'execute')),
+  null::text[],
+  'no API role may execute the 0012 internal functions'
 );
 
 -- 1.9 (0011): the detector (pg_cron runs it as postgres), the notification helper (called only by

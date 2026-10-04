@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod/mini'
 import { msUntilNextStep, totp, totpCounter } from '../../e2e/lib/totp.ts'
+import { resetUserFactors } from '../../scripts/lib/mfa-reset.mjs'
 import { adminClient, signInAs, type Db } from './lib/localStack.ts'
 import { literal, PsqlSession } from './lib/psql.ts'
 
@@ -23,6 +24,14 @@ import { literal, PsqlSession } from './lib/psql.ts'
  *     the next run does not flag the deletion (the `system` grant of the claim matched it);
  *   · the first device removed with `mfa.unenroll` → sessions revoked, the same notifications,
  *     nothing deleted.
+ *
+ * 1.9b (contract 1.9b §6.4): every handled event sends THREE emails (the member, the owner and the
+ * Nous copy to SUPPORT_EMAIL); (a) the access token the member kept is refused at once after the
+ * detector revoked its session (`session_mfa_ok` checks `auth.sessions`: no rows, `42501`
+ * without hint); (c) the removal of the member's only device blocks enrolment: with the email code
+ * the member reads nothing and `authorize_factor_change('add')` answers AN034; a device enrolled
+ * straight at GoTrue while blocked is flagged and deleted; only the Nous reset (`mfa-reset`'s
+ * `record_support_action`) lifts the block, and the enrolment after it raises no event.
  *
  * By default the detector is called through psql (the drill takes seconds). With
  * SECURITY_DRILL_CRON=1 it waits for the real `detect-factor-changes` job (every 5′) instead and
@@ -46,7 +55,10 @@ const CRON = process.env.SECURITY_DRILL_CRON === '1'
 const HANDLED_WITHIN_MS = CRON ? 7 * 60_000 : 20_000
 /** One cron period of the detector and a margin. */
 const CRON_WAIT_MS = 6 * 60_000
-const TEST_TIMEOUT_MS = CRON ? 40 * 60_000 : 240_000
+/** Seven detector runs (two more in 1.9b), and the TOTP steps between verifies. */
+const TEST_TIMEOUT_MS = CRON ? 60 * 60_000 : 420_000
+/** Every handled event: the member, the owner and the Nous copy (contract 1.9b B4). */
+const EMAILS_PER_EVENT = 3
 
 const EventRow = z.object({
   id: z.string(),
@@ -213,6 +225,37 @@ async function authorize(client: Db, action: 'add' | 'remove', factorId?: string
   return error === null ? 'ok' : `${error.code}/${error.hint ?? ''}`
 }
 
+/** The ids of the businesses the client's token reads (RLS, as PostgREST applies it). */
+async function businessesSeen(client: Db): Promise<string[]> {
+  const { data, error } = await client.from('businesses').select('id')
+  fail('read businesses', error)
+  return (data ?? []).map((row) => row.id)
+}
+
+/** today_summary of the drill business as the client: `ok` or `<code>/<hint>` of its error. */
+async function todaySummary(client: Db): Promise<string> {
+  const { error } = await client.rpc('today_summary', { p_business_id: businessId })
+  return error === null ? 'ok' : `${error.code}/${error.hint ?? ''}`
+}
+
+/** `factor_enrolment_blocked()` (0012) as the client. */
+async function enrolmentBlocked(client: Db): Promise<boolean> {
+  const { data, error } = await client.rpc('factor_enrolment_blocked')
+  fail('factor_enrolment_blocked', error)
+  return z.boolean().parse(data)
+}
+
+const BlockRow = z.object({ event_id: z.nullable(z.string()), blocked_at: z.string() })
+
+/** The member's row of `private.factor_enrolment_blocks` (0012), or null. */
+async function blockOf(userId: string): Promise<z.infer<typeof BlockRow> | null> {
+  const out = await run(
+    `select coalesce((select json_build_object('event_id', b.event_id, 'blocked_at', b.blocked_at)
+       from private.factor_enrolment_blocks b where b.user_id = ${literal(userId)}), 'null');`,
+  )
+  return z.nullable(BlockRow).parse(JSON.parse(out))
+}
+
 async function eventsOf(userId: string, kind: string, factorId?: string): Promise<EventRow[]> {
   const out = await run(
     `select coalesce(json_agg(json_build_object(
@@ -300,10 +343,11 @@ afterAll(async () => {
   }
 })
 
-describe('detection of authenticator-device changes (contract 1.9 §5.4)', () => {
+describe('detection of authenticator-device changes (contract 1.9 §5.4, 1.9b §6.4)', () => {
   it(
     'an app enrolment passes; a GoTrue device gives no fresh code and is found even when removed before the run; ' +
-      'a direct add is deleted and notified; a direct removal is notified',
+      'a revoked token reads nothing; a direct add is deleted and notified; a direct removal is notified ' +
+      'and blocks enrolment until the Nous reset',
     async () => {
       const manager = await createManager()
 
@@ -342,12 +386,24 @@ describe('detection of authenticator-device changes (contract 1.9 §5.4)', () =>
         '42501/fresh_totp_required',
       )
       expect(await factorExists(transient.factorId)).toBe(false)
+      //     1.9b (a), the control: the kept aal2 token of a live session reads the business.
+      expect(await businessesSeen(client), 'the live aal2 session').toEqual([businessId])
+      expect(await todaySummary(client)).toBe('ok')
       const transientAt = new Date().toISOString()
       await detect('transient device')
       const caught = await handled(manager, 'factor_added_unauthorized', transient.factorId)
-      expect(caught).toMatchObject({ result: 'notified', emails_sent: 2, emails_failed: 0 })
+      expect(caught).toMatchObject({
+        result: 'notified',
+        emails_sent: EMAILS_PER_EVENT,
+        emails_failed: 0,
+      })
       expect(caught.push_queued).toBe(1)
       expect(await sessionsOf(manager), 'every session of the member revoked').toBe(0)
+      //     1.9b (a): the SAME kept aal2 token, its session revoked, is refused at once (before
+      //     0012 it read for up to 1 h): no rows, and 42501 without hint (never the code sheet).
+      expect((await heldClaims(client)).aal, 'the client still holds the aal2 token').toBe('aal2')
+      expect(await businessesSeen(client), 'the revoked session reads nothing').toEqual([])
+      expect(await todaySummary(client), 'the revoked session').toBe('42501/')
       expect((await client.auth.refreshSession()).error, 'the revoked session').not.toBeNull()
       expect(await ownerPush(caught.id)).toEqual({ status: 'sent', provider: 'fake' })
       expect(await factorExists(first.factorId), 'the approved device stays').toBe(true)
@@ -363,7 +419,11 @@ describe('detection of authenticator-device changes (contract 1.9 §5.4)', () =>
       const addedAt = new Date().toISOString()
       await detect('direct add')
       const event = await handled(manager, 'factor_added_unauthorized', added.factorId)
-      expect(event).toMatchObject({ result: 'notified', emails_sent: 2, emails_failed: 0 })
+      expect(event).toMatchObject({
+        result: 'notified',
+        emails_sent: EMAILS_PER_EVENT,
+        emails_failed: 0,
+      })
       expect(event.push_queued).toBe(1)
       expect(await factorExists(added.factorId), 'the unapproved device is deleted').toBe(false)
       expect(await factorExists(first.factorId), 'the approved device stays').toBe(true)
@@ -396,15 +456,88 @@ describe('detection of authenticator-device changes (contract 1.9 §5.4)', () =>
       expect(await factorExists(first.factorId)).toBe(false)
       await detect('direct removal')
       const removal = await handled(manager, 'factor_removed_unauthorized', first.factorId)
-      expect(removal).toMatchObject({ result: 'notified', emails_sent: 2, emails_failed: 0 })
+      expect(removal).toMatchObject({
+        result: 'notified',
+        emails_sent: EMAILS_PER_EVENT,
+        emails_failed: 0,
+      })
       expect(await sessionsOf(manager), 'every session of the member revoked').toBe(0)
       expect((await again.auth.refreshSession()).error).not.toBeNull()
       expect(await ownerPush(removal.id)).toEqual({ status: 'sent', provider: 'fake' })
-      // Never a second event for the same change, never one for the owner.
-      expect(await eventsOf(manager, 'factor_removed_unauthorized')).toHaveLength(1)
-      expect(await eventsOf(ownerId, 'factor_added_unauthorized')).toEqual([])
       timings['direct removal → detected (s)'] = seconds(removedAt, removal.detected_at)
       timings['removal detected → notified (s)'] = seconds(removal.detected_at, removal.handled_at)
+
+      // 4. 1.9b (c). The removal left the member no approved device: the detector blocked
+      //    enrolment (one row, the removal event) and wrote one audit row per business.
+      const block = await blockOf(manager)
+      expect(block, 'the enrolment block of the removal').toMatchObject({ event_id: removal.id })
+      expect(
+        await count(
+          `select count(*) from public.audit_log a
+           where a.action = 'factor_enrolment_blocked' and a.entity = 'auth_user'
+             and a.entity_id = ${literal(manager)} and a.business_id = ${literal(businessId)}
+             and a.actor_type = 'system' and a.reason = ${literal(`event=${removal.id}`)};`,
+        ),
+      ).toBe(1)
+      //    With the email code (aal1) the member reads nothing as manager, and the first-enrolment
+      //    grant is refused with AN034 (a domain error: never the code sheet).
+      const blocked = await signInAs(MANAGER_EMAIL)
+      expect(await enrolmentBlocked(blocked)).toBe(true)
+      const refused = await blocked.rpc('authorize_factor_change', { p_action: 'add' })
+      expect(refused.error).toMatchObject({
+        code: 'P0001',
+        message: 'AN034',
+        hint: 'enrolment_blocked',
+      })
+      expect(await businessesSeen(blocked), 'a blocked account reads nothing').toEqual([])
+      expect(await todaySummary(blocked)).toBe('42501/')
+      //    A device enrolled straight at GoTrue (allowed: the first factor at aal1) changes nothing:
+      //    the block still holds at aal2, and the detector flags and deletes the device.
+      const direct = await enrol(blocked, 'drill-while-blocked')
+      expect((await heldClaims(blocked)).aal).toBe('aal2')
+      expect(await businessesSeen(blocked), 'blocked, also at aal2').toEqual([])
+      await detect('direct enrolment while blocked')
+      const flagged = await handled(manager, 'factor_added_unauthorized', direct.factorId)
+      expect(flagged).toMatchObject({
+        result: 'notified',
+        emails_sent: EMAILS_PER_EVENT,
+        emails_failed: 0,
+      })
+      expect(await factorExists(direct.factorId), 'the device of the blocked account').toBe(false)
+      expect(await sessionsOf(manager), 'every session of the member revoked').toBe(0)
+      expect(await blockOf(manager), 'the block stays until Nous resets').toEqual(block)
+      expect(
+        await count(
+          `select count(*) from public.audit_log a
+           where a.action = 'factor_enrolment_blocked' and a.entity_id = ${literal(manager)};`,
+        ),
+        'no second block audit row',
+      ).toBe(1)
+
+      // 5. The Nous reset (mfa-reset's record_support_action) lifts the block; the member signs
+      //    in, is not blocked, enrols through the app's path, and the next run raises no event.
+      const reset = await resetUserFactors(adminClient(), {
+        userId: manager,
+        reason: 'drill: identity checked by call-back',
+        ticket: 'DRILL-1',
+      })
+      expect(reset.enrolmentUnblocked, 'the reset lifted the block').toBe(true)
+      expect(await blockOf(manager)).toBeNull()
+      const unblocked = await signInAs(MANAGER_EMAIL)
+      expect(await enrolmentBlocked(unblocked)).toBe(false)
+      expect(await businessesSeen(unblocked), 'first enrolment (no device yet)').toEqual([
+        businessId,
+      ])
+      expect(await authorize(unblocked, 'add')).toBe('ok')
+      const afterReset = await enrol(unblocked, 'drill-after-reset')
+      await detect('enrolment after the reset')
+      expect(await eventsOf(manager, 'factor_added_unauthorized', afterReset.factorId)).toEqual([])
+      expect(await businessesSeen(unblocked), 'the new device, aal2').toEqual([businessId])
+
+      // Never a second event for the same change, never one for the owner.
+      expect(await eventsOf(manager, 'factor_removed_unauthorized')).toHaveLength(1)
+      expect(await eventsOf(manager, 'factor_added_unauthorized')).toHaveLength(3)
+      expect(await eventsOf(ownerId, 'factor_added_unauthorized')).toEqual([])
     },
     TEST_TIMEOUT_MS,
   )

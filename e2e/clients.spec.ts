@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { Page, TestInfo } from '@playwright/test'
 import { signInAal2, userIdOf } from './lib/auth'
 import {
@@ -65,15 +66,15 @@ function projectOf(testInfo: TestInfo): 'chrome' | 'safari' {
   return testInfo.project.name.includes('safari') ? 'safari' : 'chrome'
 }
 
-/** A word nobody else has (Greek letters, from the clock): the fixture's name and its search. */
+/**
+ * A word nobody else has (10 random Greek letters): the fixture's name and its search. Random,
+ * not from the clock: two clock-made words of one run shared their leading letters, and the
+ * fuzzy search then also found the other fixture.
+ */
 function uniqueWord(): string {
   const letters = 'αβγδεζηθικλμνξπρστυφχψω'
-  let n = Date.now() * 100 + Math.floor(Math.random() * 100)
   let word = ''
-  while (n > 0) {
-    word = `${letters[n % letters.length] ?? 'α'}${word}`
-    n = Math.floor(n / letters.length)
-  }
+  for (let i = 0; i < 10; i += 1) word += letters[randomInt(letters.length)] ?? 'α'
   return word
 }
 

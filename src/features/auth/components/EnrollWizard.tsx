@@ -20,14 +20,17 @@ export function EnrollWizard({
   userId,
   verifiedCount,
   onDone,
+  onBlocked,
 }: {
   mode: EnrollMode
   userId: string
   verifiedCount: number
   onDone: () => void
+  /** Mode `first` only: the server refused a new device until Nous resets (AN034). */
+  onBlocked?: () => void
 }) {
   const { t } = useTranslation('pro')
-  const wizard = useEnrollWizard({ mode, userId, verifiedCount, onDone })
+  const wizard = useEnrollWizard({ mode, userId, verifiedCount, onDone, onBlocked })
   const reduced = useReducedMotion()
   const stepRef = useRef<HTMLDivElement>(null)
   const shown = useRef(wizard.step)

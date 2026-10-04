@@ -406,3 +406,32 @@ export async function suppressedFor(businessId: string, phoneE164: string): Prom
   )
   return z.array(z.string()).parse(rows)
 }
+
+// ---------------------------------------------------------------------------------------------
+// Step 1.9b (contract 1.9b §6.5): the enrolment block of a SYNTHETIC e2e user. `blockEnrolment`
+// stands in for the detector's step 6b (an unauthorized removal left no approved device), LOCAL,
+// as postgres; only `mfa-reset` (the Nous path, `record_support_action('mfa_reset')`) lifts it.
+// ---------------------------------------------------------------------------------------------
+
+/** Blocks adding a device for the user, as the detector does (no removal event: `event_id` null). */
+export async function blockEnrolment(userId: string): Promise<void> {
+  const row = await selectJson(
+    `insert into private.factor_enrolment_blocks (user_id, event_id, blocked_at)
+     values (${literal(userId)}::uuid, null, now())
+     on conflict do nothing;
+     select json_build_object('blocked', exists (
+       select 1 from private.factor_enrolment_blocks b where b.user_id = ${literal(userId)}::uuid));`,
+  )
+  if (!z.object({ blocked: z.boolean() }).parse(row).blocked) {
+    throw new Error(`no enrolment block for ${userId}`)
+  }
+}
+
+/** Whether the user has a block row (read-only). */
+export async function hasEnrolmentBlock(userId: string): Promise<boolean> {
+  const row = await selectJson(
+    `select json_build_object('blocked', exists (
+       select 1 from private.factor_enrolment_blocks b where b.user_id = ${literal(userId)}::uuid));`,
+  )
+  return z.object({ blocked: z.boolean() }).parse(row).blocked
+}

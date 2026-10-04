@@ -7,12 +7,13 @@ import {
   FunctionsHttpError,
 } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { failureOf } from '@/shared/lib/rpcError'
+import { failureOf, RpcFailure } from '@/shared/lib/rpcError'
 import {
   authorizeFactorAdd,
   EnrollFailure,
   enrollTotp,
   fetchAuthState,
+  fetchEnrolmentBlocked,
   listUnverifiedFactorIds,
   listVerifiedFactors,
   qrImageSource,
@@ -351,6 +352,38 @@ describe('authorizeFactorAdd / removeFactor', () => {
       kind: 'stepUp',
       hint: 'aal2_required',
     })
+  })
+})
+
+describe('fetchEnrolmentBlocked (contract 1.9b §4.2)', () => {
+  it('asks the server for the caller’s own state (no arguments) and parses a boolean', async () => {
+    rpc.mockResolvedValue({ data: true, error: null, status: 200 })
+    await expect(fetchEnrolmentBlocked()).resolves.toBe(true)
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('factor_enrolment_blocked')
+    rpc.mockResolvedValue({ data: false, error: null, status: 200 })
+    await expect(fetchEnrolmentBlocked()).resolves.toBe(false)
+  })
+
+  it('an answer that is not a boolean is refused', async () => {
+    rpc.mockResolvedValue({ data: 'true', error: null, status: 200 })
+    await expect(fetchEnrolmentBlocked()).rejects.toThrow()
+    rpc.mockResolvedValue({ data: null, error: null, status: 200 })
+    await expect(fetchEnrolmentBlocked()).rejects.toThrow()
+  })
+
+  it.each([
+    [
+      'a dead session (42501 without hint)',
+      { code: '42501', message: 'the session has ended', hint: null },
+      403,
+      { kind: 'forbidden' },
+    ],
+    ['no answer', { name: 'TypeError', message: 'Failed to fetch' }, 0, { kind: 'offline' }],
+  ])('%s throws an RpcFailure, never a step-up', async (_, error, status, failure) => {
+    rpc.mockResolvedValue({ data: null, error, status })
+    const thrown: unknown = await fetchEnrolmentBlocked().catch((e: unknown) => e)
+    expect(thrown).toBeInstanceOf(RpcFailure)
+    expect(failureOf(thrown)).toEqual(failure)
   })
 })
 

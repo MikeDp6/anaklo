@@ -488,10 +488,12 @@ describe('dispatch: the security phase (contract 1.9 §3.2)', () => {
       'record_dispatch_run',
     ])
     expect(h.deleted).toEqual([FACTOR])
-    // Emails to the member and the owner, through the fake email sender.
+    // Emails to the member and the owner, and the Nous copy to SUPPORT_EMAIL (1.9b), through the
+    // fake email sender.
     expect(h.emails.map((email) => email.to)).toEqual([
       'manager@demo-barber.test',
       'owner@demo-barber.test',
+      'support@example.com',
     ])
     // The owner's push of the same run: the business only, to the owner's device only.
     expect(h.pushes).toHaveLength(1)

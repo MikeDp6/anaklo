@@ -43,6 +43,13 @@ const ENROLL_FAILURE_TEXT: Readonly<Record<EnrollFailureReason, EnrollMessageKey
   unknown: 'mfa.errors.unknown',
 }
 
+/** AN034: the server refuses a new device until Nous resets the account (contract 1.9b C3). */
+function isEnrolmentBlocked(error: unknown): boolean {
+  if (error instanceof EnrollFailure) return false
+  const failure = failureOf(error)
+  return failure.kind === 'domain' && failure.code === 'AN034'
+}
+
 /** Best effort: an abandoned unverified factor is removed again before the next enrolment. */
 async function forget(factorId: string | null): Promise<void> {
   if (!factorId) return
@@ -61,6 +68,10 @@ async function forget(factorId: string | null): Promise<void> {
  *    (may open the code sheet: `second`/`add` with a stale code), then `mfa.enroll`; the QR, the
  *    `otpauth://` link and the key (component state only, never stored);
  * 3. the 6-digit code → `onDone` only after GoTrue verified it.
+ * A first enrolment the server refuses with AN034 (adding a device is blocked until Nous resets
+ * the account, contract 1.9b §4.4) calls `onBlocked` and nothing else: no message, no
+ * `mfa.enroll`, no code sheet (AN034 is a domain error, `withStepUp` rethrows it). In the other
+ * modes it is the generic domain text (`common:errors.AN034`).
  * The pending enrolment (factor, name, mode, stage; never the secret) survives a reload of the
  * installed app: at the code stage the wizard resumes at step 3, at the QR stage it starts the
  * generation again (the QR cannot be shown twice).
@@ -70,11 +81,14 @@ export function useEnrollWizard({
   userId,
   verifiedCount,
   onDone,
+  onBlocked,
 }: {
   mode: EnrollMode
   userId: string
   verifiedCount: number
   onDone: () => void
+  /** The first enrolment was refused: adding a device is blocked until Nous resets (AN034). */
+  onBlocked?: () => void
 }) {
   const { t } = useTranslation(['pro', 'common'])
   const queryClient = useQueryClient()
@@ -131,6 +145,10 @@ export function useEnrollWizard({
         nameForm.setValue('name', name)
         go('scan', 'forward')
       } catch (error) {
+        if (mode === 'first' && onBlocked && isEnrolmentBlocked(error)) {
+          onBlocked()
+          return
+        }
         setMessage(
           error instanceof EnrollFailure
             ? ENROLL_FAILURE_TEXT[error.reason]
@@ -142,7 +160,7 @@ export function useEnrollWizard({
         setGenerating(false)
       }
     },
-    [stepUp, issuer, userId, mode, nameForm, go],
+    [stepUp, issuer, userId, mode, nameForm, go, onBlocked],
   )
 
   // Resume once per mount (StrictMode runs effects twice: the ref keeps it to one).

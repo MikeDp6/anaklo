@@ -1,12 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import { formatPhone } from '@/shared/lib/phone'
 import { cx } from '@/shared/ui/cx'
 import { useMfaRoute } from '../hooks/useMfaRoute'
-import { useSupportContact } from '../hooks/useSupportContact'
 import { MFA_CHALLENGE_PATH, withNext } from '../loaders'
 import styles from './mfa.module.css'
 import { MfaFrame } from './MfaFrame'
+import { SupportContactLinks } from './SupportContactLinks'
 
 /**
  * /mfa/lost-device, «Χάσατε τη συσκευή σας;» (contract 1.7 §6.5, plan 1.7): with a second device,
@@ -17,7 +16,6 @@ import { MfaFrame } from './MfaFrame'
 export function LostDevicePage() {
   const { t } = useTranslation('pro')
   const { verifiedFactors, next } = useMfaRoute()
-  const contact = useSupportContact()
   const challenge = withNext(MFA_CHALLENGE_PATH, next)
   const hasSecondDevice = verifiedFactors.length >= 2
   return (
@@ -32,24 +30,7 @@ export function LostDevicePage() {
       )}
       <section className={styles.section}>
         <p>{t('mfa.lostDevice.contact')}</p>
-        {(contact.email || contact.phone) && (
-          <ul className={styles.contacts}>
-            {contact.email && (
-              <li>
-                <a href={`mailto:${contact.email}`} className={cx(styles.link, 'pressable')}>
-                  {t('mfa.lostDevice.email', { email: contact.email })}
-                </a>
-              </li>
-            )}
-            {contact.phone && (
-              <li>
-                <a href={`tel:${contact.phone}`} className={cx(styles.link, 'pressable')}>
-                  {t('mfa.lostDevice.phone', { phone: formatPhone(contact.phone) })}
-                </a>
-              </li>
-            )}
-          </ul>
-        )}
+        <SupportContactLinks />
         <p className={styles.status}>{t('mfa.lostDevice.noBypass')}</p>
       </section>
       {!hasSecondDevice && (

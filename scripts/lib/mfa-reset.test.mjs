@@ -1,14 +1,23 @@
 // @vitest-environment node
 // The Nous reset (contract 1.7 §5.1) on fake ports with a call log: the dry run writes nothing,
 // --yes writes the grants and audit rows BEFORE deleting, deletes every factor, then revokes
-// every session; the runbook's email templates are complete and fill without leftovers.
+// every session; the runbook's email templates are complete and fill without leftovers. From
+// 1.9b (contract §3.3): the result says whether the enrolment block was lifted, and a reset
+// refused while a removal awaits the detector (55000 detection_pending) stops at its step. Review
+// fix (contract §8): record_support_action itself ends the sessions; the summary counts them with
+// those of the final revoke. §7 item 17 (approved 2026-10-04): a user who is owner or manager nowhere
+// is no longer refused by the script; record_support_action decides (a block is lifted, else 22023),
+// and no email template is printed for it.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { REPO_ROOT, UsageError } from './cli.mjs'
 import {
+  DETECTION_PENDING_MESSAGE,
   EMAIL_TEMPLATE_IDS,
+  NOT_PRIVILEGED_EMAIL_NOTE,
+  NOT_PRIVILEGED_NOTE,
   ResetStepError,
   extractEmailTemplates,
   fillTemplate,
@@ -34,7 +43,7 @@ const TEMPLATES = extractEmailTemplates(RUNBOOK)
 const NOW = new Date('2026-10-02T09:30:00Z')
 
 /**
- * @param {{ userId?: string | null, roles?: Array<'owner' | 'manager'>, deletes?: DeleteOutcome[] }} [options]
+ * @param {{ userId?: string | null, roles?: Array<'owner' | 'manager' | 'staff'>, deletes?: DeleteOutcome[], unblocked?: boolean, factorIds?: string[] }} [options]
  */
 function fakePorts(options = {}) {
   /** @type {string[]} */
@@ -47,7 +56,7 @@ function fakePorts(options = {}) {
       calls.push(`user_id_for_email ${email}`)
       return Promise.resolve(options.userId === undefined ? USER : options.userId)
     },
-    privilegedBusinesses(userId) {
+    memberBusinesses(userId) {
       calls.push(`read memberships ${userId}`)
       return Promise.resolve(
         roles.map((role, index) => ({
@@ -73,7 +82,16 @@ function fakePorts(options = {}) {
     },
     recordSupportAction(input) {
       calls.push(`record_support_action ${input.userId} [${input.ticket}] ${input.reason}`)
-      return Promise.resolve({ factorIds: [F1, F2], grants: 2, auditRows: roles.length })
+      const factorIds = options.factorIds ?? [F1, F2]
+      return Promise.resolve({
+        factorIds,
+        grants: factorIds.length,
+        auditRows: roles.length,
+        enrolmentUnblocked: options.unblocked ?? false,
+        // 0012 review fix: the reset's own transaction ends the sessions first
+        sessions: 2,
+        pushSubscriptions: 1,
+      })
     },
     deleteFactor(userId, factorId) {
       calls.push(`deleteFactor ${userId} ${factorId}`)
@@ -81,7 +99,8 @@ function fakePorts(options = {}) {
     },
     revokeSessions(userId) {
       calls.push(`revoke_user_sessions ${userId}`)
-      return Promise.resolve({ sessions: 3, pushSubscriptions: 1 })
+      // a session opened between the reset and this call
+      return Promise.resolve({ sessions: 1, pushSubscriptions: 0 })
     },
     ownerEmails(businessId) {
       calls.push(`owners ${businessId}`)
@@ -138,8 +157,50 @@ describe('runMfaReset', () => {
     ])
     const text = lines.join('\n')
     expect(text).toContain('factors deleted         2')
+    // the reset's own transaction (2, 1) and the final revoke (1, 0)
     expect(text).toContain('sessions revoked        3')
     expect(text).toContain('push devices removed    1')
+    expect(text).toContain(
+      '  enrolment block         none (Μπλοκάρισμα προσθήκης συσκευής: δεν υπήρχε)',
+    )
+    expect(text).not.toContain('άρθηκε')
+  })
+
+  it('says when the reset lifted an enrolment block (1.9b)', async () => {
+    const { ports } = fakePorts({ unblocked: true })
+    const { lines, run } = input(true)
+    expect(await runMfaReset(ports, run)).toBe(0)
+    expect(lines).toContain(
+      '  enrolment block         lifted (Μπλοκάρισμα προσθήκης συσκευής: άρθηκε)',
+    )
+    expect(lines.join('\n')).not.toContain('δεν υπήρχε')
+    // The line belongs to the summary, before the emails.
+    expect(
+      lines.indexOf('  enrolment block         lifted (Μπλοκάρισμα προσθήκης συσκευής: άρθηκε)'),
+    ).toBeLessThan(lines.findIndex((line) => line.startsWith('----- Email to')))
+  })
+
+  it('never prints the block line in a dry run (it cannot see blocks)', async () => {
+    const { ports } = fakePorts({ unblocked: true })
+    const { lines, run } = input(false)
+    expect(await runMfaReset(ports, run)).toBe(0)
+    expect(lines.join('\n')).not.toContain('enrolment block')
+  })
+
+  it('stops at record_support_action while a removal awaits the detector: nothing after it runs', async () => {
+    const { ports, calls } = fakePorts()
+    ports.recordSupportAction = (input) => {
+      calls.push(`record_support_action ${input.userId} refused`)
+      return Promise.reject(new Error(DETECTION_PENDING_MESSAGE))
+    }
+    const { lines, run } = input(true)
+    expect(await runMfaReset(ports, run)).toBe(1)
+    expect(calls.filter(isWrite)).toEqual([`record_support_action ${USER} refused`])
+    expect(calls.some((call) => call.startsWith('owners'))).toBe(false)
+    expect(lines.at(-1)).toBe(
+      'Failed at step record_support_action: Μια αλλαγή συσκευής αυτού του χρήστη περιμένει τον έλεγχο (έως 5′). Ξανατρέξε την ίδια εντολή σε λίγα λεπτά.',
+    )
+    expect(lines.join('\n')).not.toContain('Done:')
   })
 
   it('prints the emails filled in: the user’s, and the owners’ for a manager', async () => {
@@ -168,10 +229,60 @@ describe('runMfaReset', () => {
     expect(lines.join('\n')).toContain('No account with the email')
   })
 
-  it('refuses a user who is owner or manager nowhere, before any write', async () => {
-    const { ports, calls } = fakePorts({ roles: [] })
-    expect(await runMfaReset(ports, input(true).run)).toBe(1)
+  it('dry run of a user who is owner or manager nowhere: the plan says only a block can be lifted', async () => {
+    const { ports, calls } = fakePorts({ roles: ['staff'] })
+    const { lines, run } = input(false)
+    expect(await runMfaReset(ports, run)).toBe(0)
     expect(calls.filter(isWrite)).toEqual([])
+    expect(lines).toContain('manager-reset@demo-barber.test is not an owner or a manager anywhere.')
+    expect(lines).toContain('Staff of:')
+    expect(lines).toContain('  staff    Demo Barber (/demo-barber)')
+    expect(lines).toContain(NOT_PRIVILEGED_NOTE)
+    expect(lines).not.toContain('Owner or manager of:')
+    expect(lines).toContain(
+      'Dry run: nothing was written. After the identity check, rerun with --yes.',
+    )
+    // A member of no business at all: the same plan, without the staff list.
+    const nowhere = fakePorts({ roles: [] })
+    const none = input(false)
+    expect(await runMfaReset(nowhere.ports, none.run)).toBe(0)
+    expect(none.lines).toContain(NOT_PRIVILEGED_NOTE)
+    expect(none.lines).not.toContain('Staff of:')
+  })
+
+  it('with --yes, a blocked user who is owner or manager nowhere is reset (item 17): no email template', async () => {
+    const { ports, calls } = fakePorts({ roles: ['staff'], factorIds: [], unblocked: true })
+    const { lines, run } = input(true)
+    expect(await runMfaReset(ports, run)).toBe(0)
+    expect(calls.filter(isWrite)).toEqual([
+      `record_support_action ${USER} [E2E-1] lost phone`,
+      `revoke_user_sessions ${USER}`,
+    ])
+    expect(lines).toContain(
+      '  enrolment block         lifted (Μπλοκάρισμα προσθήκης συσκευής: άρθηκε)',
+    )
+    expect(lines).toContain(NOT_PRIVILEGED_EMAIL_NOTE)
+    expect(lines.some((line) => line.startsWith('----- Email to'))).toBe(false)
+    expect(calls.some((call) => call.startsWith('owners'))).toBe(false)
+  })
+
+  it('with --yes, a user who is owner or manager nowhere and not blocked: the server refuses, nothing after it runs', async () => {
+    const { ports, calls } = fakePorts({ roles: ['staff'] })
+    ports.recordSupportAction = (request) => {
+      calls.push(`record_support_action ${request.userId} refused`)
+      return Promise.reject(
+        new Error(
+          'record_support_action: the user is owner or manager nowhere and has no enrolment block: nothing to reset',
+        ),
+      )
+    }
+    const { lines, run } = input(true)
+    expect(await runMfaReset(ports, run)).toBe(1)
+    expect(calls.filter(isWrite)).toEqual([`record_support_action ${USER} refused`])
+    expect(lines.at(-1)).toBe(
+      'Failed at step record_support_action: record_support_action: the user is owner or manager nowhere and has no enrolment block: nothing to reset',
+    )
+    expect(lines.join('\n')).not.toContain('Done:')
   })
 
   it('counts a factor deleted meanwhile (404) as gone', async () => {
@@ -214,7 +325,12 @@ describe('resetFactorsWith (the e2e reset)', () => {
       auditRows: 2,
       sessions: 3,
       pushSubscriptions: 1,
+      enrolmentUnblocked: false,
     })
+    const unblocked = fakePorts({ unblocked: true })
+    await expect(
+      resetFactorsWith(unblocked.ports, { userId: USER, reason: 'e2e reset', ticket: 'E2E' }),
+    ).resolves.toMatchObject({ enrolmentUnblocked: true })
   })
 
   it('throws a ResetStepError when a factor is left', async () => {
@@ -224,6 +340,23 @@ describe('resetFactorsWith (the e2e reset)', () => {
     ).rejects.toThrow(ResetStepError)
   })
 })
+
+/**
+ * A service-role client whose `record_support_action` answers `answer`.
+ * @param {{ data: unknown, error: unknown }} answer
+ */
+function supportClient(answer) {
+  const fake = {
+    /** @param {string} fn */
+    rpc(fn) {
+      if (fn !== 'record_support_action') throw new Error(`unexpected rpc ${fn}`)
+      return Promise.resolve(answer)
+    },
+  }
+  /** @type {import('./mfa-reset.mjs').Db} */
+  const db = /** @type {never} */ (/** @type {unknown} */ (fake))
+  return supportPorts(db)
+}
 
 describe('supportPorts (the calls on the service-role client)', () => {
   it('calls the 0009 RPCs and the Auth admin API with the right arguments', async () => {
@@ -236,7 +369,15 @@ describe('supportPorts (the calls on the service-role client)', () => {
         if (fn === 'user_id_for_email') return Promise.resolve({ data: USER, error: null })
         if (fn === 'record_support_action') {
           return Promise.resolve({
-            data: { action: 'mfa_reset', factor_ids: [F1], grants: 1, audit_rows: 2 },
+            data: {
+              action: 'mfa_reset',
+              factor_ids: [F1],
+              grants: 1,
+              audit_rows: 2,
+              enrolment_unblocked: true,
+              sessions: 1,
+              push_subscriptions: 1,
+            },
             error: null,
           })
         }
@@ -259,7 +400,14 @@ describe('supportPorts (the calls on the service-role client)', () => {
     const ports = supportPorts(db)
     expect(await ports.userIdForEmail('a@b.gr')).toBe(USER)
     expect(await ports.recordSupportAction({ userId: USER, reason: 'r1x', ticket: 'T-1' })).toEqual(
-      { factorIds: [F1], grants: 1, auditRows: 2 },
+      {
+        factorIds: [F1],
+        grants: 1,
+        auditRows: 2,
+        enrolmentUnblocked: true,
+        sessions: 1,
+        pushSubscriptions: 1,
+      },
     )
     expect(await ports.deleteFactor(USER, F1)).toEqual({ ok: false, status: 404, message: 'gone' })
     expect(await ports.revokeSessions(USER)).toEqual({ sessions: 2, pushSubscriptions: 0 })
@@ -272,6 +420,142 @@ describe('supportPorts (the calls on the service-role client)', () => {
       ['deleteFactor', { id: F1, userId: USER }],
       ['revoke_user_sessions', { p_user_id: USER }],
     ])
+  })
+
+  it('reads every membership of the user, staff included, sorted by business name (item 17)', async () => {
+    /** @type {Array<[string, string, unknown]>} */
+    const reads = []
+    const fake = {
+      /** @param {string} table */
+      from(table) {
+        return {
+          /** @param {string} columns */
+          select(columns) {
+            return {
+              /** @param {string} column @param {unknown} value */
+              eq(column, value) {
+                reads.push([table, `${columns} eq ${column}`, value])
+                return Promise.resolve({
+                  data: [
+                    { business_id: SHOP, role: 'staff' },
+                    { business_id: OTHER_SHOP, role: 'owner' },
+                  ],
+                  error: null,
+                })
+              },
+              /** @param {string} column @param {unknown} value */
+              in(column, value) {
+                reads.push([table, `${columns} in ${column}`, value])
+                return Promise.resolve({
+                  data: [
+                    { id: SHOP, name: 'Zeta Shop', slug: 'zeta', timezone: 'Europe/Athens' },
+                    {
+                      id: OTHER_SHOP,
+                      name: 'Alpha Shop',
+                      slug: 'alpha',
+                      timezone: 'Europe/London',
+                    },
+                  ],
+                  error: null,
+                })
+              },
+            }
+          },
+        }
+      },
+    }
+    /** @type {import('./mfa-reset.mjs').Db} */
+    const db = /** @type {never} */ (/** @type {unknown} */ (fake))
+    expect(await supportPorts(db).memberBusinesses(USER)).toEqual([
+      {
+        id: OTHER_SHOP,
+        name: 'Alpha Shop',
+        slug: 'alpha',
+        timezone: 'Europe/London',
+        role: 'owner',
+      },
+      { id: SHOP, name: 'Zeta Shop', slug: 'zeta', timezone: 'Europe/Athens', role: 'staff' },
+    ])
+    expect(reads).toEqual([
+      ['business_members', 'business_id, role eq user_id', USER],
+      ['businesses', 'id, name, slug, timezone in id', [SHOP, OTHER_SHOP]],
+    ])
+  })
+
+  it('needs enrolment_unblocked, sessions and push_subscriptions in the record_support_action result (0012)', async () => {
+    const input = { userId: USER, reason: 'r1x', ticket: 'T-1' }
+    const without = supportClient({
+      data: {
+        action: 'mfa_reset',
+        factor_ids: [F1],
+        grants: 1,
+        audit_rows: 2,
+        sessions: 0,
+        push_subscriptions: 0,
+      },
+      error: null,
+    })
+    await expect(without.recordSupportAction(input)).rejects.toThrow()
+    const withoutSessions = supportClient({
+      data: {
+        action: 'mfa_reset',
+        factor_ids: [F1],
+        grants: 1,
+        audit_rows: 2,
+        enrolment_unblocked: false,
+      },
+      error: null,
+    })
+    await expect(withoutSessions.recordSupportAction(input)).rejects.toThrow()
+    const notBoolean = supportClient({
+      data: {
+        action: 'mfa_reset',
+        factor_ids: [],
+        grants: 0,
+        audit_rows: 1,
+        enrolment_unblocked: 'yes',
+        sessions: 0,
+        push_subscriptions: 0,
+      },
+      error: null,
+    })
+    await expect(notBoolean.recordSupportAction(input)).rejects.toThrow()
+  })
+
+  it('turns 55000 detection_pending into the "rerun later" message; any other error stays as it is', async () => {
+    const input = { userId: USER, reason: 'r1x', ticket: 'T-1' }
+    const pending = supportClient({
+      data: null,
+      error: {
+        code: '55000',
+        hint: 'detection_pending',
+        message:
+          'an unauthorized device change of this user awaits detection; try again after the next detector run',
+      },
+    })
+    await expect(pending.recordSupportAction(input)).rejects.toThrow(DETECTION_PENDING_MESSAGE)
+    const otherHint = supportClient({
+      data: null,
+      error: { code: '55000', hint: null, message: 'object not in prerequisite state' },
+    })
+    await expect(otherHint.recordSupportAction(input)).rejects.toThrow(
+      'record_support_action: object not in prerequisite state',
+    )
+    // Through the reset: the step is named and nothing after it runs.
+    /** @type {string[]} */
+    const deletes = []
+    const ports = {
+      ...pending,
+      /** @param {string} userId @param {string} factorId */
+      deleteFactor(userId, factorId) {
+        deletes.push(`${userId} ${factorId}`)
+        return Promise.resolve(/** @type {DeleteOutcome} */ ({ ok: true }))
+      },
+    }
+    await expect(resetFactorsWith(ports, input)).rejects.toThrow(
+      new ResetStepError('record_support_action', DETECTION_PENDING_MESSAGE),
+    )
+    expect(deletes).toEqual([])
   })
 })
 

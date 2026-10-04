@@ -8,9 +8,15 @@
 //   … --prod --project-ref <ref> --env-file <path outside the repo>            production
 //
 // The DEFAULT target is the remote dev project: rehearse with --local. Without --yes nothing is
-// written. With --yes: grants and audit rows (record_support_action), then every factor of the
-// user (auth.admin.mfa.deleteFactor), then every session (revoke_user_sessions); then it prints
-// the emails of the runbook, filled in. Never reads or prints a TOTP secret.
+// written. With --yes: grants and audit rows (record_support_action, which also lifts an
+// enrolment block and ends every session in the same transaction, and refuses while an
+// unauthorized removal of the user awaits the detector: rerun in a few minutes), then every factor
+// of the user (auth.admin.mfa.deleteFactor), then every session again (revoke_user_sessions);
+// then it prints the summary (with the enrolment block line)
+// and the emails of the runbook, filled in. Never reads or prints a TOTP secret.
+// A user who is owner or manager nowhere (a blocked manager demoted to staff, or removed) is not
+// refused by the script (contract 1.9b §7 item 17): with --yes, record_support_action lifts the
+// block, or refuses (22023, nothing written) when there is none; no email template applies.
 // The secret key comes from the environment (SUPABASE_SECRET_KEY) or --env-file <path outside
 // the repo>; never from .env.local or any file in the repository.
 import { readFileSync } from 'node:fs'

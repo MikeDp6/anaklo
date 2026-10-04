@@ -55,7 +55,10 @@ export type DispatchServices = {
   readonly emailProvider: EmailProvider
   /** 1.9: `auth.admin.mfa.deleteFactor` of the same service-role client. */
   readonly factors: FactorsAdminPort
-  /** 1.9: the Nous address of the security emails (`SUPPORT_EMAIL`). */
+  /**
+   * 1.9: the Nous address of the security emails (`SUPPORT_EMAIL`); from 1.9b also the recipient
+   * of the Nous copy of every security event.
+   */
   readonly supportEmail: string
 }
 

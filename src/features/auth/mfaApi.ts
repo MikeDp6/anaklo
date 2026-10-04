@@ -4,7 +4,7 @@ import {
   isAuthSessionMissingError,
   type Factor,
 } from '@supabase/supabase-js'
-import type { z } from 'zod/mini'
+import { z } from 'zod/mini'
 import { AuthorizeFactorResult, ManageFactorsResult } from '@fn-shared/member-schemas.ts'
 import { throwIfFunctionFailed } from '@/shared/lib/functionError'
 import { RpcFailure, throwIfFailed } from '@/shared/lib/rpcError'
@@ -156,6 +156,20 @@ export async function authorizeFactorAdd(): Promise<FactorGrant> {
   })
   throwIfFailed(error, status)
   return AuthorizeFactorResult.parse(data)
+}
+
+const EnrolmentBlocked = z.boolean()
+
+/**
+ * Whether the caller may not add a device until Nous resets the account (contract 1.9b §2.5,
+ * `factor_enrolment_blocked()`, 0012): a device was removed without going through the app and
+ * none is left. The caller's own state only; the server decides (rule 13). The loader asks only
+ * when it would otherwise send an owner or manager to the enrolment.
+ */
+export async function fetchEnrolmentBlocked(): Promise<boolean> {
+  const { data, error, status } = await supabase.rpc('factor_enrolment_blocked')
+  throwIfFailed(error, status)
+  return EnrolmentBlocked.parse(data)
 }
 
 /** GoTrue's QR is an SVG data URI; anything else is not shown (only the key is). */

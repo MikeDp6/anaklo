@@ -40,6 +40,7 @@ function data(factors: VerifiedFactor[]): MfaRouteData {
     highestRole: 'owner',
     aal: 'aal1',
     verifiedFactors: factors,
+    enrolmentBlocked: false,
     next: '/day',
   }
 }

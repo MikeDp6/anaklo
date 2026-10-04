@@ -105,6 +105,22 @@ describe('withStepUp (contract 1.7 §6.6, plan 1.7 «Frontend»)', () => {
   })
 
   it.each([
+    ['classified', new RpcFailure({ kind: 'domain', code: 'AN034' })],
+    ['raw PostgREST', { code: 'P0001', message: 'AN034', hint: 'enrolment_blocked' }],
+  ])(
+    'adding a device blocked (AN034, %s) → rethrown: no sheet, no recheck (contract 1.9b §4.5)',
+    async (_, error) => {
+      const d = deps(true)
+      const call = vi.fn<() => Promise<string>>().mockRejectedValue(error)
+      await expect(withStepUp(call, d)).rejects.toBe(error)
+      expect(failureOf(error)).toEqual({ kind: 'domain', code: 'AN034' })
+      expect(d.askForCode).not.toHaveBeenCalled()
+      expect(d.onAuthRecheck).not.toHaveBeenCalled()
+      expect(call).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([
     ['offline', new RpcFailure({ kind: 'offline' })],
     ['a domain error', new RpcFailure({ kind: 'domain', code: 'AN027' })],
     ['anything else', new Error('boom')],

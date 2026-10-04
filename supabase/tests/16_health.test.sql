@@ -1573,8 +1573,9 @@ select is(
   (select concat_ws(' ', pg_temp.keys(x.n)::text, x.n ->> 'kind', (x.n ->> 'detected_at')::timestamptz = pg_temp.t(-300),
                     x.n ->> 'push_queued')
    from (select pg_temp.r('r5') -> 'notify' as n) x),
-  '{detected_at,emails,kind,push_queued} factor_added_unauthorized t 1',
-  'bundle: exactly {kind, detected_at, push_queued, emails}'
+  '{account_email,businesses,detected_at,emails,kind,push_queued} factor_added_unauthorized t 1',
+  'bundle: exactly {account_email, businesses, detected_at, emails, kind, push_queued} (0012 adds account_email and '
+  || 'businesses for the Nous copy, contract 1.9b §2.4.5)'
 );
 
 select is(

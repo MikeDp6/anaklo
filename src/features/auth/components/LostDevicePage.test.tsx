@@ -28,6 +28,7 @@ function open(factors: VerifiedFactor[]) {
     highestRole: 'owner',
     aal: 'aal1',
     verifiedFactors: factors,
+    enrolmentBlocked: false,
     next: null,
   }
   const router = createMemoryRouter(

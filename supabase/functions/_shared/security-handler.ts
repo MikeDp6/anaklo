@@ -5,7 +5,13 @@ import { formatInZone } from './dates.ts'
 import { Locale, SecurityEmailAudience, SecurityEventKind } from './domain.ts'
 import type { EmailProvider } from './email-provider.ts'
 import type { FactorsAdminPort } from './member-functions.ts'
-import { renderSecurityEmail, securityEmailKey } from './security-email-templates.ts'
+import {
+  renderSecurityEmail,
+  SECURITY_NOUS_LOCALE,
+  SECURITY_NOUS_TIME_ZONE,
+  securityEmailKey,
+  type SecurityEmailValues,
+} from './security-email-templates.ts'
 
 /**
  * The security phase of `dispatch` (contract 1.9 §3.2): the reaction to `private.security_events`,
@@ -22,8 +28,10 @@ import { renderSecurityEmail, securityEmailKey } from './security-email-template
  *   2. `contained` (current lease only): the database queues the owners' push in `messages_log`
  *      in the same transaction and returns the email bundle. `{ recorded: false }` = another
  *      dispatcher has the event: nothing is sent.
- *   3. notify: every email once, in parallel; a failed email is counted, never retried (D16).
- *   4. `notified` with the counts.
+ *   3. notify: every email of the bundle AND the Nous copy (contract 1.9b §3.2: one email to
+ *      `SUPPORT_EMAIL`, Greek, UTC, key `security:<event id>:nous`, also when the bundle has no
+ *      email) once, in parallel; a failed email is counted, never retried (D16).
+ *   4. `notified` with the counts (the Nous copy included, contract 1.9b B4).
  * Notifications go AT MOST ONCE: they are sent only after `contained` was recorded, and a
  * dispatcher that dies while notifying leaves the event to be closed `notify_unknown` by the next
  * claim, never re-sent.
@@ -47,7 +55,7 @@ export type SecurityServices = {
   /** service_role: `auth.admin.mfa.deleteFactor`. */
   readonly factors: FactorsAdminPort
   readonly emailProvider: EmailProvider
-  /** The Nous address the emails name (`SUPPORT_EMAIL`). */
+  /** The Nous address (`SUPPORT_EMAIL`): named in the emails, and the Nous copy's recipient. */
   readonly supportEmail: string
 }
 
@@ -96,13 +104,24 @@ export const SecurityEmailItem = z.object({
 })
 export type SecurityEmailItem = z.infer<typeof SecurityEmailItem>
 
+/** One business of the bundle (0012), for the Nous copy: `<name> (<slug>)`. */
+const NotifyBusiness = z.object({ name: z.string(), slug: z.string() })
+
 const Notify = z.object({
   kind: SecurityEventKind,
   detected_at: Instant,
   push_queued: z.int().check(z.gte(0)),
   /** Parsed one by one: a malformed entry fails alone. */
   emails: z.array(z.unknown()),
+  /**
+   * 0012 (contract 1.9b §2.4.5): the account's address (null: it has none) and its owner/manager
+   * businesses in the event's order, for the Nous copy. Optional, and each business parsed alone
+   * (an invalid one is skipped): a database without 0012 still gets its Nous copy.
+   */
+  account_email: z.optional(z.nullable(z.string())),
+  businesses: z.optional(z.array(z.unknown())),
 })
+type Notify = z.infer<typeof Notify>
 
 const ContainedAnswer = z.union([
   z.object({ recorded: z.literal(true), notify: Notify }),
@@ -167,37 +186,20 @@ async function contain(services: SecurityServices, event: ClaimedSecurityEvent) 
 
 type EmailOutcome = 'sent' | 'failed'
 
-async function sendOne(
+/**
+ * Renders and sends one email; every failure (render, sender answer, throw) is logged and
+ * counted, never retried. `fields` name the email in the log: never its address or its text.
+ */
+async function deliver(
   services: SecurityServices,
   log: Log,
-  event: ClaimedSecurityEvent,
-  detectedAt: Date,
-  raw: unknown,
-  index: number,
+  fields: Readonly<Record<string, LogValue>>,
+  email: { to: string; idempotencyKey: string; render: () => { subject: string; text: string } },
 ): Promise<EmailOutcome> {
-  const fields: Record<string, LogValue> = { id: event.id, index }
-  const parsed = SecurityEmailItem.safeParse(raw)
-  if (!parsed.success) {
-    log('security_email', { ...fields, outcome: 'failed', error: 'invalid_email_item' })
-    return 'failed'
-  }
-  const email = parsed.data
-  fields.audience = email.audience
-
   let subject: string
   let text: string
   try {
-    const rendered = renderSecurityEmail(
-      securityEmailKey(event.kind, email.audience),
-      email.locale,
-      {
-        account: email.account_email,
-        date: formatInZone(detectedAt, email.timezone, SECURITY_EMAIL_DATE_PATTERN, email.locale),
-        time: formatInZone(detectedAt, email.timezone, SECURITY_EMAIL_TIME_PATTERN, email.locale),
-        support: services.supportEmail,
-        ...(email.business_name === null ? {} : { business: email.business_name }),
-      },
-    )
+    const rendered = email.render()
     subject = rendered.subject
     text = rendered.text
   } catch {
@@ -210,7 +212,7 @@ async function sendOne(
       to: email.to,
       subject,
       text,
-      idempotencyKey: `security:${event.id}:${index}`,
+      idempotencyKey: email.idempotencyKey,
     })
     if (result.ok) {
       log('security_email', { ...fields, outcome: 'sent', error: null })
@@ -221,6 +223,104 @@ async function sendOne(
     log('security_email', { ...fields, outcome: 'unknown', error: 'provider_exception' })
   }
   return 'failed'
+}
+
+/** One email of the bundle (`index` = its position): to the account or to an owner. */
+function sendOne(
+  services: SecurityServices,
+  log: Log,
+  event: ClaimedSecurityEvent,
+  detectedAt: Date,
+  raw: unknown,
+  index: number,
+): Promise<EmailOutcome> {
+  const parsed = SecurityEmailItem.safeParse(raw)
+  if (!parsed.success) {
+    log('security_email', { id: event.id, index, outcome: 'failed', error: 'invalid_email_item' })
+    return Promise.resolve('failed')
+  }
+  const email = parsed.data
+  return deliver(
+    services,
+    log,
+    { id: event.id, index, audience: email.audience },
+    {
+      to: email.to,
+      idempotencyKey: `security:${event.id}:${index}`,
+      render: () =>
+        renderSecurityEmail(securityEmailKey(event.kind, email.audience), email.locale, {
+          account: email.account_email,
+          date: formatInZone(detectedAt, email.timezone, SECURITY_EMAIL_DATE_PATTERN, email.locale),
+          time: formatInZone(detectedAt, email.timezone, SECURITY_EMAIL_TIME_PATTERN, email.locale),
+          support: services.supportEmail,
+          ...(email.business_name === null ? {} : { business: email.business_name }),
+        }),
+    },
+  )
+}
+
+/**
+ * The values of the Nous copy (contract 1.9b §3.2): the account (its address, else the user id),
+ * its businesses as `<name> (<slug>)` in the bundle's order (`-` when none), the detection in UTC,
+ * the event id and the number of owner emails in the bundle.
+ */
+function nousEmailValues(
+  event: Pick<ClaimedSecurityEvent, 'id' | 'user_id'>,
+  detectedAt: Date,
+  notify: Pick<Notify, 'account_email' | 'businesses' | 'emails'>,
+): SecurityEmailValues {
+  const businesses = (notify.businesses ?? []).flatMap((raw) => {
+    const parsed = NotifyBusiness.safeParse(raw)
+    return parsed.success ? [`${parsed.data.name} (${parsed.data.slug})`] : []
+  })
+  const owners = notify.emails.filter((raw) => {
+    const parsed = SecurityEmailItem.safeParse(raw)
+    return parsed.success && parsed.data.audience === 'owner'
+  }).length
+  const accountEmail = notify.account_email?.trim() ?? ''
+  return {
+    account: accountEmail === '' ? event.user_id : accountEmail,
+    businesses: businesses.length > 0 ? businesses.join(', ') : '-',
+    date: formatInZone(
+      detectedAt,
+      SECURITY_NOUS_TIME_ZONE,
+      SECURITY_EMAIL_DATE_PATTERN,
+      SECURITY_NOUS_LOCALE,
+    ),
+    time: formatInZone(
+      detectedAt,
+      SECURITY_NOUS_TIME_ZONE,
+      SECURITY_EMAIL_TIME_PATTERN,
+      SECURITY_NOUS_LOCALE,
+    ),
+    event: event.id,
+    owners: String(owners),
+  }
+}
+
+/** The Nous copy of a contained event: once, to `SUPPORT_EMAIL` (contract 1.9b B1–B3). */
+function sendNous(
+  services: SecurityServices,
+  log: Log,
+  event: ClaimedSecurityEvent,
+  detectedAt: Date,
+  notify: Notify,
+): Promise<EmailOutcome> {
+  return deliver(
+    services,
+    log,
+    { id: event.id, index: null, audience: 'nous' },
+    {
+      to: services.supportEmail,
+      idempotencyKey: `security:${event.id}:nous`,
+      render: () =>
+        renderSecurityEmail(
+          securityEmailKey(event.kind, 'nous'),
+          SECURITY_NOUS_LOCALE,
+          nousEmailValues(event, detectedAt, notify),
+        ),
+    },
+  )
 }
 
 type EventResult =
@@ -282,11 +382,12 @@ async function handleEvent(
   summary.contained += 1
   const notify = answer.data.notify
 
-  // 3. Notify: every email once, in parallel.
+  // 3. Notify: every email of the bundle and the Nous copy, each once, in parallel.
   const detectedAt = new Date(notify.detected_at)
-  const outcomes = await Promise.all(
-    notify.emails.map((raw, index) => sendOne(services, log, event, detectedAt, raw, index)),
-  )
+  const outcomes = await Promise.all([
+    ...notify.emails.map((raw, index) => sendOne(services, log, event, detectedAt, raw, index)),
+    sendNous(services, log, event, detectedAt, notify),
+  ])
   const sent = Math.min(MAX_EMAIL_COUNT, outcomes.filter((o) => o === 'sent').length)
   const failed = Math.min(
     MAX_EMAIL_COUNT,

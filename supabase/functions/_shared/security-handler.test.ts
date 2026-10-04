@@ -1,6 +1,7 @@
 // @vitest-environment node
 //
-// The security phase of `dispatch` (contract 1.9 §3.2) against an in-memory stand-in of
+// The security phase of `dispatch` (contract 1.9 §3.2, the Nous copy of 1.9b §3.2) against an
+// in-memory stand-in of
 // `claim_security_events`, `record_security_event_result` and `revoke_user_sessions`, a fake Auth
 // admin port and the real fake email sender. The SQL (leases, the system grant, the push rows,
 // notify_unknown) is pgTAP `16_health`; the whole chain on the local stack is
@@ -42,12 +43,20 @@ function claimed(
   }
 }
 
-/** The bundle of `queue_security_notifications`: user first, then owners (D13). */
+/**
+ * The bundle of `queue_security_notifications`: user first, then owners (D13); from 0012 also the
+ * account's address and its businesses in the event's order (contract 1.9b §2.4.5).
+ */
 function bundle(kind: Kind = 'factor_added_unauthorized') {
   return {
     kind,
     detected_at: DETECTED,
     push_queued: 2,
+    account_email: ACCOUNT,
+    businesses: [
+      { name: 'Κουρείο Demo', slug: 'demo-barber' },
+      { name: 'Other Shop', slug: 'other-shop' },
+    ],
     emails: [
       {
         audience: 'user',
@@ -166,7 +175,7 @@ function batch(...items: unknown[]) {
 }
 
 describe('security phase: an added factor (contract 1.9 §3.2)', () => {
-  it('claims → deletes the factor → revokes → contained → one email each → notified (3, 0)', async () => {
+  it('claims → deletes the factor → revokes → contained → one email each and Nous → notified (4, 0)', async () => {
     const event = claimed()
     const fake = new Fake([batch(event)])
     const result = await fake.run()
@@ -176,6 +185,7 @@ describe('security phase: an added factor (contract 1.9 §3.2)', () => {
       'deleteFactor',
       'revoke_user_sessions',
       'record_security_event_result:contained',
+      'send',
       'send',
       'send',
       'send',
@@ -200,7 +210,7 @@ describe('security phase: an added factor (contract 1.9 §3.2)', () => {
         p_id: event.id,
         p_lease_id: event.lease_id,
         p_outcome: 'notified',
-        p_emails_sent: 3,
+        p_emails_sent: 4,
         p_emails_failed: 0,
         p_error: null,
       },
@@ -217,13 +227,14 @@ describe('security phase: an added factor (contract 1.9 §3.2)', () => {
     const fake = new Fake([batch(event)])
     await fake.run()
 
-    expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EN, OWNER_EL])
+    expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EN, OWNER_EL, SUPPORT])
     expect(fake.emails.map((email) => email.idempotencyKey)).toEqual([
       `security:${event.id}:0`,
       `security:${event.id}:1`,
       `security:${event.id}:2`,
+      `security:${event.id}:nous`,
     ])
-    const [user, ownerEn, ownerEl] = fake.emails
+    const [user, ownerEn, ownerEl, nous] = fake.emails
     // 18:07 UTC = 19:07 in London (BST) and 21:07 in Athens (EEST).
     expect(user?.subject).toBe('Anaklo: we removed an authenticator device added without approval')
     expect(user?.text).toContain(
@@ -240,8 +251,12 @@ describe('security phase: an added factor (contract 1.9 §3.2)', () => {
     expect(ownerEl?.text).toContain(
       `Στις 03/10/2026 21:07 προστέθηκε μια νέα συσκευή κωδικών στον λογαριασμό ${ACCOUNT} του Κουρείο Demo`,
     )
+    // The Nous copy: Greek, in UTC (18:07), whatever the businesses' zones.
+    expect(nous?.subject).toBe('Anaklo · Nous: προστέθηκε συσκευή κωδικών χωρίς έγκριση')
+    expect(nous?.text).toContain(`Στις 03/10/2026 18:07 UTC ο έλεγχος βρήκε`)
     for (const email of fake.emails) {
       expect(email.text).not.toContain(FACTOR)
+      expect(email.subject).not.toContain(FACTOR)
       expect(email.text).not.toMatch(/https?:|www\./)
     }
   })
@@ -271,6 +286,7 @@ describe('security phase: a removed factor', () => {
       'send',
       'send',
       'send',
+      'send',
       'record_security_event_result:notified',
       'claim_security_events',
     ])
@@ -278,6 +294,12 @@ describe('security phase: a removed factor', () => {
       'Anaklo: an authenticator device was removed without approval',
     )
     expect(fake.emails[2]?.text).toContain('αφαιρέθηκε μια συσκευή κωδικών από τον λογαριασμό')
+    expect(fake.emails[3]?.to).toBe(SUPPORT)
+    expect(fake.emails[3]?.subject).toBe('Anaklo · Nous: αφαιρέθηκε συσκευή κωδικών χωρίς έγκριση')
+    expect(fake.emails[3]?.text).toContain('«Επικοινώνησε με τη Nous»')
+    expect(fake.records('notified')).toEqual([
+      expect.objectContaining({ p_emails_sent: 4, p_emails_failed: 0 }),
+    ])
     expect(result.summary).toEqual({ claimed: 1, contained: 1, notified: 1, failed: 0 })
   })
 })
@@ -372,10 +394,10 @@ describe('security phase: each event at most once', () => {
         },
       },
     })
-    expect(sends).toBe(3)
-    expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EL])
+    expect(sends).toBe(4)
+    expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EL, SUPPORT])
     expect(fake.records('notified')).toEqual([
-      expect.objectContaining({ p_emails_sent: 2, p_emails_failed: 1 }),
+      expect.objectContaining({ p_emails_sent: 3, p_emails_failed: 1 }),
     ])
     expect(result.summary.notified).toBe(1)
   })
@@ -394,9 +416,10 @@ describe('security phase: each event at most once', () => {
       ],
     }
     await fake.run()
-    expect(fake.emails).toHaveLength(3)
+    // The three good ones and the Nous copy.
+    expect(fake.emails).toHaveLength(4)
     expect(fake.records('notified')).toEqual([
-      expect.objectContaining({ p_emails_sent: 3, p_emails_failed: 4 }),
+      expect.objectContaining({ p_emails_sent: 4, p_emails_failed: 4 }),
     ])
   })
 
@@ -408,7 +431,7 @@ describe('security phase: each event at most once', () => {
         : { data: { recorded: false }, error: null },
     )
     const result = await fake.run()
-    expect(fake.emails).toHaveLength(3)
+    expect(fake.emails).toHaveLength(4)
     expect(fake.records('notified')).toHaveLength(1)
     expect(fake.logs).toContainEqual(
       expect.objectContaining({
@@ -529,10 +552,213 @@ describe('security phase: claims and limits', () => {
         kind: 'factor_added_unauthorized',
         step: 'notify',
         outcome: 'notified',
-        emails_sent: 3,
+        emails_sent: 4,
         emails_failed: 0,
         push_queued: 2,
       }) as unknown,
     })
+  })
+})
+
+describe('security phase: the Nous copy (contract 1.9b §3.2)', () => {
+  function nousEmails(fake: Fake) {
+    return fake.emails.filter((email) => email.to === SUPPORT)
+  }
+
+  it('sends exactly one, after contained, to SUPPORT_EMAIL with its own key and the 0012 values', async () => {
+    const event = claimed()
+    const fake = new Fake([batch(event)])
+    await fake.run()
+
+    expect(nousEmails(fake)).toHaveLength(1)
+    const [nous] = nousEmails(fake)
+    expect(nous?.idempotencyKey).toBe(`security:${event.id}:nous`)
+    // After the contained record, before the notified one.
+    const sendAt = fake.steps.lastIndexOf('send')
+    expect(fake.steps.indexOf('record_security_event_result:contained')).toBeLessThan(
+      fake.steps.indexOf('send'),
+    )
+    expect(sendAt).toBeLessThan(fake.steps.indexOf('record_security_event_result:notified'))
+    expect(nous?.subject).toBe('Anaklo · Nous: προστέθηκε συσκευή κωδικών χωρίς έγκριση')
+    expect(nous?.text).toBe(
+      [
+        `Στις 03/10/2026 18:07 UTC ο έλεγχος βρήκε μια συσκευή κωδικών που προστέθηκε χωρίς έγκριση στον λογαριασμό ${ACCOUNT}.`,
+        'Επιχειρήσεις όπου ο λογαριασμός είναι ιδιοκτήτης ή διαχειριστής: Κουρείο Demo (demo-barber), Other Shop (other-shop).',
+        'Τι έγινε αυτόματα: η συσκευή αφαιρέθηκε, ο λογαριασμός αποσυνδέθηκε από όλες τις συσκευές και στάλθηκε email στον λογαριασμό και σε 2 ιδιοκτήτες.',
+        `Τι κάνεις: runbook security-event.md, αναφορά ${event.id}. Επικοινωνία μόνο από κανάλι που ήδη γνωρίζουμε (το τηλέφωνο του καταστήματος από τα στοιχεία μας), ποτέ με στοιχεία από εισερχόμενο μήνυμα.`,
+      ].join('\n\n'),
+    )
+    // Never a secret, a code, a link, a factor id or the user id (the address is there).
+    expect(nous?.text).not.toContain(FACTOR)
+    expect(nous?.text).not.toContain(USER)
+    expect(nous?.text).not.toMatch(/https?:|www\./)
+  })
+
+  it('keeps the businesses in the bundle order and counts only the owner items', async () => {
+    const fake = new Fake([batch(claimed('factor_removed_unauthorized'))])
+    const base = bundle('factor_removed_unauthorized')
+    fake.notify = {
+      ...base,
+      businesses: [
+        { name: 'Zeta', slug: 'zeta' },
+        { name: 3, slug: 'bad' }, // off the contract: skipped
+        'not-an-object',
+        null,
+        { name: 'Alpha', slug: 'alpha' },
+      ],
+      emails: [
+        ...base.emails,
+        { ...base.emails[1], to: OWNER_EL }, // a third owner item
+        { audience: 'owner', to: OWNER_EL }, // off the contract: not counted
+      ],
+    }
+    await fake.run()
+    const [nous] = nousEmails(fake)
+    expect(nous?.text).toContain(
+      'Επιχειρήσεις όπου ο λογαριασμός είναι ιδιοκτήτης ή διαχειριστής: Zeta (zeta), Alpha (alpha).',
+    )
+    expect(nous?.text).toContain('σε 3 ιδιοκτήτες')
+    expect(nous?.text).toContain('«Επικοινώνησε με τη Nous»')
+  })
+
+  it('names the user id when the account has no address, and "-" when there are no businesses', async () => {
+    const event = claimed()
+    const fake = new Fake([batch(event)])
+    fake.notify = { ...bundle(), account_email: null, businesses: [], emails: [] }
+    const result = await fake.run()
+    // No other email (no address): the Nous copy alone.
+    expect(fake.emails.map((email) => email.to)).toEqual([SUPPORT])
+    expect(fake.emails[0]?.text).toContain(`στον λογαριασμό ${USER}.`)
+    expect(fake.emails[0]?.text).toContain(
+      'Επιχειρήσεις όπου ο λογαριασμός είναι ιδιοκτήτης ή διαχειριστής: -.',
+    )
+    expect(fake.emails[0]?.text).toContain('σε 0 ιδιοκτήτες')
+    expect(fake.records('notified')).toEqual([
+      expect.objectContaining({ p_emails_sent: 1, p_emails_failed: 0 }),
+    ])
+    expect(result.summary).toEqual({ claimed: 1, contained: 1, notified: 1, failed: 0 })
+    // The user id is in the Nous email only, never in a log.
+    expect(JSON.stringify(fake.logs)).not.toContain(USER)
+  })
+
+  it('still goes to Nous from a database without 0012 (no account_email, no businesses)', async () => {
+    const fake = new Fake([batch(claimed())])
+    const { kind, detected_at, push_queued, emails } = bundle()
+    fake.notify = { kind, detected_at, push_queued, emails }
+    await fake.run()
+    expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EN, OWNER_EL, SUPPORT])
+    const [nous] = nousEmails(fake)
+    expect(nous?.text).toContain(`στον λογαριασμό ${USER}.`)
+    expect(nous?.text).toContain(': -.')
+    expect(nous?.text).toContain('σε 2 ιδιοκτήτες')
+    expect(fake.records('notified')).toEqual([
+      expect.objectContaining({ p_emails_sent: 4, p_emails_failed: 0 }),
+    ])
+  })
+
+  it('goes alone when the bundle has no email (sole owner): notified (1, 0)', async () => {
+    const fake = new Fake([batch(claimed())])
+    fake.notify = { ...bundle(), emails: [] }
+    await fake.run()
+    expect(fake.emails.map((email) => email.idempotencyKey)).toEqual([
+      expect.stringMatching(/^security:[0-9a-f-]{36}:nous$/),
+    ])
+    expect(nousEmails(fake)[0]?.text).toContain(`στον λογαριασμό ${ACCOUNT}.`)
+    expect(fake.records('notified')).toEqual([
+      expect.objectContaining({ p_emails_sent: 1, p_emails_failed: 0 }),
+    ])
+  })
+
+  it('a Nous copy that throws or is refused is counted, never retried; the others still go', async () => {
+    for (const answer of ['throw', 'rejected', 'failed'] as const) {
+      const fake = new Fake([batch(claimed())])
+      const attempts: string[] = []
+      const result = await fake.run({
+        emailProvider: {
+          name: 'scripted',
+          send: (request) => {
+            attempts.push(request.to)
+            if (request.to !== SUPPORT) {
+              fake.emails.push(request)
+              return Promise.resolve({ ok: true, providerMessageId: 'id' })
+            }
+            if (answer === 'throw') return Promise.reject(new Error('smtp down'))
+            return Promise.resolve({ ok: false, outcome: answer, error: 'refused' })
+          },
+        },
+      })
+      expect(
+        attempts.filter((to) => to === SUPPORT),
+        answer,
+      ).toHaveLength(1)
+      expect(fake.emails.map((email) => email.to)).toEqual([ACCOUNT, OWNER_EN, OWNER_EL])
+      expect(fake.records('notified')).toEqual([
+        expect.objectContaining({ p_emails_sent: 3, p_emails_failed: 1 }),
+      ])
+      expect(result.summary).toEqual({ claimed: 1, contained: 1, notified: 1, failed: 0 })
+      expect(fake.logs).toContainEqual({
+        event: 'security_email',
+        fields: expect.objectContaining({
+          index: null,
+          audience: 'nous',
+          outcome: answer === 'throw' ? 'unknown' : answer,
+        }) as unknown,
+      })
+    }
+  })
+
+  it('is never sent when containment failed, the lease was lost or the contained record failed', async () => {
+    const scenarios: Array<[string, (fake: Fake) => void]> = [
+      ['contain_failed', (fake) => (fake.deleteAnswer = { ok: false, status: 500 })],
+      [
+        'lease lost',
+        (fake) =>
+          fake.overrides.set('record_security_event_result', () => ({
+            data: { recorded: false },
+            error: null,
+          })),
+      ],
+      ['unreadable contained', (fake) => (fake.notify = { kind: 'factor_added_unauthorized' })],
+      [
+        'contained record error',
+        (fake) =>
+          fake.overrides.set('record_security_event_result', () => ({
+            data: null,
+            error: { code: '40001', message: 'could not serialize access' },
+          })),
+      ],
+    ]
+    for (const [name, arrange] of scenarios) {
+      const fake = new Fake([batch(claimed())])
+      arrange(fake)
+      await fake.run()
+      expect(fake.emails, name).toEqual([])
+      expect(fake.steps, name).not.toContain('send')
+      expect(fake.records('notified'), name).toEqual([])
+    }
+  })
+
+  it('logs audience nous with no index, never the address, the user id or the factor id', async () => {
+    const fake = new Fake([batch(claimed()), batch(claimed('factor_removed_unauthorized'))])
+    fake.notify = { ...bundle(), account_email: null }
+    await fake.run()
+    const nousLines = fake.logs.filter((line) => line.fields.audience === 'nous')
+    expect(nousLines).toHaveLength(2)
+    for (const line of nousLines) {
+      expect(line).toEqual({
+        event: 'security_email',
+        fields: {
+          id: expect.any(String) as unknown,
+          index: null,
+          audience: 'nous',
+          outcome: 'sent',
+          error: null,
+        },
+      })
+    }
+    const logged = JSON.stringify(fake.logs)
+    for (const secret of [USER, FACTOR, ACCOUNT, SUPPORT, 'demo-barber', 'Other Shop', 'Nous:']) {
+      expect(logged, secret).not.toContain(secret)
+    }
   })
 })

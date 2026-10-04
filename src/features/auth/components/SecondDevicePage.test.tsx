@@ -41,6 +41,7 @@ const DATA: MfaRouteData = {
       createdAt: '2026-10-02T09:00:00Z',
     },
   ],
+  enrolmentBlocked: false,
   next: '/day',
 }
 

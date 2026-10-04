@@ -10,13 +10,13 @@ describe('DOMAIN_ERROR_HTTP_STATUS', () => {
     expect(Object.keys(DOMAIN_ERROR_HTTP_STATUS).sort()).toEqual([...DOMAIN_ERROR_CODES].sort())
   })
 
-  it('uses the statuses of contract 1.3 §2.1 (1.7 §2.9 for AN024–AN031, 1.8 §2.8 for AN032–AN033)', () => {
+  it('uses the statuses of contract 1.3 §2.1 (1.7 §2.9 for AN024–AN031, 1.8 §2.8 for AN032–AN033, 1.9b G2 for AN034)', () => {
     const byStatus: Record<number, string[]> = {}
     for (const [code, status] of Object.entries(DOMAIN_ERROR_HTTP_STATUS)) {
       ;(byStatus[status] ??= []).push(code)
     }
     expect(byStatus).toEqual({
-      403: ['AN014', 'AN015', 'AN027'],
+      403: ['AN014', 'AN015', 'AN027', 'AN034'],
       404: ['AN009', 'AN030'],
       409: [
         'AN001',

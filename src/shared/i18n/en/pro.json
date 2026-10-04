@@ -72,6 +72,11 @@
       "phone": "Call Nous: {{phone}}",
       "noBypass": "The app has no other way in without the device.",
       "back": "Back to the code"
+    },
+    "blocked": {
+      "title": "Contact Nous",
+      "body": "An authenticator device was removed from your account without going through the app. For your security, a new authenticator device can be added only after Nous confirms it is you.",
+      "contact": "Email or call Nous. We will call you back on the shop phone we have on file and unlock it together. If you can, change your email password first."
     }
   },
   "stepUp": {

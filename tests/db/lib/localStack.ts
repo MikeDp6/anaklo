@@ -60,6 +60,25 @@ export async function signOut(client: Db): Promise<void> {
   if (error) throw error
 }
 
+/**
+ * «Αποσύνδεση από όλες τις συσκευές» at GoTrue (`/auth/v1/logout?scope=global`) with the client's
+ * current access token, WITHOUT `client.auth.signOut`: the client keeps the token in memory, so a
+ * test can show what that kept token still reads once every session of the user is gone. Returns
+ * GoTrue's HTTP status (204 on success).
+ */
+export async function signOutEverywhereKeepingToken(client: Db): Promise<number> {
+  const { apiUrl, publishableKey } = localStack()
+  const { data, error } = await client.auth.getSession()
+  if (error) throw error
+  const token = data.session?.access_token
+  if (!token) throw new Error('the client holds no session')
+  const response = await fetch(`${apiUrl}/auth/v1/logout?scope=global`, {
+    method: 'POST',
+    headers: { apikey: publishableKey, Authorization: `Bearer ${token}` },
+  })
+  return response.status
+}
+
 /** PostgREST's error body: SQLSTATE in `code`, the domain code (AN0xx) in `message`. */
 const PostgrestError = z.object({ code: z.nullable(z.string()), message: z.string() })
 

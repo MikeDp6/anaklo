@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   fetchMemberships: vi.fn(),
   getSessionUser: vi.fn(),
   fetchAuthState: vi.fn(),
+  fetchEnrolmentBlocked: vi.fn(),
 }))
 vi.mock('./session', () => ({
   currentActiveUser: mocks.currentActiveUser,
@@ -27,7 +28,10 @@ vi.mock('./api', () => ({
   fetchMemberships: mocks.fetchMemberships,
   getSessionUser: mocks.getSessionUser,
 }))
-vi.mock('./mfaApi', () => ({ fetchAuthState: mocks.fetchAuthState }))
+vi.mock('./mfaApi', () => ({
+  fetchAuthState: mocks.fetchAuthState,
+  fetchEnrolmentBlocked: mocks.fetchEnrolmentBlocked,
+}))
 
 // Synthetic ids (demo seed).
 const USER = { userId: '00000000-0000-4000-8000-00000000a001', email: 'owner@demo-barber.test' }
@@ -48,8 +52,9 @@ function args(path: string): LoaderFunctionArgs {
   } as unknown as LoaderFunctionArgs
 }
 
-function given(roles: MemberRole[], auth: AuthState) {
+function given(roles: MemberRole[], auth: AuthState, blocked = false) {
   mocks.currentActiveUser.mockResolvedValue(USER)
+  mocks.fetchEnrolmentBlocked.mockResolvedValue(blocked)
   mocks.fetchMemberships.mockResolvedValue(
     roles.map((role, index) => ({ businessId: index === 0 ? B1 : B2, role, staffId: null })),
   )
@@ -175,6 +180,84 @@ describe('mfaLoader / secondDeviceLoader', () => {
     expect(location(await secondDeviceLoader(args('/mfa/second-device')))).toBe('/')
     given(['owner'], aal1([DEVICE]))
     expect(location(await secondDeviceLoader(args('/mfa/second-device')))).toBe('/mfa/challenge')
+  })
+})
+
+describe('blocked enrolment (contract 1.9b §4.2)', () => {
+  it('owner/manager without a device and blocked → «Επικοινώνησε με τη Nous», never the wizard', async () => {
+    for (const role of ['owner', 'manager'] as const) {
+      given([role], aal1([]), true)
+      expect(location(await requireMembership(args('/settings?x=1')))).toBe('/mfa/blocked')
+      given([role], aal2([]), true)
+      expect(location(await requireMembership(args('/')))).toBe('/mfa/blocked')
+    }
+  })
+
+  it('owner/manager without a device, not blocked → the enrolment (the server was asked)', async () => {
+    given(['manager'], aal1([]), false)
+    expect(location(await requireMembership(args('/')))).toBe('/mfa/enroll')
+    expect(mocks.fetchEnrolmentBlocked).toHaveBeenCalledOnce()
+  })
+
+  it('with a device, or staff, the server is never asked', async () => {
+    given(['owner'], aal1([DEVICE]), true)
+    expect(location(await requireMembership(args('/')))).toBe('/mfa/challenge')
+    given(['owner'], aal2([DEVICE]), true)
+    expect(await requireMembership(args('/'))).toMatchObject({ enrolmentBlocked: false })
+    given(['staff'], aal1([]), true)
+    expect(await requireMembership(args('/'))).toMatchObject({
+      highestRole: 'staff',
+      enrolmentBlocked: false,
+    })
+    given(['manager', 'staff'], aal2([DEVICE]), true)
+    await secondDeviceLoader(args('/mfa/second-device'))
+    expect(mocks.fetchEnrolmentBlocked).not.toHaveBeenCalled()
+  })
+
+  it('a revoked session or no membership: login / «no access» before any question', async () => {
+    given(['owner'], { kind: 'revoked' }, true)
+    expect(location(await requireMembership(args('/')))).toBe('/login')
+    given([], aal1([]), true)
+    expect(location(await requireMembership(args('/')))).toBe('/no-access')
+    expect(mocks.fetchEnrolmentBlocked).not.toHaveBeenCalled()
+  })
+
+  it('mfa/enroll while blocked → mfa/blocked; mfa/challenge, mfa/lost-device too', async () => {
+    given(['owner'], aal1([]), true)
+    expect(location(await mfaLoader('enroll')(args('/mfa/enroll')))).toBe('/mfa/blocked')
+    expect(location(await mfaLoader('challenge')(args('/mfa/challenge?next=%2Fday')))).toBe(
+      '/mfa/blocked',
+    )
+    expect(location(await secondDeviceLoader(args('/mfa/second-device')))).toBe('/mfa/blocked')
+  })
+
+  it('mfa/blocked while blocked → the screen, without next', async () => {
+    given(['manager'], aal1([]), true)
+    expect(await mfaLoader('blocked')(args('/mfa/blocked'))).toMatchObject({
+      highestRole: 'manager',
+      verifiedFactors: [],
+      enrolmentBlocked: true,
+      next: null,
+    })
+  })
+
+  it('mfa/blocked once Nous has reset: enrol → mfa/enroll; ok → next or «Σήμερα»', async () => {
+    given(['owner'], aal1([]), false)
+    expect(location(await mfaLoader('blocked')(args('/mfa/blocked')))).toBe('/mfa/enroll')
+    given(['owner'], aal2([DEVICE]))
+    expect(location(await mfaLoader('blocked')(args('/mfa/blocked?next=%2Fday')))).toBe('/day')
+    expect(location(await mfaLoader('blocked')(args('/mfa/blocked')))).toBe('/')
+    given(['staff'], aal1([]))
+    expect(location(await mfaLoader('blocked')(args('/mfa/blocked')))).toBe('/')
+    given(['owner'], aal1([DEVICE]))
+    expect(location(await mfaLoader('blocked')(args('/mfa/blocked')))).toBe('/mfa/challenge')
+  })
+
+  it('the question failing fails the guard (the error page offers «Δοκίμασε ξανά»)', async () => {
+    given(['owner'], aal1([]))
+    mocks.fetchEnrolmentBlocked.mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(requireMembership(args('/'))).rejects.toThrow('Failed to fetch')
+    await expect(mfaLoader('enroll')(args('/mfa/enroll'))).rejects.toThrow('Failed to fetch')
   })
 })
 

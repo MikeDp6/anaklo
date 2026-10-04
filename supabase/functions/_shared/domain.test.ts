@@ -78,10 +78,17 @@ describe('message templates', () => {
   })
 })
 
-/** The body of `create function <name>(` … `$$;` in the given SQL, or null. */
+/**
+ * The body of the LATEST `create [or replace] function <name>(` … `$$;` in the given SQL (later
+ * migrations replace bodies, e.g. 0012), or null.
+ */
 function functionBody(sql: string, name: string): string | null {
-  const start = sql.indexOf(`create function ${name}(`)
-  if (start < 0) return null
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const definitions = [
+    ...sql.matchAll(new RegExp(`create\\s+(?:or\\s+replace\\s+)?function\\s+${escaped}\\(`, 'g')),
+  ]
+  const start = definitions.at(-1)?.index
+  if (start === undefined) return null
   const open = sql.indexOf('$$', start)
   const close = sql.indexOf('$$;', open + 2)
   return open < 0 || close < 0 ? null : sql.slice(open, close)
